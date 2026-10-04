@@ -3,13 +3,14 @@ import {
     mkdtempSync,
     readdirSync,
     readFileSync,
-    writeFileSync,
-    rmSync
+    rmSync,
+    writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { assertPackageLicense } from './package-license.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const directory = mkdtempSync(join(tmpdir(), 'framework-packages-'));
@@ -32,12 +33,15 @@ const execute = (command, args, cwd = directory) =>
     });
 
 try {
+    const license = readFileSync(join(root, 'LICENSE'), 'utf8');
+    assertPackageLicense(root, license);
     for (const folder of readdirSync(join(root, 'libs'))) {
         const workspace = join(root, 'libs', folder);
         const pkg = JSON.parse(
             readFileSync(join(workspace, 'package.json'), 'utf8')
         );
         if (pkg.private) continue;
+        assertPackageLicense(workspace, license);
         const [packed] = JSON.parse(
             execute(
                 'npm',
@@ -105,6 +109,9 @@ try {
     // Generate a disposable consumer lockfile, then install reproducibly.
     execute('npm', ['update', '--package-lock-only', '--ignore-scripts']);
     execute('npm', ['ci', '--ignore-scripts']);
+    for (const name of Object.keys(dependencies)) {
+        assertPackageLicense(join(directory, 'node_modules', name), license);
+    }
     for (const bin of binaries) execute(process.execPath, [bin, '--help']);
     execute(process.execPath, [
         '--input-type=module',
@@ -155,7 +162,7 @@ try {
         write: false
     });
     console.log(
-        `Packed consumer passed: ${Object.keys(dependencies).length} packages, ${specifiers.length} entry points, declarations and browser bundle.`
+        `Packed consumer passed: ${Object.keys(dependencies).length} packages, ${specifiers.length} entry points, BSD-3-Clause licenses, declarations and browser bundle.`
     );
 } catch (error) {
     if (error.stdout) console.error(error.stdout.toString());

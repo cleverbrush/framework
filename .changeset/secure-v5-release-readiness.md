@@ -23,7 +23,7 @@
 '@cleverbrush/storage-s3': major
 ---
 
-Require Node.js 24+ consistently across all published packages and include package licenses. See docs/MIGRATION-v5.md for migration guidance.
+Require Node.js 24+ consistently across all published packages. Correct the root and all published-package license files to BSD-3-Clause, matching package metadata and documentation, and verify license consistency in source and npm tarballs. See docs/MIGRATION-v5.md for migration guidance.
 
 Harden JWT key/algorithm and claim validation, cookie parsing/serialization, and request-body lifecycle handling. Require explicit authorization scope for bounded server idempotency; coalesce concurrent retries and capture full response bodies. Bound response caching and bypass private, no-store and cookie-setting responses.
 

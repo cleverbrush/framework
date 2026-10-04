@@ -159,4 +159,6 @@ npm run publish:beta
 
 ## License
 
-BSD-3-Clause. See [LICENSE](./LICENSE).
+All Framework libraries are licensed under BSD-3-Clause. See [LICENSE](./LICENSE).
+Each published package includes the same license text; `npm run test:packages`
+verifies license text and metadata in both source packages and installed tarballs.

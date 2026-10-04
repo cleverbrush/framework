@@ -6,7 +6,16 @@ export default defineConfig({
         // Compiler-consumer tests allocate several GB; bound parallel workers.
         maxWorkers: 4,
         // Use simple glob pattern for auto-discovery
-        projects: ['libs/*'],
+        projects: [
+            'libs/*',
+            {
+                test: {
+                    name: 'scripts',
+                    include: ['scripts/**/*.test.mjs'],
+                    environment: 'node'
+                }
+            }
+        ],
         benchmark: {
             ...(process.env.BENCH_JSON
                 ? { outputJson: process.env.BENCH_JSON }
