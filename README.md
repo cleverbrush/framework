@@ -4,7 +4,7 @@
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](./LICENSE)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- coverage-badge-start -->
-![Unit coverage](https://img.shields.io/badge/unit_coverage-82.2%25-green)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-92.2%25-brightgreen)
 <!-- coverage-badge-end -->
 
 Cleverbrush is a schema-first TypeScript framework monorepo. It provides the

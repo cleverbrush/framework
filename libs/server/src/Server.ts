@@ -1126,6 +1126,10 @@ export class Server {
                     abortController
                 );
             })
+            .then(() => {
+                // Short-circuiting middleware never invokes the terminal handler.
+                if (ctx.responded) ws.close(1008, 'Unauthorized');
+            })
             .catch(() => {
                 ws.close(1011, 'Internal Server Error');
             });

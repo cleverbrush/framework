@@ -1,6 +1,6 @@
 # `@cleverbrush/orm-cli`
 <!-- coverage-badge-start -->
-![Unit coverage](https://img.shields.io/badge/unit_coverage-61.2%25-yellow)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-98.7%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A standalone CLI for managing PostgreSQL schema migrations for projects built

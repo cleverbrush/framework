@@ -685,6 +685,7 @@ export function isDiffEmpty(diff: MigrationDiff): boolean {
  *
  * Foreign-key constraint drops are executed as raw `ALTER TABLE … DROP
  * CONSTRAINT` statements before the main `alterTable` call.
+ * Default changes preserve the column's type, nullability and stored data.
  *
  * @param knex - A configured Knex instance or transaction.
  * @param diff - The diff from {@link diffSchema}.
@@ -711,6 +712,40 @@ export async function applyDiff(
             tableName,
             constraintName
         ]);
+    }
+
+    // A default change must never recreate, retype or drop the data column.
+    for (const column of diff.alterColumns) {
+        const change = column.changes.defaultValue;
+        if (!change) continue;
+        if (change.to === null || change.to === undefined) {
+            await knex.raw('ALTER TABLE ?? ALTER COLUMN ?? DROP DEFAULT', [
+                tableName,
+                column.name
+            ]);
+        } else {
+            const value = change.to;
+            const expression =
+                value === 'now'
+                    ? knex.fn.now()
+                    : typeof value === 'string'
+                      ? knex.raw(defaultStringLiteral(value))
+                      : typeof value === 'object' && value !== null && value.raw
+                        ? knex.raw(value.raw)
+                        : value;
+            // PostgreSQL utility statements cannot use protocol parameters.
+            // Let Knex quote literals/identifiers, then execute the resulting DDL.
+            await knex.raw(
+                knex
+                    .raw('ALTER TABLE ?? ALTER COLUMN ?? SET DEFAULT ?', [
+                        tableName,
+                        column.name,
+                        expression
+                    ])
+                    .toQuery()
+                    .replaceAll('?', '\\?')
+            );
+        }
     }
 
     const hasTableChanges =
@@ -768,13 +803,6 @@ export async function applyDiff(
                         (table as any).setNullable(col.name);
                     } else {
                         (table as any).dropNullable(col.name);
-                    }
-                } else if (key === 'defaultValue') {
-                    if (change.to === null) {
-                        table.dropColumn(col.name); // fallback — handled in source gen
-                    } else {
-                        // ALTER COLUMN SET DEFAULT is not directly in Knex builder;
-                        // handled via raw in source generation
                     }
                 }
             }
@@ -991,6 +1019,8 @@ function buildAlterTableFragments(
 ): { up: string; down: string } {
     const upLines: string[] = [];
     const downLines: string[] = [];
+    const upDefaults: string[] = [];
+    const downDefaults: string[] = [];
 
     // --- ADD COLUMNS ---
     for (const col of diff.addColumns) {
@@ -1032,25 +1062,12 @@ function buildAlterTableFragments(
                     downLines.push(`        table.setNullable('${col.name}');`);
                 }
             } else if (key === 'defaultValue') {
-                const toVal = change.to;
-                const fromVal = change.from;
-                if (toVal === null) {
-                    upLines.push(
-                        `        table.timestamp('${col.name}').alter();  // DROP DEFAULT`
-                    );
-                    downLines.push(
-                        `        table.timestamp('${col.name}').defaultTo(knex.fn.now()).alter();`
-                    );
-                } else {
-                    upLines.push(
-                        `        table.timestamp('${col.name}').notNullable().defaultTo(knex.fn.now()).alter();`
-                    );
-                    downLines.push(
-                        fromVal === null
-                            ? `        table.timestamp('${col.name}').notNullable().alter();`
-                            : `        table.timestamp('${col.name}').notNullable().defaultTo(knex.fn.now()).alter();`
-                    );
-                }
+                upDefaults.push(
+                    defaultChangeCode(tableName, col.name, change.to)
+                );
+                downDefaults.push(
+                    defaultChangeCode(tableName, col.name, change.from)
+                );
             }
         }
     }
@@ -1098,17 +1115,48 @@ function buildAlterTableFragments(
         upLines.push(`        // TODO: drop foreign key constraint '${fk}'`);
     }
 
-    const isEmpty = upLines.length === 0;
-
-    const up = isEmpty
-        ? `    // No changes needed`
-        : `    await knex.schema.alterTable('${tableName}', (table) => {\n${upLines.join('\n')}\n    });`;
-
-    const down = isEmpty
-        ? `    // No changes needed`
-        : `    await knex.schema.alterTable('${tableName}', (table) => {\n${downLines.join('\n')}\n    });`;
+    const up =
+        [
+            ...upDefaults,
+            ...(upLines.length
+                ? [
+                      `    await knex.schema.alterTable('${tableName}', (table) => {\n${upLines.join('\n')}\n    });`
+                  ]
+                : [])
+        ].join('\n') || '    // No changes needed';
+    const down =
+        [
+            ...downDefaults,
+            ...(downLines.length
+                ? [
+                      `    await knex.schema.alterTable('${tableName}', (table) => {\n${downLines.join('\n')}\n    });`
+                  ]
+                : [])
+        ].join('\n') || '    // No changes needed';
 
     return { up, down };
+}
+
+/** @internal PostgreSQL Unicode literals avoid Knex parsing literal `?` as a binding. */
+function defaultStringLiteral(value: string): string {
+    return `U&'${value.replaceAll('\\', '\\\\').replaceAll("'", "''").replaceAll('?', '\\003f')}'`;
+}
+
+/** @internal Generate default-only DDL without altering column types or nullability. */
+function defaultChangeCode(table: string, column: string, value: any): string {
+    const names = `${JSON.stringify(table)}, ${JSON.stringify(column)}`;
+    if (value === null || value === undefined) {
+        return `    await knex.raw('ALTER TABLE ?? ALTER COLUMN ?? DROP DEFAULT', [${names}]);`;
+    }
+    const expression =
+        value === 'now'
+            ? 'knex.fn.now()'
+            : typeof value === 'string'
+              ? `knex.raw(${JSON.stringify(defaultStringLiteral(value))})`
+              : typeof value === 'object' && value !== null && value.raw
+                ? `knex.raw(${JSON.stringify(value.raw)})`
+                : JSON.stringify(value);
+    return `    await knex.raw(knex.raw('ALTER TABLE ?? ALTER COLUMN ?? SET DEFAULT ?', [${names}, ${expression}]).toQuery().replaceAll('?', '\\\\?'));`;
 }
 
 /** @internal Build a Knex ColumnBuilder from a PostgreSQL data type string (runtime use). */

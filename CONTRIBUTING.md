@@ -46,8 +46,11 @@ npm run build:docs-site
 floors for **unit** coverage. New published packages need explicit floors; do not
 lower existing floors to hide regressions. Refresh README badges explicitly with
 `npm run coverage:badges` after a successful coverage run. Badges do not include
-the dedicated database or S3 integration suites. In particular,
-`scheduler-postgres` relies on the real-database suite, not its small unit suite.
+the dedicated database or S3 integration suites. Query, ORM and PostgreSQL
+scheduler unit tests use the real Knex compiler with a simulated driver boundary
+to check SQL, bindings, row decoding and failure paths. These do not prove database
+locking, concurrent claims, lease recovery or transactional behavior: the real
+PostgreSQL suites remain mandatory even when unit coverage reaches 100%.
 
 The package smoke test packs every published workspace, installs the tarballs
 and peer dependencies in a disposable consumer, checks every export and TypeScript

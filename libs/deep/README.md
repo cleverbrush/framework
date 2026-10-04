@@ -3,7 +3,7 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Unit coverage](https://img.shields.io/badge/unit_coverage-78.9%25-yellowgreen)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-98.7%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A library for deep operations on JavaScript objects — cloning, equality, merging, and flattening.

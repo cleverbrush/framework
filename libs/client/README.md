@@ -1,6 +1,6 @@
 # @cleverbrush/client
 <!-- coverage-badge-start -->
-![Unit coverage](https://img.shields.io/badge/unit_coverage-84%25-green)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-94.6%25-brightgreen)
 <!-- coverage-badge-end -->
 
 Typed HTTP client for `@cleverbrush/server` API contracts — zero codegen, full type safety. Optional React + TanStack Query integration via `@cleverbrush/client/react`.
@@ -699,7 +699,7 @@ function LiveFeed() {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `enabled` | `boolean` | `true` | Toggle the subscription on/off |
-| `maxEvents` | `number` | unlimited | Maximum events to keep in the `events` array |
+| `maxEvents` | `number` | unlimited | Maximum events to keep in the `events` array; `0` retains no history |
 
 ## React Integration (`@cleverbrush/client/react`)
 

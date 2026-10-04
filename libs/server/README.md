@@ -3,7 +3,7 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Unit coverage](https://img.shields.io/badge/unit_coverage-81.6%25-green)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-92%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema`](../schema) for request validation, [`@cleverbrush/di`](../di) for dependency injection, and [`@cleverbrush/auth`](../auth) for authentication — all wired together through a fluent builder API.
@@ -697,6 +697,9 @@ server.handle(GetUser, ({ params }) => {
 | `HttpError` | any (base class) |
 
 ## WebSocket Subscriptions
+
+Middleware that rejects a subscription closes its WebSocket with code `1008`.
+Closing or disconnecting aborts the handler signal and disposes its DI scope.
 
 Define real-time endpoints using `endpoint.subscription()`:
 

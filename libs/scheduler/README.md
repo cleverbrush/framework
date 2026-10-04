@@ -1,6 +1,6 @@
 # @cleverbrush/scheduler
 <!-- coverage-badge-start -->
-![Unit coverage](https://img.shields.io/badge/unit_coverage-83.4%25-green)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-96.3%25-brightgreen)
 <!-- coverage-badge-end -->
 
 Typed immediate, delayed and recurring jobs with durable progress. Producers,
