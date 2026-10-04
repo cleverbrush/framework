@@ -7,7 +7,6 @@ export default defineConfig({
         'src/timeout.ts',
         'src/dedupe.ts',
         'src/idempotency.ts',
-        'src/idempotencyReact.ts',
         'src/cache.ts',
         'src/batching.ts',
         'src/optimisticUpdate.ts',

@@ -1,4 +1,4 @@
-import { number, object } from '@cleverbrush/schema';
+import { number, object, string } from '@cleverbrush/schema';
 import { defineApi, endpoint } from '@cleverbrush/server/contract';
 import { expect, it, vi } from 'vitest';
 import { batching } from './batching.js';
@@ -36,13 +36,12 @@ it('retries contract-declared mutations with the original key/body and bypasses 
     expect(requests[1]).toEqual(requests[0]);
     expect(requests[0].key).toBeTruthy();
     await Promise.all([
-        client.items.create({ body: { amount: 1 }, idempotencyKey: 'first' }),
-        client.items.create({ body: { amount: 2 }, idempotencyKey: 'second' })
+        client.items.create({ body: { amount: 1 } }),
+        client.items.create({ body: { amount: 1 } })
     ]);
-    expect(requests.slice(2).map(value => value.key)).toEqual([
-        'first',
-        'second'
-    ]);
+    expect(requests).toHaveLength(4);
+    expect(requests.every(value => value.key)).toBe(true);
+    expect(new Set(requests.map(value => value.key)).size).toBe(3);
     expect(requests.every(value => !value.url.includes('__batch'))).toBe(true);
     const failing = vi.fn().mockRejectedValue(new TypeError('Lost'));
     const ordinary = createClient(api, {
@@ -79,20 +78,27 @@ it('preserves the contract retry policy when requesting a binary response', asyn
         middlewares: [retry({ delay: () => 0 }), batching({ windowMs: 1 })]
     });
     const result = await client.items.create.file({
-        body: { amount: 1 },
-        idempotencyKey: 'download'
+        body: { amount: 1 }
     });
     expect(await result.text()).toBe('receipt');
     expect(fetch).toHaveBeenCalledTimes(2);
-    for (const [, init] of fetch.mock.calls)
-        expect(new Headers(init.headers).get('x-idempotency-key')).toBe(
-            'download'
-        );
+    const keys = fetch.mock.calls.map(([, init]) =>
+        new Headers(init.headers).get('x-idempotency-key')
+    );
+    expect(keys[0]).toBeTruthy();
+    expect(keys[1]).toBe(keys[0]);
 });
 
 it('honors explicit retry method restrictions and removes duplicate header casing', async () => {
     const fetch = vi.fn().mockRejectedValue(new TypeError('Lost response'));
-    const client = createClient(api, {
+    const customHeadersApi = defineApi({
+        items: {
+            create: api.items.create.headers(
+                object({ 'x-idempotency-key': string() })
+            )
+        }
+    });
+    const client = createClient(customHeadersApi, {
         fetch,
         headers: {
             'X-Idempotency-Key': 'default',
@@ -101,7 +107,10 @@ it('honors explicit retry method restrictions and removes duplicate header casin
         middlewares: [retry({ methods: ['GET'], delay: () => 0 })]
     });
     await expect(
-        client.items.create({ body: { amount: 1 }, idempotencyKey: 'explicit' })
+        client.items.create({
+            body: { amount: 1 },
+            headers: { 'x-idempotency-key': 'explicit' }
+        })
     ).rejects.toThrow();
     expect(fetch).toHaveBeenCalledOnce();
     expect(

@@ -5,7 +5,7 @@ export default function IdempotencySection() {
     return (
         <>
             <div className="section-header">
-                <h1>Idempotent Operations</h1>
+                <h1>HTTP Idempotency</h1>
                 <p className="subtitle">
                     Deduplicate replays of mutating requests via idempotency
                     keys
@@ -27,8 +27,7 @@ const client = createClient(api, {
 // Framework generates a key and retains it across HTTP retries.
 await client.todos.create({ body: { title: 'Buy milk' } });
 
-// To retry an existing user attempt, supply its saved key.
-await client.todos.create({ body: savedBody, idempotencyKey: savedKey });
+// A new client call represents a new operation and gets a fresh key.
 `)
                         }}
                     />
@@ -63,25 +62,6 @@ await client.todos.create({ body: savedBody, idempotencyKey: savedKey });
             </div>
 
             <div className="card">
-                <h2>User save attempts</h2>
-                <p>
-                    Use <code>createIdempotentOperation</code> from
-                    <code>@cleverbrush/client/idempotency</code> to retain a
-                    payload snapshot and key after an uncertain failure. Its
-                    <code>prepare</code> callback computes defaults once per
-                    changed input, and <code>execute</code> sends the request.
-                    Success clears the attempt; <code>reset(draftId)</code>
-                    cancels its local state. Independent drafts use separate
-                    IDs.
-                </p>
-                <p>
-                    The matching <code>useIdempotentOperation</code> hook lives
-                    in <code>@cleverbrush/client/idempotency/react</code> and
-                    requires no form or query library. FormData actions can use
-                    <code>withIdempotencyKey</code> and
-                    <code>readIdempotencyKey</code> to pass metadata separately
-                    from their domain payload.
-                </p>
                 <h2>How replay works</h2>
                 <ul>
                     <li>

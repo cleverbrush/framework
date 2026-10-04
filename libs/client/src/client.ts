@@ -201,7 +201,6 @@ export function createClient<T extends ApiContract>(
                 name => name.toLowerCase() === 'x-idempotency-key'
             );
             const key =
-                args?.idempotencyKey ??
                 new Headers(args?.headers).get('x-idempotency-key') ??
                 new Headers(extraHeaders).get('x-idempotency-key') ??
                 crypto.randomUUID();
