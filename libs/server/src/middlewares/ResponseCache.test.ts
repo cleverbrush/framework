@@ -34,6 +34,44 @@ function send(ctx: RequestContext, body: string, status = 200) {
 }
 
 describe('server response cache generations', () => {
+    test.each([
+        { 'Cache-Control': 'private, max-age=60' },
+        { 'cache-control': 'no-store' },
+        { 'Set-Cookie': 'session=private' }
+    ])('does not replay private response headers %j', async headers => {
+        const cache = cacheResponse();
+        const initial = context();
+        await cache(initial, async () => {
+            initial.response.writeHead(200, headers);
+            initial.response.end('private data');
+        });
+        const handler = vi.fn();
+        await cache(context(), handler);
+        expect(handler).toHaveBeenCalledOnce();
+    });
+    test('evicts oldest keys at capacity and bypasses oversized bodies', async () => {
+        const cache = cacheResponse({ maxEntries: 1, maxResponseBytes: 3 });
+        for (const name of ['first', 'second']) {
+            const ctx = context('GET', [name]);
+            await cache(ctx, async () => send(ctx, 'ok'));
+        }
+        const miss = vi.fn();
+        await cache(context('GET', ['first']), miss);
+        expect(miss).toHaveBeenCalledOnce();
+        const hit = vi.fn();
+        await cache(context('GET', ['second']), hit);
+        expect(hit).not.toHaveBeenCalled();
+        const large = context('GET', ['large']);
+        await cache(large, async () => send(large, 'too large'));
+        await cache(context('GET', ['large']), miss);
+        expect(miss).toHaveBeenCalledTimes(2);
+    });
+    test('rejects unbounded or invalid retention settings', () => {
+        expect(() => cacheResponse({ maxEntries: 0 })).toThrow();
+        expect(() => cacheResponse({ maxResponseBytes: Infinity })).toThrow();
+        expect(() => cacheResponse({ defaultTtl: NaN })).toThrow();
+        expect(() => cacheResponse({ ttlByTag: { records: -1 } })).toThrow();
+    });
     test('preserves HTTP body, status and headers across cached responses', async () => {
         const cache = cacheResponse();
         let reads = 0;
@@ -89,18 +127,19 @@ describe('server response cache generations', () => {
         await cache(context(), handler);
         expect(handler).toHaveBeenCalledTimes(1);
     });
-    test.each([
-        400, 500
-    ])('failed write %s preserves cached entries', async status => {
-        const cache = cacheResponse();
-        const initial = context();
-        await cache(initial, async () => send(initial, 'old'));
-        const write = context('PATCH');
-        await cache(write, async () => send(write, '', status));
-        const handler = vi.fn();
-        await cache(context(), handler);
-        expect(handler).not.toHaveBeenCalled();
-    });
+    test.each([400, 500])(
+        'failed write %s preserves cached entries',
+        async status => {
+            const cache = cacheResponse();
+            const initial = context();
+            await cache(initial, async () => send(initial, 'old'));
+            const write = context('PATCH');
+            await cache(write, async () => send(write, '', status));
+            const handler = vi.fn();
+            await cache(context(), handler);
+            expect(handler).not.toHaveBeenCalled();
+        }
+    );
     test('a thrown write preserves entries', async () => {
         const cache = cacheResponse();
         const initial = context();

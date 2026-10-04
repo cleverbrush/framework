@@ -36,7 +36,8 @@ export async function validate(config: OrmCliConfig): Promise<void> {
         }
     }
 
-    process.exit(1);
+    // Let the command router close the database pool before exiting.
+    throw new Error('Schema drift detected');
 }
 
 function summarizeDiff(diff: MigrationDiff): string {

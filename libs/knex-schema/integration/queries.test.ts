@@ -527,23 +527,23 @@ describe('eager ordering', () => {
         }
     });
 
-    it.each([
-        '"taskId" desc',
-        '1 desc'
-    ])('retains ordering by a projected alias or position: %s', async order => {
-        const rows = await query(knex, taskEntity.schema)
-            .where(t => t.projectId, 1)
-            .select(t => ({ taskId: t.id }))
-            .orderByRaw(order)
-            .joinMany({
-                foreignSchema: Note,
-                localColumn: t => t.id,
-                foreignColumn: t => t.taskId,
-                as: 'notes'
-            })
-            .limit(2);
-        expect(rows.map(row => row.taskId)).toEqual([105, 104]);
-    });
+    it.each(['"taskId" desc', '1 desc'])(
+        'retains ordering by a projected alias or position: %s',
+        async order => {
+            const rows = await query(knex, taskEntity.schema)
+                .where(t => t.projectId, 1)
+                .select(t => ({ taskId: t.id }))
+                .orderByRaw(order)
+                .joinMany({
+                    foreignSchema: Note,
+                    localColumn: t => t.id,
+                    foreignColumn: t => t.taskId,
+                    as: 'notes'
+                })
+                .limit(2);
+            expect(rows.map(row => row.taskId)).toEqual([105, 104]);
+        }
+    );
 });
 
 describe('aggregate results', () => {

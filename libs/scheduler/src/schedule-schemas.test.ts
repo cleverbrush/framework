@@ -97,22 +97,25 @@ describe('schedule schemas', () => {
         { every: 'day', skipFirst: Number.MAX_SAFE_INTEGER + 1 },
         { every: 'day', timeZone: '+02:00' },
         { every: 'day', timeZone: 'Wrong/Zone' }
-    ])('rejects %j at validation, calculation and registration boundaries', async input => {
-        expect(ScheduleSchema.validate(input).valid).toBe(false);
-        expect(() => new ScheduleCalculator(input as any)).toThrow();
-        const jobs = new JobScheduler({
-            storageRepository: new InMemoryJobRepository()
-        });
-        await expect(
-            jobs.upsertSchedule(
-                'bad',
-                testJob(),
-                { id: 'one' },
-                { schedule: input as any }
-            )
-        ).rejects.toThrow();
-        expect((await jobs.health()).counts.queued ?? 0).toBe(0);
-    });
+    ])(
+        'rejects %j at validation, calculation and registration boundaries',
+        async input => {
+            expect(ScheduleSchema.validate(input).valid).toBe(false);
+            expect(() => new ScheduleCalculator(input as any)).toThrow();
+            const jobs = new JobScheduler({
+                storageRepository: new InMemoryJobRepository()
+            });
+            await expect(
+                jobs.upsertSchedule(
+                    'bad',
+                    testJob(),
+                    { id: 'one' },
+                    { schedule: input as any }
+                )
+            ).rejects.toThrow();
+            expect((await jobs.health()).counts.queued ?? 0).toBe(0);
+        }
+    );
     it('keeps shared constraints after schema composition', () => {
         for (const every of [
             'minute',

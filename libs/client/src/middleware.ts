@@ -1,5 +1,5 @@
 /**
- * Middleware composition system for the `@cleverbrush/web` typed HTTP client.
+ * Middleware composition system for the `@cleverbrush/client` typed HTTP client.
  *
  * A middleware wraps a {@link FetchLike} function, allowing it to inspect,
  * modify, or short-circuit requests and responses.  Middlewares are composed
@@ -7,7 +7,7 @@
  *
  * @example
  * ```ts
- * import { composeMiddleware, type Middleware } from '@cleverbrush/web';
+ * import { composeMiddleware, type Middleware } from '@cleverbrush/client';
  *
  * const logger: Middleware = (next) => async (url, init) => {
  *     console.log('→', init.method, url);
@@ -99,7 +99,7 @@ export function composeMiddleware(
  * ```
  */
 export const PER_CALL_OPTIONS: unique symbol = Symbol.for(
-    '@cleverbrush/web:per-call-options'
+    '@cleverbrush/client:per-call-options'
 );
 
 /**
@@ -127,7 +127,7 @@ export function getPerCallOptions<T>(
  * access to the endpoint's structural info plus the actual call arguments
  * without any URL parsing or regex.
  *
- * Used by {@link throttlingCache} for cache-invalidation callbacks.
+ * Used by `throttlingCache` for cache-invalidation callbacks.
  */
 export interface EndpointMeta {
     /** Contract group name, e.g. `"todos"`. */

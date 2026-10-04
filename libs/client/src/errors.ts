@@ -1,5 +1,5 @@
 /**
- * Base error class for all errors thrown by the `@cleverbrush/web` client.
+ * Base error class for all errors thrown by the `@cleverbrush/client` client.
  *
  * Provides a common prototype chain so consumers can catch *any* client
  * error with a single `instanceof WebError` check.

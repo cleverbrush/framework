@@ -1,5 +1,5 @@
 /**
- * Type utilities for the `@cleverbrush/web` typed HTTP client.
+ * Type utilities for the `@cleverbrush/client` typed HTTP client.
  *
  * These types extract request argument shapes and response types from
  * `EndpointBuilder` instances defined via `@cleverbrush/server/contract`.
@@ -603,8 +603,8 @@ export interface ClientOptions {
      *
      * @example
      * ```ts
-     * import { retry } from '@cleverbrush/web/retry';
-     * import { timeout } from '@cleverbrush/web/timeout';
+     * import { retry } from '@cleverbrush/client/retry';
+     * import { timeout } from '@cleverbrush/client/timeout';
      *
      * const client = createClient(api, {
      *     middlewares: [retry(), timeout({ timeout: 10000 })],

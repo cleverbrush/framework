@@ -82,15 +82,12 @@ describe('versioned cache keys', () => {
             key({ value: [{ id: 1 }, { id: 1 }] })
         );
     });
-    test.each([
-        new Map(),
-        new Set(),
-        new Date(NaN),
-        Symbol(),
-        () => 1
-    ])('rejects unsupported values explicitly: %s', value => {
-        expect(() => key({ value })).toThrow(TypeError);
-    });
+    test.each([new Map(), new Set(), new Date(NaN), Symbol(), () => 1])(
+        'rejects unsupported values explicitly: %s',
+        value => {
+            expect(() => key({ value })).toThrow(TypeError);
+        }
+    );
     test('rejects cycles and getters', () => {
         const cyclic: any = {};
         cyclic.self = cyclic;

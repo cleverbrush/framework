@@ -39,35 +39,39 @@ test('indexed descriptors are stable, lazy, typed and preserve arrays when setti
     expect((tree.addresses as any)['01']).toBeUndefined();
     expect((tree.addresses as any)[1.5]).toBeUndefined();
 });
-test.each([
-    'sync',
-    'async'
-] as const)('indexed errors use precise descriptors (%s)', async mode => {
-    const value = {
-        addresses: [{ city: '' }, { city: 'Paris' }],
-        tags: [''],
-        matrix: [['']]
-    };
-    const result = await (mode === 'sync'
-        ? schema.validate(value, { doNotStopOnFirstError: true })
-        : schema.validateAsync(value, { doNotStopOnFirstError: true }));
-    expect(result.valid).toBe(false);
-    expect(result.getErrorsFor(t => t.addresses[0].city).isValid).toBe(false);
-    expect(result.getErrorsFor(t => t.addresses[1].city).isValid).toBe(true);
-    expect(result.getErrorsFor(t => t.tags[0]).isValid).toBe(false);
-    expect(result.getErrorsFor(t => t.matrix[0][0]).isValid).toBe(false);
-    expect(
-        result.getInvalidProperties().map(p => p.descriptor.toJsonPointer())
-    ).toEqual(
-        expect.arrayContaining([
-            '/addresses',
-            '/addresses/0/city',
-            '/tags',
-            '/tags/0',
-            '/matrix/0/0'
-        ])
-    );
-});
+test.each(['sync', 'async'] as const)(
+    'indexed errors use precise descriptors (%s)',
+    async mode => {
+        const value = {
+            addresses: [{ city: '' }, { city: 'Paris' }],
+            tags: [''],
+            matrix: [['']]
+        };
+        const result = await (mode === 'sync'
+            ? schema.validate(value, { doNotStopOnFirstError: true })
+            : schema.validateAsync(value, { doNotStopOnFirstError: true }));
+        expect(result.valid).toBe(false);
+        expect(result.getErrorsFor(t => t.addresses[0].city).isValid).toBe(
+            false
+        );
+        expect(result.getErrorsFor(t => t.addresses[1].city).isValid).toBe(
+            true
+        );
+        expect(result.getErrorsFor(t => t.tags[0]).isValid).toBe(false);
+        expect(result.getErrorsFor(t => t.matrix[0][0]).isValid).toBe(false);
+        expect(
+            result.getInvalidProperties().map(p => p.descriptor.toJsonPointer())
+        ).toEqual(
+            expect.arrayContaining([
+                '/addresses',
+                '/addresses/0/city',
+                '/tags',
+                '/tags/0',
+                '/matrix/0/0'
+            ])
+        );
+    }
+);
 test('indexed validation works below a nested object and with escaped keys', () => {
     const nested = object({
         profile: object({

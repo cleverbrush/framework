@@ -63,8 +63,8 @@ function formatIssuePath(
  * so `getErrorsFor(t => t.order.id)` works without any additional
  * configuration.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use the {@link extern | extern()} factory function instead.
  *
  * @example

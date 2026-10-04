@@ -1,4 +1,7 @@
 # @cleverbrush/otel
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-89%25-green)
+<!-- coverage-badge-end -->
 
 OpenTelemetry instrumentation for the Cleverbrush framework — traces, logs, and metrics over OTLP for `@cleverbrush/server`, `@cleverbrush/orm`, and `@cleverbrush/log`. Designed to ship straight into SigNoz, Grafana Tempo, Jaeger, or any OTLP-compatible backend.
 

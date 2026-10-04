@@ -913,7 +913,6 @@ export function withExtensions<
 
         // Create a dynamic subclass
         const ExtendedClass = class extends BaseClass {
-            // biome-ignore lint/complexity/noUselessConstructor: required
             constructor(...args: any[]) {
                 super(...args);
             }

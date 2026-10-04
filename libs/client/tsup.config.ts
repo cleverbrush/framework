@@ -6,6 +6,7 @@ export default defineConfig({
         'src/retry.ts',
         'src/timeout.ts',
         'src/dedupe.ts',
+        'src/idempotency.ts',
         'src/cache.ts',
         'src/batching.ts',
         'src/optimisticUpdate.ts',

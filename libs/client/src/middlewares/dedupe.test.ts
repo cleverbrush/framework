@@ -3,6 +3,19 @@ import type { FetchLike } from '../middleware.js';
 import { dedupe } from './dedupe.js';
 
 describe('dedupe middleware', () => {
+    test('allows immediate body consumption by every concurrent caller', async () => {
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockResolvedValue(new Response('body'));
+        const mw = dedupe()(fetch);
+        const first = mw('/same', {}).then(response => response.text());
+        const second = mw('/same', {}).then(response => response.text());
+        await expect(Promise.all([first, second])).resolves.toEqual([
+            'body',
+            'body'
+        ]);
+        expect(fetch).toHaveBeenCalledOnce();
+    });
     test('deduplicates concurrent GET requests with the same URL', async () => {
         let callCount = 0;
         const fetch = vi.fn<FetchLike>().mockImplementation(() => {
@@ -20,7 +33,7 @@ describe('dedupe middleware', () => {
         ]);
 
         expect(fetch).toHaveBeenCalledTimes(1);
-        // First caller gets original, others get clones — all readable
+        // Every caller gets its own clone — all readable
         expect(await r1.json()).toEqual({ n: 1 });
         expect(await r2.json()).toEqual({ n: 1 });
         expect(await r3.json()).toEqual({ n: 1 });

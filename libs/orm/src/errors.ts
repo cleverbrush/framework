@@ -1,7 +1,7 @@
 // @cleverbrush/orm — typed error classes
 
 /**
- * Thrown by {@link DbSet.findOrFail} when no row matches the supplied
+ * Thrown by `DbSet.findOrFail` when no row matches the supplied
  * primary key value(s). The `entity` field carries the SQL table name (or
  * the entity's schema name when a table name is unavailable); `pk` is the
  * exact value (scalar or tuple) that was looked up.
@@ -32,7 +32,7 @@ export class EntityNotFoundError extends Error {
 }
 
 /**
- * Thrown by {@link DbContext.saveChanges} when an UPDATE or DELETE detects
+ * Thrown by `DbContext.saveChanges` when an UPDATE or DELETE detects
  * that the row's row-version column (`.rowVersion()`) has changed since the
  * entity was last loaded — indicating a concurrent modification.
  *
@@ -63,7 +63,7 @@ export class ConcurrencyError extends Error {
 }
 
 /**
- * Thrown by {@link DbContext.saveChanges} when an invariant is violated on
+ * Thrown by `DbContext.saveChanges` when an invariant is violated on
  * a tracked entity — e.g. the primary key or discriminator column was mutated.
  *
  * @public

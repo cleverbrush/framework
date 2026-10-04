@@ -160,7 +160,9 @@ test('navigation fixtures typecheck against public package declarations', () => 
             `${name} must be tested through its published declarations`
         ).toBe(true);
     }
-}, 30000);
+    // This compiles fixtures across six public packages, including editor
+    // language-service metadata; allow coverage overhead on shared runners.
+}, 120_000);
 
 describe.each(references)('$language $name ($property)', reference => {
     test('goes to the original property declaration', () => {

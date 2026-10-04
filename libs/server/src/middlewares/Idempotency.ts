@@ -1,185 +1,123 @@
-/**
- * Server-side idempotency middleware.
- *
- * Ensures mutating requests with the same idempotency key produce the
- * same result exactly once — subsequent replays return the stored
- * response without re-executing the handler.
- *
- * @module
- */
-
-import type { ServerResponse } from 'node:http';
+import { createHash } from 'node:crypto';
+import { HttpError } from '../HttpError.js';
 import type { RequestContext } from '../RequestContext.js';
 import type { Middleware } from '../types.js';
+import { captureResponse, type ResponseSnapshot } from './ResponseSnapshot.js';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-/**
- * Configuration for {@link idempotency}.
- */
+/** Configuration for bounded, process-local mutation response replay. */
 export interface ServerIdempotencyOptions {
     /**
-     * TTL in milliseconds for stored responses.
-     * Defaults to `86_400_000` (24 hours).
+     * Explicit authorization/tenant scope. Run after authentication and
+     * authorization. Return undefined to skip; use a fixed string only for
+     * deliberately public operations. Never use an unverified identity header.
      */
+    scope: (ctx: RequestContext) => string | undefined;
+    /** Stored response lifetime in milliseconds. Default: 86,400,000. */
     ttl?: number;
-
-    /**
-     * Header name to read the idempotency key from.
-     * Defaults to `"x-idempotency-key"`.
-     */
+    /** Case-insensitive request header. Default: x-idempotency-key. */
     headerName?: string;
-
-    /**
-     * Predicate that decides whether a request should be skipped.
-     * Defaults to skipping non-mutating requests (GET, HEAD, OPTIONS).
-     */
+    /** Default: skip GET, HEAD, OPTIONS and other non-mutating methods. */
     skip?: (ctx: RequestContext) => boolean;
+    /** Maximum retained keys, including pending requests. Default: 1000. */
+    maxEntries?: number;
+    /** Maximum response body retained per key. Default: 65,536 bytes. */
+    maxResponseBytes?: number;
 }
 
-// ---------------------------------------------------------------------------
-// Internals
-// ---------------------------------------------------------------------------
-
-interface StoredResponse {
-    status: number;
-    headers: Record<string, string | string[] | undefined>;
-    body: Buffer;
+interface Entry {
+    result: Promise<ResponseSnapshot | undefined>;
     expiresAt: number;
 }
 
-function isMutating(method: string): boolean {
-    return ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method.toUpperCase());
-}
-
-const CLEANUP_INTERVAL = 60_000;
-
-// ---------------------------------------------------------------------------
-// Middleware
-// ---------------------------------------------------------------------------
-
 /**
- * Server-side idempotency middleware.
- *
- * Reads the `x-idempotency-key` header from mutating requests. If a
- * response has already been stored for that key, it is returned
- * immediately — the handler is never called. Otherwise the handler
- * executes and its response is stored for future replays.
- *
- * GET, HEAD, and OPTIONS requests pass through without checking.
- *
- * @param options - Configuration.
- * @returns A server-side {@link Middleware}.
- *
- * @example
- * ```ts
- * server.handle(CreateTodo, createHandler, {
- *     middlewares: [idempotency({ ttl: 86_400_000 })]
- * });
- * ```
+ * Replay completed mutations and coalesce concurrent requests within one
+ * middleware instance. Keys include explicit scope, method and full request URL.
+ * Reusing a key means retrying the same input; bodies are not fingerprinted.
+ * This is not durable exactly-once execution: restarts, expiry and thrown
+ * failures may permit another execution. Use database deduplication for that.
+ * Oversized/incomplete responses retain a non-replayable reservation (409).
+ * Capacity exhaustion returns 503 without executing the operation.
  */
-export function idempotency(
-    options: ServerIdempotencyOptions = {}
-): Middleware {
+export function idempotency(options: ServerIdempotencyOptions): Middleware {
+    if (typeof options?.scope !== 'function')
+        throw new TypeError('idempotency requires an explicit scope');
     const {
+        scope,
         ttl = 86_400_000,
         headerName = 'x-idempotency-key',
-        skip = (ctx: RequestContext) => !isMutating(ctx.method)
+        skip = ctx => !['POST', 'PUT', 'DELETE', 'PATCH'].includes(ctx.method),
+        maxEntries = 1000,
+        maxResponseBytes = 65_536
     } = options;
-
-    const store = new Map<string, StoredResponse>();
-
-    // Periodic cleanup of expired entries
-    const cleanupTimer = setInterval(() => {
-        const now = Date.now();
-        for (const [key, entry] of store) {
-            if (entry.expiresAt <= now) {
-                store.delete(key);
-            }
-        }
-    }, CLEANUP_INTERVAL);
-
-    if (cleanupTimer.unref) {
-        cleanupTimer.unref();
+    for (const [name, value] of Object.entries({
+        ttl,
+        maxEntries,
+        maxResponseBytes
+    })) {
+        if (!Number.isSafeInteger(value) || value <= 0)
+            throw new TypeError(name + ' must be a positive safe integer');
     }
-
-    return async (ctx: RequestContext, next: () => Promise<void>) => {
-        if (skip(ctx)) {
-            return next();
-        }
-
-        const key =
-            ctx.headers[headerName] ?? ctx.headers[headerName.toLowerCase()];
-        if (!key || typeof key !== 'string' || key.length === 0) {
-            return next();
-        }
-
-        // Check if we already have a stored response for this key
-        const stored = store.get(key);
-        if (stored) {
-            if (stored.expiresAt <= Date.now()) {
-                store.delete(key);
-                // Expired — fall through to handler
-            } else {
-                // Replay stored response
-                const res = ctx.response as ServerResponse;
-                res.writeHead(stored.status, stored.headers);
-                res.end(stored.body);
-                ctx.responded = true;
-                return;
-            }
-        }
-
-        // Capture the handler's response for future replays
-        const originalWriteHead = (
-            ctx.response as ServerResponse
-        ).writeHead.bind(ctx.response);
-        const originalEnd = (ctx.response as ServerResponse).end.bind(
-            ctx.response
-        );
-
-        let capturedStatus = 200;
-        let capturedHeaders: Record<string, string | string[] | undefined> = {};
-        const chunks: Buffer[] = [];
-
-        (ctx.response as ServerResponse).writeHead = function (
-            this: ServerResponse,
-            statusCode: number,
-            ...args: any[]
-        ) {
-            capturedStatus = statusCode;
-            if (args.length > 0) {
-                capturedHeaders = args[0];
-            }
-            return originalWriteHead(statusCode, ...args) as ServerResponse;
-        } as any;
-
-        (ctx.response as ServerResponse).end = function (
-            this: ServerResponse,
-            chunk?: any,
-            ...args: any[]
-        ) {
-            if (chunk) {
-                chunks.push(
-                    Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
+    const store = new Map<string, Entry>();
+    return async (ctx, next) => {
+        const supplied =
+            ctx.headers[headerName.toLowerCase()] ?? ctx.headers[headerName];
+        if (skip(ctx) || !supplied) return next();
+        if (supplied.length > 256)
+            throw new HttpError(400, 'Idempotency key is too long');
+        const identity = scope(ctx);
+        if (identity === undefined) return next();
+        if (typeof identity !== 'string')
+            throw new TypeError('Idempotency scope must be a string');
+        const key = createHash('sha256')
+            .update(
+                JSON.stringify([
+                    identity,
+                    ctx.method,
+                    ctx.url?.href ?? '/',
+                    supplied
+                ])
+            )
+            .digest('hex');
+        const now = Date.now();
+        for (const [k, entry] of store)
+            if (entry.expiresAt <= now) store.delete(k);
+        const existing = store.get(key);
+        if (existing) {
+            const snapshot = await existing.result;
+            if (!snapshot)
+                throw new HttpError(
+                    409,
+                    'The previous response cannot be replayed; verify the operation outcome'
                 );
-            }
-            return originalEnd(chunk, ...args) as ServerResponse;
-        } as any;
-
-        await next();
-
-        // Store the response for future replays
-        if (capturedStatus >= 200 && capturedStatus < 500) {
-            const body = Buffer.concat(chunks);
-            store.set(key, {
-                status: capturedStatus,
-                headers: capturedHeaders,
-                body,
-                expiresAt: Date.now() + ttl
-            });
+            ctx.response.writeHead(snapshot.status, snapshot.headers);
+            ctx.response.end(snapshot.body);
+            ctx.responded = true;
+            return;
+        }
+        if (store.size >= maxEntries)
+            throw new HttpError(503, 'Idempotency capacity reached');
+        let resolve!: (value: ResponseSnapshot | undefined) => void;
+        let reject!: (error: unknown) => void;
+        const result = new Promise<ResponseSnapshot | undefined>((yes, no) => {
+            resolve = yes;
+            reject = no;
+        });
+        // The first caller observes errors directly even when no waiter exists.
+        void result.catch(() => undefined);
+        const entry: Entry = { result, expiresAt: Infinity };
+        store.set(key, entry);
+        try {
+            const snapshot = await captureResponse(
+                ctx.response,
+                next,
+                maxResponseBytes
+            );
+            entry.expiresAt = Date.now() + ttl;
+            resolve(snapshot);
+        } catch (error) {
+            store.delete(key);
+            reject(error);
+            throw error;
         }
     };
 }

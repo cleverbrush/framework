@@ -19,7 +19,7 @@ import { checkJsonDepth, safeJsonParse } from './safeJson.js';
  */
 export const IRequestContext = object({
     method: string(),
-    url: string(),
+    url: any().hasType<URL>(),
     pathParams: record(string(), string()),
     queryParams: record(string(), string()),
     headers: record(string(), string()),
@@ -59,8 +59,7 @@ export class RequestContext {
     /** @internal — overridable for testing */
     _queryParams?: Record<string, string>;
     #services?: IServiceProvider;
-    #bodyBuffer: Buffer | null = null;
-    #bodyRead = false;
+    #bodyPromise?: Promise<Buffer>;
     #jsonCache: unknown = undefined;
     #jsonParsed = false;
     responded = false;
@@ -91,7 +90,7 @@ export class RequestContext {
         );
 
         // Build headers record (lowercased keys, string values)
-        const headers: Record<string, string> = {};
+        const headers: Record<string, string> = Object.create(null);
         for (const [key, value] of Object.entries(request.headers)) {
             if (typeof value === 'string') {
                 headers[key] = value;
@@ -114,7 +113,7 @@ export class RequestContext {
     /** Parsed query string parameters from the request URL. */
     get queryParams(): Record<string, string> {
         if (this._queryParams) return this._queryParams;
-        const params: Record<string, string> = {};
+        const params: Record<string, string> = Object.create(null);
         for (const [key, value] of this.url.searchParams) {
             params[key] = value;
         }
@@ -130,27 +129,59 @@ export class RequestContext {
         this.#services = value;
     }
 
-    /** Read and buffer the raw request body. Result is cached after the first call. */
+    /** Read once; concurrent readers share the same result or failure. */
     async body(): Promise<Buffer> {
-        if (this.#bodyRead) return this.#bodyBuffer!;
-
-        this.#bodyBuffer = await new Promise<Buffer>((resolve, reject) => {
+        if (this.#bodyPromise) return this.#bodyPromise;
+        this.#bodyPromise = new Promise<Buffer>((resolve, reject) => {
             const chunks: Buffer[] = [];
             let totalSize = 0;
-            this.request.on('data', (chunk: Buffer) => {
+            let settled = false;
+            const cleanup = () => {
+                this.request.off('data', data);
+                this.request.off('end', end);
+                this.request.off('error', error);
+                this.request.off('aborted', aborted);
+                this.request.off('close', closed);
+            };
+            const error = (reason: Error) => {
+                if (settled) return;
+                settled = true;
+                cleanup();
+                chunks.length = 0;
+                reject(reason);
+            };
+            const aborted = () =>
+                error(new HttpError(400, 'Request body interrupted'));
+            const closed = () => {
+                if (!this.request.readableEnded) aborted();
+            };
+            const data = (chunk: Buffer) => {
+                if (settled) return;
                 totalSize += chunk.length;
                 if (totalSize > this.maxBodySize) {
+                    error(new HttpError(413, 'Payload Too Large'));
                     this.request.destroy();
-                    reject(new HttpError(413, 'Payload Too Large'));
                     return;
                 }
                 chunks.push(chunk);
-            });
-            this.request.on('end', () => resolve(Buffer.concat(chunks)));
-            this.request.on('error', reject);
+            };
+            const end = () => {
+                if (settled) return;
+                settled = true;
+                cleanup();
+                resolve(Buffer.concat(chunks));
+            };
+            if (this.request.destroyed || this.request.readableEnded) {
+                aborted();
+                return;
+            }
+            this.request.on('data', data);
+            this.request.on('end', end);
+            this.request.on('error', error);
+            this.request.on('aborted', aborted);
+            this.request.on('close', closed);
         });
-        this.#bodyRead = true;
-        return this.#bodyBuffer;
+        return this.#bodyPromise;
     }
 
     /** Read, buffer, and JSON-parse the request body. Result is cached after the first call. */

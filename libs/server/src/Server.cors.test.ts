@@ -326,69 +326,74 @@ describe('HTTP CORS preflights', () => {
 });
 
 describe('HTTP CORS origin policies', () => {
-    it.each([
-        false,
-        true
-    ])('evaluates %s async predicates on every request and skips absent origins', async asynchronous => {
-        let allowed = true;
-        const predicate = vi.fn((value: string) =>
-            asynchronous
-                ? Promise.resolve(allowed && value === origin)
-                : allowed && value === origin
-        );
-        const handler = vi.fn(() => ({}));
-        const url = await start(
-            new ServerBuilder()
-                .useCors({ origin: predicate })
-                .handle(endpoint.get('/records'), handler)
-        );
-        expect((await preflight(`${url}/records`, 'GET')).status).toBe(204);
-        expect(
-            (await send(`${url}/records`, { headers: { origin } })).status
-        ).toBe(200);
-        allowed = false;
-        expect((await preflight(`${url}/records`, 'GET')).status).toBe(403);
-        expect(
-            (await send(`${url}/records`, { headers: { origin } })).status
-        ).toBe(403);
-        const absent = await send(`${url}/records`);
-        expect(absent.status).toBe(200);
-        expect(absent.headers.get('access-control-allow-origin')).toBeNull();
-        expect(absent.headers.get('vary')).toBe('Origin');
-        expect(predicate).toHaveBeenCalledTimes(4);
-        expect(handler).toHaveBeenCalledTimes(2);
-    });
-
-    it.each([
-        false,
-        true
-    ])('fails closed with a generic 500 on %s async callback errors', async asynchronous => {
-        const handler = vi.fn(() => ({}));
-        const predicate = () => {
-            const error = new HttpError(418, 'private origin lookup failure');
-            if (asynchronous) return Promise.reject(error);
-            throw error;
-        };
-        const url = await start(
-            new ServerBuilder()
-                .useCors({ origin: predicate })
-                .handle(endpoint.post('/records'), handler)
-        );
-        for (const response of [
-            await preflight(`${url}/records`),
-            await send(`${url}/records`, {
-                method: 'POST',
-                headers: { origin }
-            })
-        ]) {
-            expect(response.status).toBe(500);
+    it.each([false, true])(
+        'evaluates %s async predicates on every request and skips absent origins',
+        async asynchronous => {
+            let allowed = true;
+            const predicate = vi.fn((value: string) =>
+                asynchronous
+                    ? Promise.resolve(allowed && value === origin)
+                    : allowed && value === origin
+            );
+            const handler = vi.fn(() => ({}));
+            const url = await start(
+                new ServerBuilder()
+                    .useCors({ origin: predicate })
+                    .handle(endpoint.get('/records'), handler)
+            );
+            expect((await preflight(`${url}/records`, 'GET')).status).toBe(204);
             expect(
-                response.headers.get('access-control-allow-origin')
+                (await send(`${url}/records`, { headers: { origin } })).status
+            ).toBe(200);
+            allowed = false;
+            expect((await preflight(`${url}/records`, 'GET')).status).toBe(403);
+            expect(
+                (await send(`${url}/records`, { headers: { origin } })).status
+            ).toBe(403);
+            const absent = await send(`${url}/records`);
+            expect(absent.status).toBe(200);
+            expect(
+                absent.headers.get('access-control-allow-origin')
             ).toBeNull();
-            expect(response.body).not.toContain('private');
+            expect(absent.headers.get('vary')).toBe('Origin');
+            expect(predicate).toHaveBeenCalledTimes(4);
+            expect(handler).toHaveBeenCalledTimes(2);
         }
-        expect(handler).not.toHaveBeenCalled();
-    });
+    );
+
+    it.each([false, true])(
+        'fails closed with a generic 500 on %s async callback errors',
+        async asynchronous => {
+            const handler = vi.fn(() => ({}));
+            const predicate = () => {
+                const error = new HttpError(
+                    418,
+                    'private origin lookup failure'
+                );
+                if (asynchronous) return Promise.reject(error);
+                throw error;
+            };
+            const url = await start(
+                new ServerBuilder()
+                    .useCors({ origin: predicate })
+                    .handle(endpoint.post('/records'), handler)
+            );
+            for (const response of [
+                await preflight(`${url}/records`),
+                await send(`${url}/records`, {
+                    method: 'POST',
+                    headers: { origin }
+                })
+            ]) {
+                expect(response.status).toBe(500);
+                expect(
+                    response.headers.get('access-control-allow-origin')
+                ).toBeNull();
+                expect(response.body).not.toContain('private');
+            }
+            expect(handler).not.toHaveBeenCalled();
+        }
+    );
 
     it('supports explicit public wildcard and opaque-origin policies', async () => {
         const wildcard = await start(
@@ -530,71 +535,70 @@ describe('HTTP CORS response headers', () => {
         }
     });
 
-    it.each([
-        'implicit',
-        'object',
-        'array',
-        'message-object',
-        'message-array'
-    ])('merges Vary and preserves cookies with native %s header writes', async mode => {
-        const url = await start(
-            new ServerBuilder()
-                .useCors({ origin })
-                .handle(endpoint.get('/records'), () =>
-                    ActionResult.raw((_req, res) => {
-                        res.setHeader('vary', 'Accept-Encoding, origin');
-                        res.setHeader('access-control-allow-origin', '*');
-                        res.setHeader(
-                            'access-control-allow-credentials',
-                            'true'
-                        );
-                        const headers = {
-                            Vary: 'Accept, ORIGIN',
-                            'Set-Cookie': ['a=1', 'b=2'],
-                            'Access-Control-Allow-Origin': otherOrigin
-                        };
-                        const raw = [
-                            'Vary',
-                            'Accept, ORIGIN',
-                            'Set-Cookie',
-                            'a=1',
-                            'Set-Cookie',
-                            'b=2',
-                            'Access-Control-Allow-Origin',
-                            otherOrigin
-                        ];
-                        if (mode === 'object') res.writeHead(202, headers);
-                        else if (mode === 'array') res.writeHead(202, raw);
-                        else if (mode === 'message-object')
-                            res.writeHead(202, 'Accepted', headers);
-                        else if (mode === 'message-array')
-                            res.writeHead(202, 'Accepted', raw);
-                        else {
-                            res.statusCode = 202;
-                            res.setHeader('set-cookie', ['a=1', 'b=2']);
+    it.each(['implicit', 'object', 'array', 'message-object', 'message-array'])(
+        'merges Vary and preserves cookies with native %s header writes',
+        async mode => {
+            const url = await start(
+                new ServerBuilder()
+                    .useCors({ origin })
+                    .handle(endpoint.get('/records'), () =>
+                        ActionResult.raw((_req, res) => {
+                            res.setHeader('vary', 'Accept-Encoding, origin');
+                            res.setHeader('access-control-allow-origin', '*');
                             res.setHeader(
-                                'vary',
-                                'Accept-Encoding, origin, Accept'
+                                'access-control-allow-credentials',
+                                'true'
                             );
-                        }
-                        res.end('raw');
-                    })
-                )
-        );
-        const response = await send(`${url}/records`, { headers: { origin } });
-        expect(response.status).toBe(202);
-        expect(response.body).toBe('raw');
-        expect(response.headers.get('access-control-allow-origin')).toBe(
-            origin
-        );
-        expect(
-            response.headers.get('access-control-allow-credentials')
-        ).toBeNull();
-        expect(response.headers.get('vary')).toBe(
-            'Accept-Encoding, origin, Accept'
-        );
-        expect(response.headers.getSetCookie()).toEqual(['a=1', 'b=2']);
-    });
+                            const headers = {
+                                Vary: 'Accept, ORIGIN',
+                                'Set-Cookie': ['a=1', 'b=2'],
+                                'Access-Control-Allow-Origin': otherOrigin
+                            };
+                            const raw = [
+                                'Vary',
+                                'Accept, ORIGIN',
+                                'Set-Cookie',
+                                'a=1',
+                                'Set-Cookie',
+                                'b=2',
+                                'Access-Control-Allow-Origin',
+                                otherOrigin
+                            ];
+                            if (mode === 'object') res.writeHead(202, headers);
+                            else if (mode === 'array') res.writeHead(202, raw);
+                            else if (mode === 'message-object')
+                                res.writeHead(202, 'Accepted', headers);
+                            else if (mode === 'message-array')
+                                res.writeHead(202, 'Accepted', raw);
+                            else {
+                                res.statusCode = 202;
+                                res.setHeader('set-cookie', ['a=1', 'b=2']);
+                                res.setHeader(
+                                    'vary',
+                                    'Accept-Encoding, origin, Accept'
+                                );
+                            }
+                            res.end('raw');
+                        })
+                    )
+            );
+            const response = await send(`${url}/records`, {
+                headers: { origin }
+            });
+            expect(response.status).toBe(202);
+            expect(response.body).toBe('raw');
+            expect(response.headers.get('access-control-allow-origin')).toBe(
+                origin
+            );
+            expect(
+                response.headers.get('access-control-allow-credentials')
+            ).toBeNull();
+            expect(response.headers.get('vary')).toBe(
+                'Accept-Encoding, origin, Accept'
+            );
+            expect(response.headers.getSetCookie()).toEqual(['a=1', 'b=2']);
+        }
+    );
 
     it('preserves Vary wildcard and CORS on streamed results', async () => {
         const url = await start(
@@ -619,64 +623,70 @@ describe('HTTP CORS response headers', () => {
         );
     });
 
-    it.each([
-        'cache',
-        'idempotency'
-    ])('recomputes CORS on %s replay without mutating stored headers', async mode => {
-        let calls = 0;
-        const savedHeaders = Object.freeze({
-            'content-type': 'text/plain',
-            Vary: 'Accept',
-            'Access-Control-Allow-Origin': origin,
-            'Access-Control-Allow-Credentials': 'true'
-        });
-        const url = await start(
-            new ServerBuilder()
-                .useCors({ origin: [origin, otherOrigin] })
-                .handle(
-                    mode === 'cache'
-                        ? endpoint.get('/records').cacheTag('records')
-                        : endpoint.post('/records'),
-                    () =>
-                        ActionResult.raw((_req, res) => {
-                            calls++;
-                            res.writeHead(200, savedHeaders);
-                            res.end('saved body');
-                        }),
-                    {
-                        middlewares: [
-                            mode === 'cache' ? cacheResponse() : idempotency()
-                        ]
+    it.each(['cache', 'idempotency'])(
+        'recomputes CORS on %s replay without mutating stored headers',
+        async mode => {
+            let calls = 0;
+            const savedHeaders = Object.freeze({
+                'content-type': 'text/plain',
+                Vary: 'Accept',
+                'Access-Control-Allow-Origin': origin,
+                'Access-Control-Allow-Credentials': 'true'
+            });
+            const url = await start(
+                new ServerBuilder()
+                    .useCors({ origin: [origin, otherOrigin] })
+                    .handle(
+                        mode === 'cache'
+                            ? endpoint.get('/records').cacheTag('records')
+                            : endpoint.post('/records'),
+                        () =>
+                            ActionResult.raw((_req, res) => {
+                                calls++;
+                                res.writeHead(200, savedHeaders);
+                                res.end('saved body');
+                            }),
+                        {
+                            middlewares: [
+                                mode === 'cache'
+                                    ? cacheResponse()
+                                    : idempotency({
+                                          scope: () => 'public-test'
+                                      })
+                            ]
+                        }
+                    )
+            );
+            for (const value of [origin, otherOrigin, undefined]) {
+                const response = await send(`${url}/records`, {
+                    method: mode === 'cache' ? 'GET' : 'POST',
+                    headers: {
+                        ...(value ? { origin: value } : {}),
+                        'x-idempotency-key': 'same-key'
                     }
-                )
-        );
-        for (const value of [origin, otherOrigin, undefined]) {
-            const response = await send(`${url}/records`, {
+                });
+                expect(response.body).toBe('saved body');
+                expect(
+                    response.headers.get('access-control-allow-origin')
+                ).toBe(value ?? null);
+                expect(
+                    response.headers.get('access-control-allow-credentials')
+                ).toBeNull();
+                expect(response.headers.get('vary')).toBe('Accept, Origin');
+            }
+            const denied = await send(`${url}/records`, {
                 method: mode === 'cache' ? 'GET' : 'POST',
                 headers: {
-                    ...(value ? { origin: value } : {}),
+                    origin: 'https://denied.example.test',
                     'x-idempotency-key': 'same-key'
                 }
             });
-            expect(response.body).toBe('saved body');
-            expect(response.headers.get('access-control-allow-origin')).toBe(
-                value ?? null
-            );
+            expect(denied.status).toBe(403);
             expect(
-                response.headers.get('access-control-allow-credentials')
+                denied.headers.get('access-control-allow-origin')
             ).toBeNull();
-            expect(response.headers.get('vary')).toBe('Accept, Origin');
+            expect(savedHeaders.Vary).toBe('Accept');
+            expect(calls).toBe(1);
         }
-        const denied = await send(`${url}/records`, {
-            method: mode === 'cache' ? 'GET' : 'POST',
-            headers: {
-                origin: 'https://denied.example.test',
-                'x-idempotency-key': 'same-key'
-            }
-        });
-        expect(denied.status).toBe(403);
-        expect(denied.headers.get('access-control-allow-origin')).toBeNull();
-        expect(savedHeaders.Vary).toBe('Accept');
-        expect(calls).toBe(1);
-    });
+    );
 });

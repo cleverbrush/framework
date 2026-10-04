@@ -71,8 +71,7 @@ export interface StringBuiltinExtensions<T extends string = string> {
      * By default only `http` and `https` protocols are accepted.
      * Pass `opts.protocols` to restrict or expand the allowed set.
      *
-     * @param opts - optional configuration
-     * @param opts.protocols - allowed URL protocols (default: `['http', 'https']`)
+     * The options overload accepts a `protocols` array (default: http/https).
      * @param errorMessage - custom error message or function to generate one
      * @returns a new schema builder with the URL validator applied
      *
@@ -303,8 +302,7 @@ export const stringExtensions = defineExtension({
          * By default only `http` and `https` protocols are accepted.
          * Pass `opts.protocols` to restrict or expand the allowed set.
          *
-         * @param opts - optional configuration
-         * @param opts.protocols - allowed URL protocols (default: `['http', 'https']`)
+         * @param optsOrError - protocol options or a custom error message
          * @param errorMessage - custom error message or function to generate one
          * @returns a new schema builder with the URL validator applied
          *

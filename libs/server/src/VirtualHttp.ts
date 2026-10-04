@@ -114,7 +114,6 @@ export class VirtualServerResponse extends Writable {
 
     readonly #chunks: Buffer[] = [];
     readonly #customHeaders: Record<string, string> = {};
-    #customStatus = 200;
 
     // -----------------------------------------------------------------------
     // Writable interface — captures data written via readable.pipe(res)
@@ -141,7 +140,6 @@ export class VirtualServerResponse extends Writable {
         status: number,
         headers?: Record<string, string | string[] | number> | string | string[]
     ): this {
-        this.#customStatus = status;
         this.statusCode = status;
         if (
             headers != null &&
@@ -177,6 +175,11 @@ export class VirtualServerResponse extends Writable {
      */
     getHeader(name: string): string | undefined {
         return this.#customHeaders[name.toLowerCase()];
+    }
+
+    /** Return a snapshot of response headers, matching ServerResponse. */
+    getHeaders(): Record<string, string> {
+        return { ...this.#customHeaders };
     }
 
     /**
@@ -215,7 +218,7 @@ export class VirtualServerResponse extends Writable {
      */
     toResult(): VirtualResult {
         return {
-            status: this.#customStatus,
+            status: this.statusCode,
             headers: { ...this.#customHeaders },
             body: Buffer.concat(this.#chunks).toString('utf-8')
         };

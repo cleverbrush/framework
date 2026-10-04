@@ -1,5 +1,6 @@
 // Supplementary tests for JwtScheme — focused on uncovered branches.
 
+import { createHmac, generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { jwtScheme, signJwt } from './JwtScheme.js';
 
@@ -15,6 +16,97 @@ const ctx = (authHeader?: string) => ({
 });
 
 describe('JwtScheme — additional branch coverage', () => {
+    const rawToken = (header: unknown, payload: unknown) => {
+        const data = [header, payload]
+            .map(value =>
+                Buffer.from(JSON.stringify(value)).toString('base64url')
+            )
+            .join('.');
+        return `${data}.${createHmac('sha256', SECRET).update(data).digest('base64url')}`;
+    };
+
+    it.each([null, [], 'header', 1])(
+        'rejects non-object header %j without throwing',
+        async header => {
+            await expect(
+                scheme().authenticate(ctx(`Bearer ${rawToken(header, {})}`))
+            ).resolves.toMatchObject({ succeeded: false });
+        }
+    );
+
+    it.each([null, [], 'payload', 1])(
+        'rejects non-object payload %j without throwing',
+        async payload => {
+            await expect(
+                scheme().authenticate(
+                    ctx(`Bearer ${rawToken({ alg: 'HS256' }, payload)}`)
+                )
+            ).resolves.toMatchObject({ succeeded: false });
+        }
+    );
+
+    it.each(['exp', 'nbf', 'iat'])(
+        'rejects malformed %s claims',
+        async name => {
+            for (const value of ['9999999999', null, {}, []]) {
+                const token = rawToken({ alg: 'HS256' }, { [name]: value });
+                expect(
+                    (await scheme().authenticate(ctx(`Bearer ${token}`)))
+                        .succeeded
+                ).toBe(false);
+            }
+        }
+    );
+
+    it('expires at the expiration instant, including tolerance', async () => {
+        const now = Math.floor(Date.now() / 1000);
+        for (const tolerance of [0, 60]) {
+            const token = signJwt({ exp: now - tolerance }, SECRET);
+            expect(
+                (
+                    await scheme({ clockTolerance: tolerance }).authenticate(
+                        ctx(`Bearer ${token}`)
+                    )
+                ).succeeded
+            ).toBe(false);
+        }
+    });
+
+    it('does not ignore critical JOSE extensions', async () => {
+        const token = rawToken(
+            { alg: 'HS256', crit: ['unknown'], unknown: true },
+            {}
+        );
+        expect(
+            (await scheme().authenticate(ctx(`Bearer ${token}`))).succeeded
+        ).toBe(false);
+    });
+
+    it('rejects asymmetric key material as an HMAC secret', () => {
+        const { publicKey } = generateKeyPairSync('rsa', {
+            modulusLength: 2048
+        });
+        const pem = publicKey.export({ type: 'spki', format: 'pem' });
+        expect(() =>
+            scheme({ secret: pem, algorithms: ['HS256', 'RS256'] })
+        ).toThrow();
+        expect(() => signJwt({}, pem, 'HS256')).toThrow();
+    });
+
+    it.each([-1, NaN, Infinity])(
+        'rejects invalid clock tolerance %s',
+        clockTolerance => {
+            expect(() => scheme({ clockTolerance })).toThrow();
+        }
+    );
+
+    it('accepts case-insensitive bearer authentication', async () => {
+        const token = signJwt({ sub: 'u1' }, SECRET);
+        expect(
+            (await scheme().authenticate(ctx(`bearer ${token}`))).succeeded
+        ).toBe(true);
+    });
+
     it('rejects an empty Bearer token', async () => {
         const result = await scheme().authenticate(ctx('Bearer    '));
         expect(result.succeeded).toBe(false);

@@ -30,12 +30,12 @@ npm run lint:fix
 
 | Property | Value |
 |---|---|
-| Package manager | npm (v24+) |
+| Package manager | npm 11 (see `packageManager`) |
 | Build system | Turborepo (`turbo run build`) |
 | Language | TypeScript — target ES2022, `moduleResolution: bundler` |
 | Lint / Format | [Biome](https://biomejs.dev) (not ESLint or Prettier) |
 | Test runner | [Vitest](https://vitest.dev) (with built-in typecheck) |
-| Node.js | 20+ (22 recommended — see `.nvmrc`) |
+| Node.js | 24+ (see `.nvmrc`) |
 | Module system | ES Modules (`"type": "module"` in root `package.json`) |
 
 ### Workspace layout
@@ -73,6 +73,8 @@ scripts/       ← build/release helper scripts
 | `@cleverbrush/otel` | OpenTelemetry instrumentation |
 | `@cleverbrush/env` | Environment-variable parsing with schema validation |
 | `@cleverbrush/schema-json` | JSON Schema generation from schema builders |
+| `@cleverbrush/storage` | Provider-neutral object storage contracts |
+| `@cleverbrush/storage-s3` | Streaming S3-compatible storage |
 
 ---
 
@@ -152,8 +154,8 @@ The `demos/` directory is linted separately (see `demos/todo-backend/biome.json`
 ## Testing Conventions
 
 - Tests are **co-located** with source files: `src/foo.ts` → `src/foo.test.ts`
-- Vitest globals are available (`describe`, `it`, `expect`, etc.) — no explicit
-  import needed (configured via `"types": ["vitest/globals"]` in `tsconfig.json`)
+- Import runtime helpers (`describe`, `it`, `expect`, etc.) from `vitest`.
+  Ambient TypeScript declarations do not enable runtime globals.
 - Run with `npm run test` which also performs TypeScript typechecking
 - Benchmarks live in `libs/benchmarks/` and run with `npm run bench`
 - Server integration tests live in `libs/server-integration-tests/`

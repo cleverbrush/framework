@@ -106,34 +106,34 @@ test('clearing issues preserves local errors, and reset clears all issue state',
     expect(result.current.name.error).toBeUndefined();
     expect(result.current.form.error).toBeUndefined();
 });
-test.each([
-    'edit',
-    'reset',
-    'unmount'
-] as const)('ignores late issues after %s', async action => {
-    const { result, unmount } = ready();
-    let resolve!: (result: any) => void;
-    const pending = new Promise<any>(r => {
-        resolve = r;
-    });
-    let submit!: Promise<void>;
-    await act(async () => {
-        submit = result.current.form.handleSubmit(() => pending)();
-    });
-    if (action === 'edit')
-        await act(async () => result.current.name.onChange('Grace'));
-    if (action === 'reset') act(() => result.current.form.reset());
-    if (action === 'unmount') unmount();
-    await act(async () => {
-        resolve({
-            ok: false,
-            error: 'Rejected',
-            issues: [{ pointer: '/name', detail: 'Old issue' }]
+test.each(['edit', 'reset', 'unmount'] as const)(
+    'ignores late issues after %s',
+    async action => {
+        const { result, unmount } = ready();
+        let resolve!: (result: any) => void;
+        const pending = new Promise<any>(r => {
+            resolve = r;
         });
-        await submit;
-    });
-    if (action !== 'unmount') expect(result.current.name.error).toBeUndefined();
-});
+        let submit!: Promise<void>;
+        await act(async () => {
+            submit = result.current.form.handleSubmit(() => pending)();
+        });
+        if (action === 'edit')
+            await act(async () => result.current.name.onChange('Grace'));
+        if (action === 'reset') act(() => result.current.form.reset());
+        if (action === 'unmount') unmount();
+        await act(async () => {
+            resolve({
+                ok: false,
+                error: 'Rejected',
+                issues: [{ pointer: '/name', detail: 'Old issue' }]
+            });
+            await submit;
+        });
+        if (action !== 'unmount')
+            expect(result.current.name.error).toBeUndefined();
+    }
+);
 test('local validation reaches indexed fields and programmatic array replacement clears stale issues', async () => {
     const { result } = ready();
     await act(async () => result.current.city.onChange(''));

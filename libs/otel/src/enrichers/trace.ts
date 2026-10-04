@@ -7,7 +7,7 @@ import { trace } from '@opentelemetry/api';
  *
  * Reads from the OpenTelemetry context via `@opentelemetry/api`,
  * so it works with any tracer provider — including the one
- * configured by {@link import('../setupOtel.js').setupOtel}.
+ * configured by `setupOtel`.
  *
  * No-op when no span is active.
  *

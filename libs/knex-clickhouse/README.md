@@ -1,6 +1,6 @@
 # @cleverbrush/knex-clickhouse
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-100%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A [Knex](https://knexjs.org/) dialect for [ClickHouse](https://clickhouse.com/). Uses the official `@clickhouse/client` library to connect to ClickHouse and lets you build queries with Knex's familiar API.

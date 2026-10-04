@@ -18,30 +18,34 @@ type NumberSchemaBuilderCreateProps<
  * Can be required or optional, can be restricted to be equal to a certain value,
  * can be restricted to be in a certain range, can be restricted to be integer.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link number | number()} function instead.
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = number().equals(42);
  * const result = schema.validate(42);
  * // result.valid === true
  * // result.object === 42
  * ```
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = number();
  * const result = schema.validate('42');
  * // result.valid === false
  * // result.errors[0].message === 'is expected to be a number'
  * ```
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = number().min(0).max(100);
  * const result = schema.validate(42);
  * // result.valid === true
  * // result.object === 42
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = number().min(0).max(100);
  * const result = schema.validate(142.5);
  * // result.valid === false
@@ -843,7 +847,8 @@ export class NumberSchemaBuilder<
      * a string source (e.g. a parse-string schema, URL parameter,
      * or form input).
      *
-     * @example ```ts
+     * @example
+     * ```ts
      * const schema = number().coerce();
      * const result = schema.validate('42');
      * // result.valid === true

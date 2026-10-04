@@ -268,7 +268,7 @@ export type TypedQueryClient<T extends ApiContract> = {
 /**
  * A single endpoint on the unified client.
  *
- * The endpoint is **callable** (direct HTTP fetch, same as `@cleverbrush/web`)
+ * The endpoint is **callable** (direct HTTP fetch, same as `@cleverbrush/client`)
  * and also exposes TanStack Query hooks (`useQuery`, `useMutation`, etc.)
  * as properties on the same object.
  *

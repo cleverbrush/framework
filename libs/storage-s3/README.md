@@ -1,9 +1,12 @@
 # @cleverbrush/storage-s3
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-90.7%25-brightgreen)
+<!-- coverage-badge-end -->
 
 An implementation of [`ObjectStorage`](../storage) for S3-compatible services.
 Uses the modular AWS SDK as a protocol client; an AWS account is not required.
 Explicit endpoints and credentials are required, with no ambient AWS credential
-lookup. The package is server-only and requires Node.js 20+.
+lookup. The package is server-only and requires Node.js 24+.
 
 ## Configure a provider
 

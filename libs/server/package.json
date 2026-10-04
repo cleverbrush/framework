@@ -8,8 +8,8 @@
         "@cleverbrush/auth": "^4.4.3",
         "@cleverbrush/di": "^4.4.3",
         "@cleverbrush/schema": "^4.4.3",
-        "@fastify/busboy": "^3.2.0",
-        "ws": "^8.20.0"
+        "@fastify/busboy": "^3.2.2",
+        "ws": "^8.22.0"
     },
     "devDependencies": {
         "@types/busboy": "1.5.4",
@@ -29,7 +29,7 @@
         "typescript",
         "cleverbrush"
     ],
-    "license": "BSD 3-Clause",
+    "license": "BSD-3-Clause",
     "main": "./dist/index.js",
     "exports": {
         ".": {
@@ -43,6 +43,9 @@
     },
     "sideEffects": false,
     "name": "@cleverbrush/server",
+    "engines": {
+        "node": ">=24"
+    },
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/server#readme",
     "repository": {
         "type": "git",

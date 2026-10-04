@@ -1,5 +1,6 @@
 {
     "compilerOptions": {
+        "types": ["node", "vitest/globals"],
         "composite": true,
         "rootDir": "./src",
         "outDir": "./dist",

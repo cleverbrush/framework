@@ -203,7 +203,8 @@ export class ServiceCollection {
      * services.addSingletonInstance(IConfig, config);
      * ```
      *
-     * @example Register a function value (impossible with {@link addSingleton})
+     * @example Register a function value
+     * Unlike {@link addSingleton}, this API accepts functions as values.
      * ```ts
      * const IHandler = func();
      * const myHandler = (req: Request) => new Response('ok');

@@ -1,4 +1,7 @@
 # @cleverbrush/log
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-98.5%25-brightgreen)
+<!-- coverage-badge-end -->
 
 Enterprise structured logging for TypeScript — Serilog-style message templates, CLEF format, batching sinks with circuit breaking, ambient correlation IDs.
 

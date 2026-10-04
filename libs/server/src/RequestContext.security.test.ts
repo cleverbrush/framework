@@ -83,6 +83,38 @@ function createStreamingContext(
 }
 
 describe('RequestContext — security', () => {
+    it('shares a body read started after the first chunk has arrived', async () => {
+        const { req, res } = createReqRes();
+        const ctx = new RequestContext(req, res);
+        const first = ctx.body();
+        req.emit('data', Buffer.from('first'));
+        const second = ctx.body();
+        req.emit('data', Buffer.from('second'));
+        req.emit('end');
+        expect((await first).toString()).toBe('firstsecond');
+        expect(await second).toBe(await first);
+        expect(req.listenerCount('data')).toBe(0);
+        expect(req.listenerCount('aborted')).toBe(0);
+    });
+
+    it('rejects interrupted reads and remembers the failure', async () => {
+        const { req, res } = createReqRes();
+        const ctx = new RequestContext(req, res);
+        const pending = ctx.body();
+        req.emit('aborted');
+        await expect(pending).rejects.toMatchObject({ status: 400 });
+        await expect(ctx.body()).rejects.toMatchObject({ status: 400 });
+        expect(req.listenerCount('data')).toBe(0);
+    });
+
+    it('does not inherit query parameter names from Object.prototype', () => {
+        const { req, res } = createReqRes({ url: '/?__proto__=value' });
+        const params = new RequestContext(req, res).queryParams;
+        expect(
+            Object.getOwnPropertyDescriptor(params, '__proto__')?.value
+        ).toBe('value');
+        expect(params.constructor).toBeUndefined();
+    });
     it('rejects chunked body exceeding maxBodySize with HttpError 413', async () => {
         const chunk = Buffer.alloc(512, 'x');
         const ctx = createStreamingContext([chunk, chunk], 512);
@@ -118,7 +150,7 @@ describe('RequestContext — security', () => {
         const result = (await ctx.json()) as any;
 
         expect(result.safe).toBe('ok');
-        expect(result.__proto__).toBe(Object.prototype);
+        expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
         expect(({} as any).polluted).toBeUndefined();
     });
 

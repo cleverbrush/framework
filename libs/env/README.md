@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-97.9%25-brightgreen)
+<!-- coverage-badge-end -->
 
 Type-safe environment variable parsing with `@cleverbrush/schema` — validated, coerced, structured configs from `process.env`.
 

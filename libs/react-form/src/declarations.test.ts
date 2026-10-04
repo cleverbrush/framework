@@ -34,4 +34,6 @@ test('consumers can emit declarations for exported inferred form systems', () =>
         )
     ).toEqual([]);
     expect(output.join('\n')).toContain('TypedFormSystem');
-});
+    // In-process TypeScript declaration emit is substantially slower with V8
+    // coverage on shared CI runners than ordinary form behavior tests.
+}, 60_000);

@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-96.4%25-brightgreen)
+<!-- coverage-badge-end -->
 
 OpenAPI 3.1 specification generation for [`@cleverbrush/server`](../server). Converts endpoint registrations, schema definitions, and authentication configuration into a fully-formed OpenAPI document — no annotations, no decorators. Also generates **AsyncAPI 3.0** documents for WebSocket subscription endpoints.
 

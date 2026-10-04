@@ -16,8 +16,8 @@ type GenericSchemaBuilderCreateProps<TRequired extends boolean = true> =
  * builder whose TypeScript type is inferred from the template function's
  * generic signature.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link generic | generic()} function instead.
  *
  * @example Single type parameter
@@ -59,7 +59,7 @@ type GenericSchemaBuilderCreateProps<TRequired extends boolean = true> =
  * // InferType → { ok: boolean; value?: string; error?: number }
  * ```
  *
- * @example With default arguments (enables direct `.validate()` on the template)
+ * @example With default arguments
  * ```ts
  * const AnyList = generic(
  *   [any()],   // default args — one per template parameter
@@ -149,7 +149,7 @@ export class GenericSchemaBuilder<
      * ```
      */
     // Set to the actual function in the constructor; declared here for TypeScript.
-    public declare readonly apply: TFn;
+    declare public readonly apply: TFn;
 
     /**
      * @hidden

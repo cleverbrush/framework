@@ -125,27 +125,18 @@ describe('typed aliases and aggregate SQL', () => {
 
 describe('aggregate decoders', () => {
     const count = compileAggregate(db, aggregate.count(), () => '').decode;
-    it.each([
-        '0',
-        '3',
-        5,
-        12n,
-        String(Number.MAX_SAFE_INTEGER)
-    ])('decodes safe count %s', value => {
-        expect(count(value)).toBe(Number(value));
-    });
-    it.each([
-        '9007199254740993',
-        -1,
-        '1.5',
-        '',
-        null,
-        NaN,
-        {},
-        Infinity
-    ])('rejects unsafe/malformed count %s', value => {
-        expect(() => count(value)).toThrow();
-    });
+    it.each(['0', '3', 5, 12n, String(Number.MAX_SAFE_INTEGER)])(
+        'decodes safe count %s',
+        value => {
+            expect(count(value)).toBe(Number(value));
+        }
+    );
+    it.each(['9007199254740993', -1, '1.5', '', null, NaN, {}, Infinity])(
+        'rejects unsafe/malformed count %s',
+        value => {
+            expect(() => count(value)).toThrow();
+        }
+    );
     it('lets output schemas replace default decoding, including overflow policy', () => {
         const compiled = compileAggregate(
             db,

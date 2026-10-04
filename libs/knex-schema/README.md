@@ -1,4 +1,7 @@
 # @cleverbrush/knex-schema
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-63.5%25-yellow)
+<!-- coverage-badge-end -->
 
 Type-safe, schema-driven query builder for [Knex](https://knexjs.org/). Use `@cleverbrush/schema` object builders to describe your PostgreSQL tables — column name mapping, eager loading, and full CRUD are handled automatically with complete TypeScript inference.
 

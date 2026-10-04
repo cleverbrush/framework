@@ -49,7 +49,7 @@ export { EXTRA_TYPE_BRAND, METHOD_LITERAL_BRAND } from '@cleverbrush/schema';
 
 /**
  * Phantom-type brand placed on a column schema by `.primaryKey()`.
- * Carried on the property schema's type so that {@link PrimaryKeyOf} can
+ * Carried on the property schema's type so that `PrimaryKeyOf` can
  * locate primary-key columns at the type level.
  *
  * @public
@@ -102,7 +102,7 @@ function hasColumnName(this: SchemaBuilder<any, any, any>, name: string) {
 
 /**
  * Stores the SQL table name for an `ObjectSchemaBuilder` using the schema
- * extension system. Required for {@link query} to build queries — throws at
+ * extension system. Required for `query` to build queries — throws at
  * query creation time if not set.
  */
 function hasTableName(
@@ -260,7 +260,7 @@ export const dbExtension = defineExtension({
         /**
          * Set the SQL table name for this object schema.
          *
-         * Required before creating a {@link query} builder — throws at
+         * Required before creating a `query` builder — throws at
          * query creation time when not set.
          *
          * @param name - The SQL table name (e.g. `'users'`).
@@ -803,7 +803,7 @@ export const ddlExtension = defineExtension({
          * // rows: Array<Pick<Post, 'id' | 'title'>>
          * ```
          *
-         * @see {@link SchemaQueryBuilder.projected}
+         * @see `SchemaQueryBuilder.select`
          */
         projection<
             TProperties extends Record<
@@ -982,9 +982,9 @@ export interface VariantInputForResolver {
 /**
  * @internal Validate + apply a fully-resolved variant config to a base
  * schema. Stores the `'variants'` and `'polymorphicVariants'` extensions
- * read by {@link QuerySource}.
+ * read by query execution.
  *
- * Called by the {@link Entity} chain (`.discriminator().ctiVariant().stiVariant()`).
+ * Called by the `Entity` chain (`.discriminator().ctiVariant().stiVariant()`).
  * Replaces the previous schema-level `.withVariants()` method.
  */
 export function applyVariantsToSchema(
@@ -1280,7 +1280,7 @@ export function getProjections(
  * Retrieve the resolved variant configuration stored by `.withVariants()`.
  * Returns `null` when the schema is not polymorphic.
  *
- * @internal — used by {@link QuerySource}.
+ * @internal — used by query execution.
  */
 export function getVariants(
     schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>

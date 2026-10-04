@@ -19,46 +19,52 @@ type StringSchemaBuilderCreateProps<
  * length, restricted to start with a certain value, restricted to end with
  * a certain value, restricted to match a certain regular expression.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link string | string()} function instead.
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string().equals('hello');
  * const result = schema.validate('hello');
  * // result.valid === true
  * // result.object === 'hello'
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string().equals('hello');
  * const result = schema.validate('world');
  * // result.valid === false
  * // result.errors[0].message === "is expected to be equal to 'hello'"
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string().minLength(5);
  * const result = schema.validate('hello');
  * // result.valid === true
  * // result.object === 'hello'
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string().minLength(5);
  * const result = schema.validate('hi');
  * // result.valid === false
  * // result.errors[0].message === 'is expected to have a length of at least 5'
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string().minLength(2).maxLength(5);
  * const result = schema.validate('yes');
  * // result.valid === true
  * // result.object === 'yes'
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string('no');
  * const result = schema.validate('yes');
  * // result.valid === false

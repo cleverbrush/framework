@@ -93,14 +93,19 @@ describe('CORS policy parsing', () => {
         'https://app.example.test, https://other.example.test',
         'https://app.example.test/path',
         'null https://app.example.test'
-    ])('rejects malformed Origin without calling a predicate: %s', async value => {
-        const predicate = vi.fn(() => true);
-        const { req, res } = exchange({ origin: value });
-        await new CorsPolicy({ origin: predicate }).handle(req, res, match);
-        expect(res.statusCode).toBe(403);
-        expect(predicate).not.toHaveBeenCalled();
-        expect(res.getHeader('access-control-allow-origin')).toBeUndefined();
-    });
+    ])(
+        'rejects malformed Origin without calling a predicate: %s',
+        async value => {
+            const predicate = vi.fn(() => true);
+            const { req, res } = exchange({ origin: value });
+            await new CorsPolicy({ origin: predicate }).handle(req, res, match);
+            expect(res.statusCode).toBe(403);
+            expect(predicate).not.toHaveBeenCalled();
+            expect(
+                res.getHeader('access-control-allow-origin')
+            ).toBeUndefined();
+        }
+    );
     it.each([
         { 'access-control-request-method': '' },
         { 'access-control-request-method': 'POST, DELETE' },

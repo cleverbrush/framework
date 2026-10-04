@@ -408,8 +408,11 @@ export class ScopedServiceProvider implements IServiceProvider {
      */
     resolveWithStack(
         schema: SchemaBuilder<any, any, any, any, any>,
-        resolutionStack: Set<SchemaBuilder<any, any, any, any, any>>
+        resolutionStack: Set<SchemaBuilder<any, any, any, any, any>>,
+        optional = false
     ): any {
+        if (optional && !this.#scope.getDescriptors().has(schema))
+            return undefined;
         return this.#resolve(schema, resolutionStack);
     }
 
@@ -465,6 +468,10 @@ class ScopedResolverProxy implements IServiceProvider {
     getOptional<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         schema: TSchema
     ): InferType<TSchema> | undefined {
-        return this.#provider.getOptional(schema);
+        return this.#provider.resolveWithStack(
+            schema,
+            this.#resolutionStack,
+            true
+        );
     }
 }

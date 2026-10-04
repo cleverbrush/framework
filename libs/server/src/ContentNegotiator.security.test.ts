@@ -10,7 +10,7 @@ describe('ContentNegotiator — security', () => {
         ) as any;
 
         expect(result.safe).toBe('ok');
-        expect(result.__proto__).toBe(Object.prototype);
+        expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
         expect(({} as any).polluted).toBeUndefined();
     });
 
@@ -85,7 +85,7 @@ describe('ContentNegotiator — security', () => {
         ) as Record<string, unknown>;
 
         expect(result.safe).toBe('ok');
-        expect(result.__proto__).toBe(Object.prototype);
+        expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
         expect(result.constructor).toBe(Object);
         expect(({} as any).polluted).toBeUndefined();
     });

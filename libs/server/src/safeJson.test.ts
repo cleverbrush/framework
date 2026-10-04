@@ -29,7 +29,7 @@ describe('safeJsonParse', () => {
             '{"__proto__":{"polluted":true},"safe":"value"}'
         ) as any;
         expect(result.safe).toBe('value');
-        expect(result.__proto__).toBe(Object.prototype);
+        expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
         expect(({} as any).polluted).toBeUndefined();
     });
 
@@ -38,7 +38,7 @@ describe('safeJsonParse', () => {
             '{"a":{"__proto__":{"polluted":true},"b":1}}'
         ) as any;
         expect(result.a.b).toBe(1);
-        expect(result.a.__proto__).toBe(Object.prototype);
+        expect(Object.getPrototypeOf(result.a)).toBe(Object.prototype);
         expect(({} as any).polluted).toBeUndefined();
     });
 
@@ -55,7 +55,7 @@ describe('safeJsonParse', () => {
             '[{"__proto__":{"polluted":true},"ok":1}]'
         ) as any[];
         expect(result[0].ok).toBe(1);
-        expect(result[0].__proto__).toBe(Object.prototype);
+        expect(Object.getPrototypeOf(result[0])).toBe(Object.prototype);
         expect(({} as any).polluted).toBeUndefined();
     });
 

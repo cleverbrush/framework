@@ -1,4 +1,7 @@
 # @cleverbrush/scheduler-postgres
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-11.2%25-red)
+<!-- coverage-badge-end -->
 
 PostgreSQL persistence for [@cleverbrush/scheduler](../scheduler/README.md).
 Uses @cleverbrush/orm and @cleverbrush/knex-schema for schemas, migrations and

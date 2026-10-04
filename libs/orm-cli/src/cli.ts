@@ -1,12 +1,13 @@
 // @cleverbrush/orm-cli — main command router
 
-import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import { loadConfig } from './config.js';
 import type { OrmCliConfig } from './types.js';
 
 // Read the CLI's own version at startup
-const _require = createRequire(import.meta.url);
-const _pkg = _require('../package.json') as { version: string };
+const _pkg = JSON.parse(
+    readFileSync(new URL('../package.json', import.meta.url), 'utf8')
+) as { version: string };
 
 export async function run(argv: string[]): Promise<void> {
     const [cmd, sub, ...rest] = argv;
@@ -170,7 +171,7 @@ COMMANDS
 OPTIONS
   --config <path>   Path to db.config.ts  (default: db.config.ts in cwd)
   --dir    <path>   Migrations directory  (overrides config.migrations.directory)
-  --to     <name>   (migrate run)      Apply up to a specific migration by filename
+  --to     <name>   (migrate run)      Apply one pending migration by filename
   --all             (migrate rollback) Roll back all applied migrations
   --yes             (db push)          Skip the confirmation prompt
   --help,    -h     Show this help

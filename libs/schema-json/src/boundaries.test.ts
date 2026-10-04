@@ -4,38 +4,38 @@ import { withStandardJsonSchema } from './standardJsonSchema.js';
 import { toJsonSchema } from './toJsonSchema.js';
 
 describe('named reference JSON Schema', () => {
-    it.each([
-        '2020-12',
-        '07'
-    ] as const)('keeps annotations outside the definition in draft %s', draft => {
-        const user = object({ name: string() }).schemaName('User');
-        const schema = object({
-            user: user,
-            previous: user
-                .nullable()
-                .optional()
-                .describe('Previous user')
-                .example(null)
-        });
-        const json = toJsonSchema(schema, {
-            draft,
-            $schema: false,
-            nameResolver: s => (s === user ? 'User' : null)
-        }) as any;
-        expect(json.required).toEqual(['user']);
-        expect(json.properties.user).toEqual({
-            $ref: '#/components/schemas/User'
-        });
-        expect(json.properties.previous).toMatchObject({
-            description: 'Previous user',
-            examples: [null],
-            anyOf: [
-                { allOf: [{ $ref: '#/components/schemas/User' }] },
-                { type: 'null' }
-            ]
-        });
-        expect(user.introspect().description).toBeUndefined();
-    });
+    it.each(['2020-12', '07'] as const)(
+        'keeps annotations outside the definition in draft %s',
+        draft => {
+            const user = object({ name: string() }).schemaName('User');
+            const schema = object({
+                user: user,
+                previous: user
+                    .nullable()
+                    .optional()
+                    .describe('Previous user')
+                    .example(null)
+            });
+            const json = toJsonSchema(schema, {
+                draft,
+                $schema: false,
+                nameResolver: s => (s === user ? 'User' : null)
+            }) as any;
+            expect(json.required).toEqual(['user']);
+            expect(json.properties.user).toEqual({
+                $ref: '#/components/schemas/User'
+            });
+            expect(json.properties.previous).toMatchObject({
+                description: 'Previous user',
+                examples: [null],
+                anyOf: [
+                    { allOf: [{ $ref: '#/components/schemas/User' }] },
+                    { type: 'null' }
+                ]
+            });
+            expect(user.introspect().description).toBeUndefined();
+        }
+    );
 
     it('keeps final local default and nullability modifiers', () => {
         const target = string().nullable().schemaName('Name');
@@ -60,45 +60,47 @@ describe('named reference JSON Schema', () => {
         );
     });
 
-    it.each([
-        '2020-12',
-        '07'
-    ] as const)('retains local modifiers before name resolution in draft %s', draft => {
-        const target = string()
-            .nullable()
-            .describe('Canonical')
-            .schemaName('Name');
-        const local = target
-            .notNullable()
-            .describe('Use')
-            .example('Ada')
-            .readonly();
-        const nameResolver = (s: typeof target) =>
-            s.introspect().schemaName ?? null;
-        expect(
-            toJsonSchema(local, { draft, $schema: false, nameResolver })
-        ).toEqual({
-            allOf: [
-                { $ref: '#/components/schemas/Name' },
+    it.each(['2020-12', '07'] as const)(
+        'retains local modifiers before name resolution in draft %s',
+        draft => {
+            const target = string()
+                .nullable()
+                .describe('Canonical')
+                .schemaName('Name');
+            const local = target
+                .notNullable()
+                .describe('Use')
+                .example('Ada')
+                .readonly();
+            const nameResolver = (s: typeof target) =>
+                s.introspect().schemaName ?? null;
+            expect(
+                toJsonSchema(local, { draft, $schema: false, nameResolver })
+            ).toEqual({
+                allOf: [
+                    { $ref: '#/components/schemas/Name' },
+                    { not: { type: 'null' } }
+                ],
+                description: 'Use',
+                examples: ['Ada'],
+                readOnly: true
+            });
+            expect(
+                toJsonSchema(local, { draft, $schema: false }).allOf
+            ).toEqual([
+                { type: ['string', 'null'], description: 'Canonical' },
                 { not: { type: 'null' } }
-            ],
-            description: 'Use',
-            examples: ['Ada'],
-            readOnly: true
-        });
-        expect(toJsonSchema(local, { draft, $schema: false }).allOf).toEqual([
-            { type: ['string', 'null'], description: 'Canonical' },
-            { not: { type: 'null' } }
-        ]);
-        expect(
-            toJsonSchema(local.nullable(), {
-                draft,
-                $schema: false,
-                nameResolver
-            }).allOf
-        ).toEqual([{ $ref: '#/components/schemas/Name' }]);
-        expect(target.introspect().description).toBe('Canonical');
-    });
+            ]);
+            expect(
+                toJsonSchema(local.nullable(), {
+                    draft,
+                    $schema: false,
+                    nameResolver
+                }).allOf
+            ).toEqual([{ $ref: '#/components/schemas/Name' }]);
+            expect(target.introspect().description).toBe('Canonical');
+        }
+    );
 
     it('exports shape/rule derivatives inline while keeping nested named children', () => {
         const name = string().schemaName('Name');

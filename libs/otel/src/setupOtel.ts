@@ -212,7 +212,9 @@ export function setupOtel(config: OtelConfig): OtelHandle {
             ...(url ? { url } : {}),
             ...(headers ? { headers } : {})
         });
-        logRecordProcessors = [new BatchLogRecordProcessor(logExporter)];
+        logRecordProcessors = [
+            new BatchLogRecordProcessor({ exporter: logExporter })
+        ];
     }
 
     let metricReader: PeriodicExportingMetricReader | undefined;
@@ -234,9 +236,11 @@ export function setupOtel(config: OtelConfig): OtelHandle {
 
     const sdk = new NodeSDK({
         resource,
-        ...(spanProcessors ? { spanProcessors } : {}),
-        ...(logRecordProcessors ? { logRecordProcessors } : {}),
-        ...(metricReader ? { metricReaders: [metricReader] } : {}),
+        // Explicit empty lists disable exporters; omitted options let the SDK
+        // re-enable defaults from the environment.
+        spanProcessors: spanProcessors ?? [],
+        logRecordProcessors: logRecordProcessors ?? [],
+        metricReaders: metricReader ? [metricReader] : [],
         instrumentations: (config.instrumentations ?? []) as any
     });
 

@@ -1,4 +1,7 @@
 # @cleverbrush/client
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-84%25-green)
+<!-- coverage-badge-end -->
 
 Typed HTTP client for `@cleverbrush/server` API contracts — zero codegen, full type safety. Optional React + TanStack Query integration via `@cleverbrush/client/react`.
 

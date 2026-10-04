@@ -2,14 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { alias, isSqlIdentifier, number, object } from './index.js';
 
 describe('isSqlIdentifier', () => {
-    it.each([
-        'task',
-        '_task',
-        'task_owner2',
-        'TaskOwner',
-        'select'
-    ])('accepts the supported single-name format: %s', name =>
-        expect(isSqlIdentifier(name)).toBe(true));
+    it.each(['task', '_task', 'task_owner2', 'TaskOwner', 'select'])(
+        'accepts the supported single-name format: %s',
+        name => expect(isSqlIdentifier(name)).toBe(true)
+    );
     it.each([
         '',
         '2tasks',
