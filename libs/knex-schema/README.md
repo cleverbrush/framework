@@ -1,6 +1,6 @@
 # @cleverbrush/knex-schema
 <!-- coverage-badge-start -->
-![Unit coverage](https://img.shields.io/badge/unit_coverage-63.5%25-yellow)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-83%25-green)
 <!-- coverage-badge-end -->
 
 Type-safe, schema-driven query builder for [Knex](https://knexjs.org/). Use `@cleverbrush/schema` object builders to describe your PostgreSQL tables — column name mapping, eager loading, and full CRUD are handled automatically with complete TypeScript inference.
@@ -636,8 +636,8 @@ See the `@cleverbrush/orm` docs for the full inheritance API (`.ofVariant()` etc
 | `entitiesToSnapshot(entities)` | Materialise entity definitions into a JSON-serialisable schema snapshot |
 | `loadSnapshot(path)` / `writeSnapshot(path, snap)` | Read/write the committed snapshot file |
 | `generateMigrationsForContext(entities, prevSnapshot)` | Diff entities against the snapshot and emit a TS migration source plus the next snapshot |
-| `generateMigration(snapshotA, snapshotB)` | Lower-level snapshot-vs-snapshot diff |
-| `diffSchema(schema, dbState)` / `applyDiff(knex, diff, table)` | Live-database diff/apply (used by `cb-orm db push`) |
+| `generateMigration(diff, tableName)` | Emit up/down migration source from a `MigrationDiff`; default changes preserve the column's type and nullability |
+| `diffSchema(schema, dbState)` / `applyDiff(knex, diff, table)` | Live-database diff/apply (used by `cb-orm db push`); default changes preserve column types and stored values |
 | `validateEntitiesAgainstDatabase(knex, entities)` | Read-only live-database validation for CI drift checks |
 | `introspectDatabase(knex, table)` / `tableExistsInDb(knex, table)` | Database introspection helpers |
 | `generateCreateTable(schema)` / `generateCreatePolymorphicTables(schema)` | Knex-statement builders for fresh `CREATE TABLE` |

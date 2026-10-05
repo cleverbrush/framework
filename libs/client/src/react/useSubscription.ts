@@ -119,7 +119,7 @@ export function useSubscription<TOutgoing, TIncoming = never>(
                         const next = [...prev, event];
                         const max = maxEventsRef.current;
                         if (max !== undefined && next.length > max) {
-                            return next.slice(-max);
+                            return max === 0 ? [] : next.slice(-max);
                         }
                         return next;
                     });

@@ -1,6 +1,6 @@
 # `@cleverbrush/orm`
 <!-- coverage-badge-start -->
-![Unit coverage](https://img.shields.io/badge/unit_coverage-81%25-green)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-92.1%25-brightgreen)
 <!-- coverage-badge-end -->
 
 EF-Core-like typed ORM layer on top of [`@cleverbrush/knex-schema`](../knex-schema).

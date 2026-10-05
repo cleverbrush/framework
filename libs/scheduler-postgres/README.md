@@ -1,6 +1,6 @@
 # @cleverbrush/scheduler-postgres
 <!-- coverage-badge-start -->
-![Unit coverage](https://img.shields.io/badge/unit_coverage-11.2%25-red)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-100%25-brightgreen)
 <!-- coverage-badge-end -->
 
 PostgreSQL persistence for [@cleverbrush/scheduler](../scheduler/README.md).

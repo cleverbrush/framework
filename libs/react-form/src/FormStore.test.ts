@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { createFormStore } from './FormStore.js';
 
 function setup(profile: any) {
@@ -71,4 +71,29 @@ describe('shared deep utilities in the form store', () => {
         store.setFieldValue('/profile', replacement, true);
         expect(store.getFieldState('/profile').dirty).toBe(true);
     });
+});
+test('notifies subscribers explicitly and clears root issues after value changes', () => {
+    const store = createFormStore(null);
+    const listener = vi.fn();
+    const unsubscribe = store.subscribe('/name', listener);
+    store.setIssues([{ pointer: '', detail: 'Invalid form' }]);
+    expect(store.getFieldState('/name').error).toBeUndefined();
+    store.notifyAll();
+    expect(listener).toHaveBeenCalled();
+    store.setValues({ name: 'Ada' });
+    expect(store.getSubmissionState().error).toBeUndefined();
+    unsubscribe();
+});
+
+test('safely reads escaped and malformed pointers when invalidating server issues', () => {
+    const store = createFormStore({ 'a/b': { 'c~d': 'old' }, name: 'old' });
+    store.setIssues([
+        { pointer: '/a~1b/c~0d', detail: 'Reserved value' },
+        { pointer: '/missing/child', detail: 'Unknown field' },
+        { pointer: '/bad~2pointer', detail: 'Malformed escape' },
+        { pointer: 'not-a-pointer', detail: 'Malformed root' }
+    ]);
+    store.setValues({ 'a/b': { 'c~d': 'new' }, name: 'new' });
+    expect(store.getSubmissionState().error).not.toContain('Reserved value');
+    expect(store.getSubmissionState().error).toContain('Malformed escape');
 });
