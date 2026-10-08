@@ -59,7 +59,7 @@ jobs:
         run: npm run build:schema-site && npm run build:docs-site
 
       - name: Generate every package API reference
-        run: npx typedoc --out "$RUNNER_TEMP/framework-api-docs"
+        run: npm run docs:generate -- --out "$RUNNER_TEMP/framework-api-docs"
 
       - uses: actions/upload-artifact@v4
         if: always()

@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
+import { typescriptCli } from '../../../scripts/typescript-cli.mjs';
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -145,11 +146,7 @@ services.addSingletonFromSchema(Result, factory, (value: number) => value);
         );
         const result = spawnSync(
             process.execPath,
-            [
-                join(repository, 'node_modules/typescript/lib/tsc.js'),
-                '-p',
-                join(directory, 'tsconfig.json')
-            ],
+            [typescriptCli(), '-p', join(directory, 'tsconfig.json')],
             { encoding: 'utf8', timeout: 60000 }
         );
         expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0);

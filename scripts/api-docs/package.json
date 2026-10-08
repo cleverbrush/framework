@@ -1,0 +1,9 @@
+{
+    "name": "@cleverbrush/api-docs-tooling",
+    "private": true,
+    "type": "module",
+    "devDependencies": {
+        "typedoc-legacy": "npm:typedoc@0.28.20",
+        "typescript": "6.0.3"
+    }
+}

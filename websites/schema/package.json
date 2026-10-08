@@ -18,7 +18,7 @@
         "@t3-oss/env-core": "^0.13.11",
         "@t3-oss/env-nextjs": "^0.13.11",
         "@tanstack/react-form": "^1.28.6",
-        "next": "^16.3.6",
+        "next": "16.4.0",
         "performative-ui": "^0.3.0",
         "react": "^19.2.4",
         "react-dom": "^19.2.4"
@@ -27,6 +27,6 @@
         "@types/node": "^20",
         "@types/react": "^19",
         "@types/react-dom": "^19",
-        "typescript": "^6.0.2"
+        "typescript": "7.1.0-dev.20261007.1"
     }
 }

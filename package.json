@@ -15,7 +15,7 @@
         "build:docs-site": "cd websites/docs && npm run build && cd ../..",
         "clean": "turbo run clean",
         "watch": "tsc --build --watch tsconfig.build.json",
-        "docs": "typedoc && ./scripts/inject-gtm.sh websites/docs/public/api-docs/latest",
+        "docs": "npm run docs:generate && ./scripts/inject-gtm.sh websites/docs/public/api-docs/latest",
         "docs:snapshot": "./scripts/snapshot-docs.sh",
         "lint": "biome check ./libs ./websites/schema ./websites/docs",
         "typecheck:schema-site": "tsc --noEmit -p websites/schema/tsconfig.json",
@@ -41,14 +41,16 @@
         "test:e2e:api": "npm run test:api -w @cleverbrush/demo-e2e",
         "test:e2e:ui": "npm run test:ui -w @cleverbrush/demo-e2e",
         "test:e2e:reset": "RESET=1 npm run test -w @cleverbrush/demo-e2e",
-        "test:storage:integration": "node scripts/test-storage.mjs"
+        "test:storage:integration": "node scripts/test-storage.mjs",
+        "docs:generate": "node scripts/generate-api-docs.mjs"
     },
     "workspaces": [
         "./libs/*",
         "./demos/*",
         "./websites/shared",
         "./websites/schema",
-        "./websites/docs"
+        "./websites/docs",
+        "./scripts/api-docs"
     ],
     "keywords": [],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
@@ -65,8 +67,18 @@
         "jsdom": "^29.0.1",
         "tsup": "^8.5.1",
         "turbo": "^2.9.14",
-        "typedoc": "^0.28.18",
-        "typescript": "^6.0.2",
+        "typescript": "7.1.0-dev.20261007.1",
         "vitest": "^4.1.11"
+    },
+    "overrides": {
+        "tsup": {
+            "typescript": "$typescript"
+        },
+        "@t3-oss/env-core": {
+            "typescript": "$typescript"
+        },
+        "@t3-oss/env-nextjs": {
+            "typescript": "$typescript"
+        }
     }
 }

@@ -11,8 +11,8 @@ type AnySchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<
  * in TypeScript. Allows to define a schema for \`any\` value.
  * Use it when you don't know the type of the value.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use \`any()\` function instead.
  *
  * @example
@@ -169,8 +169,8 @@ type ArraySchemaBuilderCreateProps<TElementSchema extends SchemaBuilder<any, any
  * Also you can limit the length of the array by using \`minLength\`
  * and \`maxLength\` methods.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link array | array()} function instead.
  * @see {@link array}
  */
@@ -200,11 +200,11 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
      */
     clearHasType(): ArraySchemaBuilder<TElementSchema, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /**
-     * Performs synchronous validation of the schema over \`object\`. {@inheritDoc SchemaBuilder.validate}
+     * {@inheritDoc SchemaBuilder.validate}
      */
     validate(object: TResult, context?: ValidationContext): ArraySchemaValidationResult<TResult, TElementSchema>;
     /**
-     * Performs asynchronous validation of the schema over \`object\`. {@inheritDoc SchemaBuilder.validateAsync}
+     * {@inheritDoc SchemaBuilder.validateAsync}
      */
     validateAsync(object: TResult, context?: ValidationContext): Promise<ArraySchemaValidationResult<TResult, TElementSchema>>;
     /**
@@ -365,23 +365,26 @@ type BooleanSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnT
  * Allows to define a schema for a boolean value. It can be required or optional.
  * It can be restricted to be equal to a certain value.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link boolean | boolean()} function instead.
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = boolean().equals(true);
  * const result = schema.validate(true);
  * // result.valid === true
  * // result.object === true
  * \`\`\`
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = boolean().equals(false);
  * const result = schema.validate(true);
  * // result.valid === false
  * // result.errors[0].message === 'is expected to be equal to 'false''
  * \`\`\`
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = boolean().equals(true).optional();
  * const result = schema.validate(undefined);
  * // result.valid === true
@@ -408,15 +411,6 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
     static create(props: BooleanSchemaBuilderCreateProps<any>): BooleanSchemaBuilder<boolean, any, false, undefined, false, {}, boolean>;
     protected constructor(props: BooleanSchemaBuilderCreateProps<TRequired>);
     introspect(): {
-        /**
-         * If set, restrict object to be equal to a certain value.
-         */
-        equalsTo: boolean | undefined;
-        /**
-         * Equals to validation error message provider.
-         * If not provided, default error message will be used.
-         */
-        equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<BooleanSchemaBuilder<TResult, TRequired, false, undefined, false, {}, TResult>>;
         type: string;
         isRequired: boolean;
         isNullable: boolean;
@@ -435,6 +429,15 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
         hasCatch: boolean;
         catchValue: TFinalResult | (() => TFinalResult) | undefined;
         example: unknown;
+        /**
+         * If set, restrict object to be equal to a certain value.
+         */
+        equalsTo: boolean | undefined;
+        /**
+         * Equals to validation error message provider.
+         * If not provided, default error message will be used.
+         */
+        equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<BooleanSchemaBuilder<TResult, TRequired, false, undefined, false, {}, TResult>>;
     };
     /**
      * @inheritdoc
@@ -508,7 +511,8 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
      * Accepts \`"true"\` → \`true\` and \`"false"\` → \`false\`; other values are
      * left unchanged so the boolean schema rejects them.
      *
-     * @example \`\`\`ts
+     * @example
+     * \`\`\`ts
      * const schema = boolean().coerce();
      * const result = schema.validate('true');
      * // result.valid === true
@@ -538,33 +542,37 @@ type DateSchemaBuilderCreateProps<T = Date, R extends boolean = true> = Partial<
  * It can be restricted to be: equal to a certain value, in future, in past, in a certain range.
  * Supports parsing from JSON string and UNIX epoch (using preprocessors).
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link date | date()} function instead.
  *
- * @example \`\`\`ts
- * const date = new Date(2020, 0, 2);
+ * @example
+ * \`\`\`ts
+ * const value = new Date(2020, 0, 2);
  * const schema = date().min(new Date(2020, 0, 1));
- * const result = schema.validate(date);
+ * const result = schema.validate(value);
  * // result.valid === true
- * // result.object === date
+ * // result.object === value
  * \`\`\`
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = date();
  * const result = schema.validate('2020-01-01');
  * // result.valid === false
  * // result.errors[0].message === 'is expected to be a date'
  * \`\`\`
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = date().parseFromJson();
  * const result = schema.validate('2020-01-01T00:00:00.000Z');
  * // result.valid === true
  * // result.object is equal to corresponding Date object
  * \`\`\`
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = date().parseFromEpoch();
  * const result = schema.validate(1577836800000);
  * // result.valid === true
@@ -589,6 +597,22 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
     static create(props: DateSchemaBuilderCreateProps): DateSchemaBuilder<Date, true, false, false, {}>;
     protected constructor(props: DateSchemaBuilderCreateProps);
     introspect(): {
+        type: string;
+        isRequired: boolean;
+        isNullable: boolean;
+        isReadonly: boolean;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
+        example: unknown;
         /**
          * Min valid value (if defined).
          */
@@ -652,22 +676,6 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
          * Array of validator functions
          */
         validators: ValidatorEntry<TResult>[];
-        type: string;
-        isRequired: boolean;
-        isNullable: boolean;
-        isReadonly: boolean;
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
-        extensions: {
-            [x: string]: unknown;
-        };
-        hasDefault: boolean;
-        defaultValue: TResult | (() => TResult) | undefined;
-        description: string | undefined;
-        schemaName: string | undefined;
-        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
-        hasCatch: boolean;
-        catchValue: TResult | (() => TResult) | undefined;
-        example: unknown;
     };
     /**
      * @inheritdoc
@@ -797,7 +805,8 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
      * For more specific parsing, see {@link acceptJsonString} and
      * {@link acceptEpoch}.
      *
-     * @example \`\`\`ts
+     * @example
+     * \`\`\`ts
      * const schema = date().coerce();
      * const result = schema.validate('2024-01-15');
      * // result.valid === true
@@ -862,8 +871,8 @@ type ExternSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnTy
  * so \`getErrorsFor(t => t.order.id)\` works without any additional
  * configuration.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use the {@link extern | extern()} factory function instead.
  *
  * @example
@@ -1052,8 +1061,8 @@ type InferParameters<TParams extends SchemaBuilder<any, any, any, any, any>[]> =
  * It can be required or optional, and may carry typed parameter and return-type
  * schemas so that the inferred TypeScript function signature is fully typed.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link func | func()} function instead.
  *
  * @example Basic validation
@@ -1143,10 +1152,6 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNu
      * \`\`\`
      */
     introspect(): {
-        /** List of parameter schemas added via {@link addParameter}. */
-        parameters: SchemaBuilder<any, any, any, any, any>[];
-        /** Return type schema set via {@link hasReturnType}, or \`undefined\` if not set. */
-        returnType: SchemaBuilder<any, any, any, any, any> | undefined;
         type: string;
         isRequired: boolean;
         isNullable: boolean;
@@ -1165,6 +1170,10 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNu
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
+        /** List of parameter schemas added via {@link addParameter}. */
+        parameters: SchemaBuilder<any, any, any, any, any>[];
+        /** Return type schema set via {@link hasReturnType}, or \`undefined\` if not set. */
+        returnType: SchemaBuilder<any, any, any, any, any> | undefined;
     };
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
@@ -1312,8 +1321,8 @@ type GenericSchemaBuilderCreateProps<TRequired extends boolean = true> = Partial
  * builder whose TypeScript type is inferred from the template function's
  * generic signature.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link generic | generic()} function instead.
  *
  * @example Single type parameter
@@ -1355,7 +1364,7 @@ type GenericSchemaBuilderCreateProps<TRequired extends boolean = true> = Partial
  * // InferType → { ok: boolean; value?: string; error?: number }
  * \`\`\`
  *
- * @example With default arguments (enables direct \`.validate()\` on the template)
+ * @example With default arguments
  * \`\`\`ts
  * const AnyList = generic(
  *   [any()],   // default args — one per template parameter
@@ -1449,10 +1458,6 @@ export declare class GenericSchemaBuilder<TFn extends (...args: any[]) => Schema
      * \`\`\`
      */
     introspect(): {
-        /** Template function passed to {@link generic}. */
-        templateFn: ((...args: any[]) => SchemaBuilder<any, any, any, any, any>) | undefined;
-        /** Default positional arguments for the template function, or \`undefined\`. */
-        defaults: readonly any[] | undefined;
         type: string;
         isRequired: boolean;
         isNullable: boolean;
@@ -1471,6 +1476,10 @@ export declare class GenericSchemaBuilder<TFn extends (...args: any[]) => Schema
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
+        /** Template function passed to {@link generic}. */
+        templateFn: ((...args: any[]) => SchemaBuilder<any, any, any, any, any>) | undefined;
+        /** Default positional arguments for the template function, or \`undefined\`. */
+        defaults: readonly any[] | undefined;
     };
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
@@ -1621,8 +1630,6 @@ export declare class IntersectionSchemaBuilder<TLeft extends SchemaBuilder<any, 
     static create(props: IntersectionSchemaBuilderCreateProps<any, any>): IntersectionSchemaBuilder<any, any, true, false, undefined, false, {}>;
     protected constructor(props: IntersectionSchemaBuilderCreateProps<TLeft, TRight, TRequired>);
     introspect(): {
-        left: TLeft;
-        right: TRight;
         type: string;
         isRequired: boolean;
         isNullable: boolean;
@@ -1634,13 +1641,15 @@ export declare class IntersectionSchemaBuilder<TLeft extends SchemaBuilder<any, 
             [x: string]: unknown;
         };
         hasDefault: boolean;
-        defaultValue: (TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | undefined;
+        defaultValue: (() => TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | (TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
         referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
-        catchValue: (TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | undefined;
+        catchValue: (() => TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | (TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | undefined;
         example: unknown;
+        left: TLeft;
+        right: TRight;
     };
     /**
      * @override
@@ -1787,11 +1796,6 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
      * @inheritdoc
      */
     introspect(): {
-        /**
-         * The getter function that returns the lazily-resolved schema.
-         * Call {@link LazySchemaBuilder.resolve} to obtain the schema instance.
-         */
-        getter: () => SchemaBuilder<TResult, any, any>;
         type: string;
         isRequired: boolean;
         isNullable: boolean;
@@ -1810,6 +1814,11 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
+        /**
+         * The getter function that returns the lazily-resolved schema.
+         * Call {@link LazySchemaBuilder.resolve} to obtain the schema instance.
+         */
+        getter: () => SchemaBuilder<TResult, any, any>;
     };
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
@@ -1919,8 +1928,8 @@ type NullSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType
  * in a typed schema, for example in discriminated-union branches or when
  * modelling a JSON payload that may carry a JSON \`null\` value.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link nul | nul()} function instead.
  *
  * @example
@@ -1982,12 +1991,10 @@ export declare class NullSchemaBuilder<TRequired extends boolean = true, TNullab
     validateAsync(object: null, context?: ValidationContext): Promise<ValidationResult<null>>;
     /**
      * Performs synchronous validation of the schema over \`object\`.
-     * @param context Optional \`ValidationContext\` settings.
      */
     protected _validate(object: null, _context?: ValidationContext): ValidationResult<null>;
     /**
      * Performs async validation of the schema over \`object\`.
-     * @param context Optional \`ValidationContext\` settings.
      */
     protected _validateAsync(object: null, _context?: ValidationContext): Promise<ValidationResult<null>>;
     protected createFromProps<TReq extends boolean>(props: NullSchemaBuilderCreateProps<TReq>): this;
@@ -2076,30 +2083,34 @@ type NumberSchemaBuilderCreateProps<T = number, R extends boolean = true> = Part
  * Can be required or optional, can be restricted to be equal to a certain value,
  * can be restricted to be in a certain range, can be restricted to be integer.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link number | number()} function instead.
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = number().equals(42);
  * const result = schema.validate(42);
  * // result.valid === true
  * // result.object === 42
  * \`\`\`
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = number();
  * const result = schema.validate('42');
  * // result.valid === false
  * // result.errors[0].message === 'is expected to be a number'
  * \`\`\`
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = number().min(0).max(100);
  * const result = schema.validate(42);
  * // result.valid === true
  * // result.object === 42
  * \`\`\`
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = number().min(0).max(100);
  * const result = schema.validate(142.5);
  * // result.valid === false
@@ -2124,6 +2135,22 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
     static create(props: NumberSchemaBuilderCreateProps): NumberSchemaBuilder<number, true, false, false, {}>;
     protected constructor(props: NumberSchemaBuilderCreateProps);
     introspect(): {
+        type: string;
+        isRequired: boolean;
+        isNullable: boolean;
+        isReadonly: boolean;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
+        example: unknown;
         /**
          * Min valid value (if defined).
          */
@@ -2185,22 +2212,6 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
          * Array of validator functions
          */
         validators: ValidatorEntry<TResult>[];
-        type: string;
-        isRequired: boolean;
-        isNullable: boolean;
-        isReadonly: boolean;
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
-        extensions: {
-            [x: string]: unknown;
-        };
-        hasDefault: boolean;
-        defaultValue: TResult | (() => TResult) | undefined;
-        description: string | undefined;
-        schemaName: string | undefined;
-        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
-        hasCatch: boolean;
-        catchValue: TResult | (() => TResult) | undefined;
-        example: unknown;
     };
     /**
      * @inheritdoc
@@ -2316,7 +2327,8 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
      * a string source (e.g. a parse-string schema, URL parameter,
      * or form input).
      *
-     * @example \`\`\`ts
+     * @example
+     * \`\`\`ts
      * const schema = number().coerce();
      * const result = schema.validate('42');
      * // result.valid === true
@@ -2520,8 +2532,8 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
  * Which means that you can define nested objects and arrays of
  * any complexity.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link object | object()} function instead.
  *
  * @example
@@ -2646,12 +2658,12 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
             [x: string]: unknown;
         };
         hasDefault: boolean;
-        defaultValue: (undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | (() => undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | undefined;
+        defaultValue: (() => undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | (undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
         referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
-        catchValue: (undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | (() => undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | undefined;
+        catchValue: (() => undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | (undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | undefined;
         example: unknown;
     };
     /**
@@ -3188,10 +3200,6 @@ export declare class ParseStringSchemaBuilder<TResult = any, TRequired extends b
      * - \`templateDefinition\` — the parsed template (literals and selector segments).
      */
     introspect(): {
-        /** The object schema defining the result shape. */
-        objectSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
-        /** The template definition (literals + segments). */
-        templateDefinition: ParseStringTemplateDefinition;
         type: string;
         isRequired: boolean;
         isNullable: boolean;
@@ -3210,6 +3218,10 @@ export declare class ParseStringSchemaBuilder<TResult = any, TRequired extends b
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
+        /** The object schema defining the result shape. */
+        objectSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+        /** The template definition (literals + segments). */
+        templateDefinition: ParseStringTemplateDefinition;
     };
     /**
      * Builds a string from the template by substituting parameter values.
@@ -3340,8 +3352,8 @@ type PromiseSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnT
  * function) and optionally carries a typed resolved-value schema so that
  * the inferred TypeScript type is \`Promise<T>\` instead of \`Promise<any>\`.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link promise | promise()} function instead.
  *
  * @example Basic validation
@@ -3418,8 +3430,6 @@ export declare class PromiseSchemaBuilder<TRequired extends boolean = true, TNul
      * \`\`\`
      */
     introspect(): {
-        /** Resolved-value schema set via {@link hasResolvedType}, or \`undefined\` if not set. */
-        resolvedType: SchemaBuilder<any, any, any, any, any> | undefined;
         type: string;
         isRequired: boolean;
         isNullable: boolean;
@@ -3438,6 +3448,8 @@ export declare class PromiseSchemaBuilder<TRequired extends boolean = true, TNul
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
+        /** Resolved-value schema set via {@link hasResolvedType}, or \`undefined\` if not set. */
+        resolvedType: SchemaBuilder<any, any, any, any, any> | undefined;
     };
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
@@ -3868,14 +3880,6 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
      * Returns an introspection object describing the record schema.
      */
     introspect(): {
-        /**
-         * The schema every key must satisfy (a \`StringSchemaBuilder\`).
-         */
-        keySchema: TKeySchema;
-        /**
-         * The schema every value must satisfy.
-         */
-        valueSchema: TValueSchema;
         type: string;
         isRequired: boolean;
         isNullable: boolean;
@@ -3894,6 +3898,14 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
+        /**
+         * The schema every key must satisfy (a \`StringSchemaBuilder\`).
+         */
+        keySchema: TKeySchema;
+        /**
+         * The schema every value must satisfy.
+         */
+        valueSchema: TValueSchema;
     };
     /**
      * Core sync validation. {@inheritDoc SchemaBuilder.validate}
@@ -4035,7 +4047,7 @@ export type InferType<T> = T extends {
  *
  * When returned from an object-level validator (via {@link SchemaBuilder.addValidator | addValidator}),
  * the optional \`property\` selector can route the error to a specific property
- * so that {@link ObjectSchemaValidationResult.getErrorsFor | getErrorsFor()} reports it
+ * so that \`ObjectSchemaValidationResult.getErrorsFor()\` reports it
  * on that property rather than only on the root object.
  *
  * \`\`\`ts
@@ -4437,8 +4449,8 @@ type ResolvedSchemaType<TResult, TRequired extends boolean, TNullable extends bo
  * Base class for all schema builders. Provides basic functionality for schema building.
  *
  * **Note:** this class is not intended to be used directly, use one of the subclasses instead.
- * @typeparam TResult Type of the object that will be returned by \`validate()\` method.
- * @typeparam TRequired If \`true\`, object will be required. If \`false\`, object will be optional.
+ * @typeParam TResult Type of the object that will be returned by \`validate()\` method.
+ * @typeParam TRequired If \`true\`, object will be required. If \`false\`, object will be optional.
  */
 export declare abstract class SchemaBuilder<TResult = any, TRequired extends boolean = true, TNullable extends boolean = false, THasDefault extends boolean = false, TExtensions = {}> {
     #private;
@@ -5082,46 +5094,52 @@ type StringSchemaBuilderCreateProps<T = string, R extends boolean = true> = Part
  * length, restricted to start with a certain value, restricted to end with
  * a certain value, restricted to match a certain regular expression.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link string | string()} function instead.
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = string().equals('hello');
  * const result = schema.validate('hello');
  * // result.valid === true
  * // result.object === 'hello'
  * \`\`\`
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = string().equals('hello');
  * const result = schema.validate('world');
  * // result.valid === false
  * // result.errors[0].message === "is expected to be equal to 'hello'"
  * \`\`\`
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = string().minLength(5);
  * const result = schema.validate('hello');
  * // result.valid === true
  * // result.object === 'hello'
  * \`\`\`
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = string().minLength(5);
  * const result = schema.validate('hi');
  * // result.valid === false
  * // result.errors[0].message === 'is expected to have a length of at least 5'
  * \`\`\`
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = string().minLength(2).maxLength(5);
  * const result = schema.validate('yes');
  * // result.valid === true
  * // result.object === 'yes'
  * \`\`\`
  *
- * @example \`\`\`ts
+ * @example
+ * \`\`\`ts
  * const schema = string('no');
  * const result = schema.validate('yes');
  * // result.valid === false
@@ -5146,6 +5164,22 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
     static create(props: StringSchemaBuilderCreateProps): StringSchemaBuilder<string, true, false, false, {}>;
     protected constructor(props: StringSchemaBuilderCreateProps);
     introspect(): {
+        type: string;
+        isRequired: boolean;
+        isNullable: boolean;
+        isReadonly: boolean;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
+        example: unknown;
         /**
          * Min length of the string (if defined).
          */
@@ -5208,22 +5242,6 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
          * Array of validator functions
          */
         validators: ValidatorEntry<TResult>[];
-        type: string;
-        isRequired: boolean;
-        isNullable: boolean;
-        isReadonly: boolean;
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
-        extensions: {
-            [x: string]: unknown;
-        };
-        hasDefault: boolean;
-        defaultValue: TResult | (() => TResult) | undefined;
-        description: string | undefined;
-        schemaName: string | undefined;
-        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
-        hasCatch: boolean;
-        catchValue: TResult | (() => TResult) | undefined;
-        example: unknown;
     };
     /**
      * @inheritdoc
@@ -5414,8 +5432,8 @@ type TupleSchemaBuilderCreateProps<TElements extends readonly SchemaBuilder<any,
  * Use it when you need to validate function arguments, CSV rows, coordinate
  * pairs, structured event payloads, or any other fixed-structure array.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link tuple | tuple()} function instead.
  *
  * @example
@@ -5490,11 +5508,11 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
      */
     clearHasType(): TupleSchemaBuilder<TElements, TRequired, TNullable, undefined, THasDefault, TExtensions, TRestSchema> & TExtensions;
     /**
-     * Performs synchronous validation of the schema over \`object\`. {@inheritDoc SchemaBuilder.validate}
+     * {@inheritDoc SchemaBuilder.validate}
      */
     validate(object: TResult, context?: ValidationContext): TupleSchemaValidationResult<TResult, TElements>;
     /**
-     * Performs asynchronous validation of the schema over \`object\`. {@inheritDoc SchemaBuilder.validateAsync}
+     * {@inheritDoc SchemaBuilder.validateAsync}
      */
     validateAsync(object: TResult, context?: ValidationContext): Promise<TupleSchemaValidationResult<TResult, TElements>>;
     /**
@@ -5536,16 +5554,6 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions, TRestSchema> & TExtensions;
     introspect(): {
-        /**
-         * Per-position element schemas defining the fixed tuple structure.
-         */
-        elements: TElements;
-        /**
-         * Optional schema for elements beyond the fixed positions.
-         * When set, additional elements are validated against this schema.
-         * Mirrors TypeScript's rest element syntax: \`[string, number, ...boolean[]]\`.
-         */
-        restSchema: (TRestSchema & SchemaBuilder<any, any, any, any, any>) | undefined;
         type: string;
         isRequired: boolean;
         isNullable: boolean;
@@ -5564,6 +5572,16 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
+        /**
+         * Per-position element schemas defining the fixed tuple structure.
+         */
+        elements: TElements;
+        /**
+         * Optional schema for elements beyond the fixed positions.
+         * When set, additional elements are validated against this schema.
+         * Mirrors TypeScript's rest element syntax: \`[string, number, ...boolean[]]\`.
+         */
+        restSchema: (TRestSchema & SchemaBuilder<any, any, any, any, any>) | undefined;
     };
     /**
      * Sets a schema that all elements beyond the fixed positions must satisfy.
@@ -5691,8 +5709,8 @@ type TakeExceptIndex<TArr extends readonly SchemaBuilder<any, any, any, any, any
  * Which means that you are not limited to primitive types and
  * can construct complex types as well, e.g. object | array.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link union | union()} function instead.
  *
  * @example
@@ -5769,12 +5787,12 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
             [x: string]: unknown;
         };
         hasDefault: boolean;
-        defaultValue: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
+        defaultValue: (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
         referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
-        catchValue: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
+        catchValue: (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
         example: unknown;
     };
     /**
@@ -6110,7 +6128,7 @@ type MergeExtensionMethods<TExts extends readonly ExtensionDescriptor<any>[], TT
  *
  * This powers scope-name autocomplete in \`SchemaQueryBuilder.scoped()\`.
  */
-declare const METHOD_LITERAL_BRAND: "__cleverbrush_method_literal_brand__";
+declare const METHOD_LITERAL_BRAND: '__cleverbrush_method_literal_brand__';
 export { METHOD_LITERAL_BRAND };
 export type MethodLiteralBrandSymbol = typeof METHOD_LITERAL_BRAND;
 /**
@@ -6133,7 +6151,7 @@ export type MethodLiteralBrandSymbol = typeof METHOD_LITERAL_BRAND;
  *
  * @see {@link FixedMethods} for how the accumulation works.
  */
-declare const EXTRA_TYPE_BRAND: "__cleverbrush_extra_type_brand__";
+declare const EXTRA_TYPE_BRAND: '__cleverbrush_extra_type_brand__';
 export { EXTRA_TYPE_BRAND };
 export type ExtraTypeBrandSymbol = typeof EXTRA_TYPE_BRAND;
 /** @internal Drops the first element of a tuple type. */
@@ -7141,8 +7159,7 @@ export interface StringBuiltinExtensions<T extends string = string> {
      * By default only \`http\` and \`https\` protocols are accepted.
      * Pass \`opts.protocols\` to restrict or expand the allowed set.
      *
-     * @param opts - optional configuration
-     * @param opts.protocols - allowed URL protocols (default: \`['http', 'https']\`)
+     * The options overload accepts a \`protocols\` array (default: http/https).
      * @param errorMessage - custom error message or function to generate one
      * @returns a new schema builder with the URL validator applied
      *
@@ -7319,8 +7336,7 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
          * By default only \`http\` and \`https\` protocols are accepted.
          * Pass \`opts.protocols\` to restrict or expand the allowed set.
          *
-         * @param opts - optional configuration
-         * @param opts.protocols - allowed URL protocols (default: \`['http', 'https']\`)
+         * @param optsOrError - protocol options or a custom error message
          * @param errorMessage - custom error message or function to generate one
          * @returns a new schema builder with the URL validator applied
          *
@@ -7366,7 +7382,7 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
          * \`\`\`
          */
         ip(this: StringSchemaBuilder, opts?: {
-            version?: "v4" | "v6";
+            version?: 'v4' | 'v6';
         }, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, false, {}>;
         /**
          * Preprocessor that trims leading and trailing whitespace before validation.

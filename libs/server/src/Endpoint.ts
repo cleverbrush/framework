@@ -707,17 +707,20 @@ type CacheTagSelector<TParams, TBody, TQuery, THeaders> = {
           : Record<string, never>;
 };
 
+// Explicit variance lets the native compiler compare contracts by their type
+// arguments instead of expanding every method for each operation in a large API.
+// Body/response descriptors also expose setters, so those states are invariant.
 export class EndpointBuilder<
-    TParams = {},
-    TBody = undefined,
-    TQuery = {},
-    THeaders = {},
-    TServices = {},
-    TPrincipal = undefined,
-    TRoles extends string = string,
-    TResponse = any,
-    TResponses extends Record<number, any> = {},
-    TUpload extends UploadContract = false
+    out TParams = {},
+    in out TBody = undefined,
+    out TQuery = {},
+    out THeaders = {},
+    out TServices = {},
+    out TPrincipal = undefined,
+    out TRoles extends string = string,
+    in out TResponse = any,
+    out TResponses extends Record<number, any> = {},
+    out TUpload extends UploadContract = false
 > {
     readonly #method: string;
     readonly #basePath: string;
