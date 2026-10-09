@@ -1,0 +1,147 @@
+name: CI
+
+on:
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: framework-validation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint, Build & Test (Node ${{ matrix.node }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [24]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Typecheck schema site
+        run: npm run typecheck:schema-site
+
+      - name: Typecheck docs site
+        run: npm run typecheck:docs-site
+
+      - name: Test & Typecheck
+        run: npm run test
+
+      - name: Coverage and package floors
+        run: npm run test:coverage
+
+      - name: Dependency security
+        run: npm audit --audit-level=high
+
+      - name: Packed package smoke tests
+        run: npm run test:packages
+
+      - name: Build documentation websites
+        run: npm run build:schema-site && npm run build:docs-site
+
+      - name: Generate every package API reference
+        run: npx typedoc --out "$RUNNER_TEMP/framework-api-docs"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-node-${{ matrix.node }}
+          path: coverage/
+
+  query-integration:
+    name: PostgreSQL Query Integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: framework_queries
+          POSTGRES_USER: framework_test
+          POSTGRES_PASSWORD: framework_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U framework_test -d framework_queries"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      QUERY_TEST_DATABASE_URL: postgres://framework_test:framework_test@127.0.0.1:5432/framework_queries
+      SCHEDULER_TEST_DATABASE_URL: postgres://framework_test:framework_test@127.0.0.1:5432/framework_queries
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:queries:integration
+      - run: npm run test:scheduler:integration
+      - run: npm run test:queries:integration && npm run test:scheduler:integration
+        env:
+          TZ: America/Los_Angeles
+      - run: node demos/durable-jobs/demo.ts
+      - run: node demos/durable-jobs/periodic.ts --fast
+
+  storage-integration:
+    name: S3 Storage Integration (Garage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:storage:integration
+
+  demo-e2e:
+    name: Demo API, browser and telemetry E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      KEEP_STACK: '0'
+      COMPOSE_PROJECT_NAME: framework-e2e
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run playwright:install --workspace @cleverbrush/demo-e2e -- --with-deps
+      - run: npm run test:e2e
+      - name: Collect isolated stack logs
+        if: failure()
+        run: docker compose -f demos/docker-compose.yml logs --no-color > e2e-stack.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: demo-e2e-logs
+          path: e2e-stack.log
+      - name: Remove disposable CI stack
+        if: always()
+        run: docker compose -f demos/docker-compose.yml down --volumes --remove-orphans
