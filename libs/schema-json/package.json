@@ -32,7 +32,7 @@
         "@cleverbrush/schema": "*"
     },
     "peerDependencies": {
-        "@cleverbrush/schema": "^4.0.0",
+        "@cleverbrush/schema": "^5.0.0",
         "@standard-schema/spec": "^1.1.0"
     },
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/schema-json#readme",
@@ -47,5 +47,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "4.5.0"
+    "version": "5.0.0"
 }

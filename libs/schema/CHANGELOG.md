@@ -1,5 +1,54 @@
 # @cleverbrush/schema
 
+## 5.0.0
+
+### Major Changes
+
+- d916566: Make Framework query builders immutable and infer row schemas automatically.
+  
+  Retain returned query builders, return synchronous builders from scopes and grouped predicates, and supply an explicit Framework object output schema for opaque raw SELECTs. Ordinary, aliased, polymorphic and ORM queries expose their row schemas directly. Projections replace scalar selections, and projected/aggregate/raw queries cannot perform entity writes. Reads and write-returning rows consistently preserve exact decimal/bigint strings, Date objects and SQL nulls.
+  
+  All published Framework packages advance together to the next major version. Tracked entity objects remain mutable.
+  
+  ### Migrating from v4.x to v5
+  
+  Remove `withRowSchema()` calls and retain each configured query instead of relying on mutation. Replace raw base-query overloads with explicit output contracts. See `libs/knex-schema/MIGRATION-v5.md` for the complete migration guide.
+- c5b4dbc: Require Node.js 24+ consistently across all published packages. Correct the root and all published-package license files to BSD-3-Clause, matching package metadata and documentation, and verify license consistency in source and npm tarballs. See docs/MIGRATION-v5.md for migration guidance.
+  
+  Harden JWT key/algorithm and claim validation, cookie parsing/serialization, and request-body lifecycle handling. Require explicit authorization scope for bounded server idempotency; coalesce concurrent retries and capture full response bodies. Bound response caching and bypass private, no-store and cookie-setting responses.
+  
+  Preserve DI scope validation through factories and propagate registered optional-service failures. Fix batch response status/header capture, timeout abort-listener cleanup, concurrent deduplication response cloning, CLI database cleanup on validation/production-guard failures, and the missing client idempotency JavaScript export. Update security-sensitive dependencies and ensure OpenTelemetry disable flags override SDK defaults.
+  
+  Add regression tests, package-consumer smoke checks, package-level unit coverage floors, migration/security documentation and release validation gates.
+
+### Minor Changes
+
+- a90a491: Add opt-in immutable, detached PostgreSQL reads with projection-aware runtime
+  schemas, precise decimal/bigint decoding, nested relation graphs and explicit
+  STI/CTI branch schemas. Reuse result schemas directly in separately defined
+  application mappings without duplicating projection schemas.
+  
+  Add `getSyncMapper()` with synchronous eligibility inferred through the existing
+  `configure()` API, completeness checks, nested mapping propagation and runtime
+  thenable guards. Existing queries and asynchronous mapping behavior are unchanged.
+  
+  Add application-agnostic typed metadata extension methods that retain metadata
+  through immutable chains. Use these in database extensions without modifying
+  global schema prototypes.
+  
+  Preserve typed function-schema compatibility in dependency injection when a
+  function declares its return schema.
+- f9b1f56: Add optional-aware fallbacks and preprocessing, and automatic named schema
+  references through ordinary immutable use-site modifiers, without a wrapper API.
+  Shape, validation-rule, default, fallback and extension changes clear inherited
+  names; apply schemaName after those edits to establish a new named definition.
+  Preserve one canonical definition in JSON
+  Schema, OpenAPI and AsyncAPI with strict name collision checks. Keep existing
+  type inference and optional null acceptance unchanged.
+- 47133eb: Preserve structured server validation issues through typed clients and form
+  submissions. Add transport-independent external form issues, typed indexed array
+  fields, and precise indexed validation paths without changing existing form APIs.
+
 ## 4.5.0
 
 ## 4.4.3

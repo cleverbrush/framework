@@ -1,5 +1,78 @@
 # @cleverbrush/server
 
+## 5.0.0
+
+### Major Changes
+
+- d916566: Make Framework query builders immutable and infer row schemas automatically.
+  
+  Retain returned query builders, return synchronous builders from scopes and grouped predicates, and supply an explicit Framework object output schema for opaque raw SELECTs. Ordinary, aliased, polymorphic and ORM queries expose their row schemas directly. Projections replace scalar selections, and projected/aggregate/raw queries cannot perform entity writes. Reads and write-returning rows consistently preserve exact decimal/bigint strings, Date objects and SQL nulls.
+  
+  All published Framework packages advance together to the next major version. Tracked entity objects remain mutable.
+  
+  ### Migrating from v4.x to v5
+  
+  Remove `withRowSchema()` calls and retain each configured query instead of relying on mutation. Replace raw base-query overloads with explicit output contracts. See `libs/knex-schema/MIGRATION-v5.md` for the complete migration guide.
+- c5b4dbc: Require Node.js 24+ consistently across all published packages. Correct the root and all published-package license files to BSD-3-Clause, matching package metadata and documentation, and verify license consistency in source and npm tarballs. See docs/MIGRATION-v5.md for migration guidance.
+  
+  Harden JWT key/algorithm and claim validation, cookie parsing/serialization, and request-body lifecycle handling. Require explicit authorization scope for bounded server idempotency; coalesce concurrent retries and capture full response bodies. Bound response caching and bypass private, no-store and cookie-setting responses.
+  
+  Preserve DI scope validation through factories and propagate registered optional-service failures. Fix batch response status/header capture, timeout abort-listener cleanup, concurrent deduplication response cloning, CLI database cleanup on validation/production-guard failures, and the missing client idempotency JavaScript export. Update security-sensitive dependencies and ensure OpenTelemetry disable flags override SDK defaults.
+  
+  Add regression tests, package-consumer smoke checks, package-level unit coverage floors, migration/security documentation and release validation gates.
+
+### Minor Changes
+
+- 54a3d43: Add opt-in server-wide CORS through `ServerBuilder.useCors()` and
+  `ServerCorsOptions`. Handle route-aware preflights before authentication while
+  preserving the normal pipeline for actual requests. Support exact origins,
+  origin predicates, explicit request/response header policies, credentials and
+  preflight cache duration. Reject disallowed origins before handlers and finalize
+  CORS headers per physical response, including errors and cache/idempotency replays.
+- 0a08509: Add immutable, contract-bound implementation scopes and feature-module composition
+  with complete operation coverage, cross-file handler inference, shared/per-operation
+  DI, and unchanged HTTP/subscription registration. Add reusable, endpoint-checked
+  error policies and a standalone handler wrapper. Existing registration APIs and
+  the browser-safe contract entry point remain supported.
+- 47133eb: Preserve structured server validation issues through typed clients and form
+  submissions. Add transport-independent external form issues, typed indexed array
+  fields, and precise indexed validation paths without changing existing form APIs.
+- 32240e4: Add contract-declared mutation replay with typed async request preparation,
+  explicit authorization scopes, and consistent endpoint error policies. Generate
+  client keys and coordinate HTTP retries/batching from the contract without
+  changing ordinary client calls. Document replay headers and framework errors in
+  OpenAPI while preserving domain response schemas.
+- e788a0d: Add schema-based single and multiple file upload contracts, typed multipart client
+  serialization, and matching OpenAPI schemas. Enforce multipart body, file, field,
+  and part limits, reject truncated or duplicate singleton uploads, and support
+  file-only endpoints. Existing options-only uploads retain their single-file
+  shape and explicit MIME rejection reporting.
+  
+  Add lossless JSONB object reads and writes using native object schemas with
+  `.acceptUnknownProps().jsonb()`. Preserve nested extension data through returning
+  rows and projections, validate JSON extensions in the database layer, align
+  nullable object column DDL with reads, and track nested edits independently in
+  the ORM. Fix the PostgreSQL
+  upsert returning path exercised by document round trips.
+
+### Patch Changes
+
+- 6d7e982: Close WebSocket subscriptions when middleware rejects the request without
+  calling the next handler, preventing idle unauthorized connections.
+- efe2f2f: Preserve original property declarations and JSDoc through derived types so
+  editors can navigate to definitions and show property documentation. This covers
+  query selectors, rows, projections and write payloads; declared relation includes;
+  mapper targets; JSON Schema inferred values; composed API groups and injected
+  services; and merged object properties. Runtime behavior is unchanged.
+- Updated dependencies [d916566]
+- Updated dependencies [a90a491]
+- Updated dependencies [f9b1f56]
+- Updated dependencies [c5b4dbc]
+- Updated dependencies [47133eb]
+  - @cleverbrush/auth@5.0.0
+  - @cleverbrush/di@5.0.0
+  - @cleverbrush/schema@5.0.0
+
 ## 4.5.0
 
 ### Minor Changes

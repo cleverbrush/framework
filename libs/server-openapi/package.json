@@ -11,10 +11,10 @@
         "@cleverbrush/auth": "*"
     },
     "peerDependencies": {
-        "@cleverbrush/server": "^4.0.0",
-        "@cleverbrush/schema": "^4.0.0",
-        "@cleverbrush/schema-json": "^4.0.0",
-        "@cleverbrush/auth": "^4.0.0"
+        "@cleverbrush/server": "^5.0.0",
+        "@cleverbrush/schema": "^5.0.0",
+        "@cleverbrush/schema-json": "^5.0.0",
+        "@cleverbrush/auth": "^5.0.0"
     },
     "description": "OpenAPI 3.1 spec generation for @cleverbrush/server — automatic endpoint documentation",
     "files": [
@@ -54,5 +54,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "4.5.0"
+    "version": "5.0.0"
 }

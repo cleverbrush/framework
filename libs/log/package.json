@@ -44,13 +44,13 @@
         "clean": "rm -rf dist tsconfig.tsbuildinfo"
     },
     "dependencies": {
-        "@cleverbrush/schema": "^4.5.0",
-        "@cleverbrush/async": "^4.5.0"
+        "@cleverbrush/schema": "^5.0.0",
+        "@cleverbrush/async": "^5.0.0"
     },
     "peerDependencies": {
-        "@cleverbrush/di": "^4.0.0",
-        "@cleverbrush/server": "^4.0.0",
-        "@cleverbrush/knex-clickhouse": "^4.0.0"
+        "@cleverbrush/di": "^5.0.0",
+        "@cleverbrush/server": "^5.0.0",
+        "@cleverbrush/knex-clickhouse": "^5.0.0"
     },
     "peerDependenciesMeta": {
         "@cleverbrush/di": {
@@ -71,5 +71,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "4.5.0"
+    "version": "5.0.0"
 }

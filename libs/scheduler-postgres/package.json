@@ -3,7 +3,7 @@
     "engines": {
         "node": ">=24"
     },
-    "version": "4.4.3",
+    "version": "5.0.0",
     "description": "Transactional PostgreSQL repository for the Cleverbrush durable scheduler",
     "type": "module",
     "sideEffects": false,
@@ -20,10 +20,10 @@
         }
     },
     "dependencies": {
-        "@cleverbrush/scheduler": "^4.4.3",
-        "@cleverbrush/schema": "^4.4.3",
-        "@cleverbrush/orm": "^4.4.3",
-        "@cleverbrush/knex-schema": "^4.4.3"
+        "@cleverbrush/scheduler": "^5.0.0",
+        "@cleverbrush/schema": "^5.0.0",
+        "@cleverbrush/orm": "^5.0.0",
+        "@cleverbrush/knex-schema": "^5.0.0"
     },
     "peerDependencies": {
         "knex": ">=3.1.0",

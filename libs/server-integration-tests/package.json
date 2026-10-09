@@ -4,9 +4,9 @@
     "version": "2.0.2",
     "type": "module",
     "dependencies": {
-        "@cleverbrush/server": "^4.0.0",
-        "@cleverbrush/schema": "^4.0.0",
-        "@cleverbrush/di": "^4.0.0",
-        "@cleverbrush/auth": "^4.0.0"
+        "@cleverbrush/server": "^5.0.0",
+        "@cleverbrush/schema": "^5.0.0",
+        "@cleverbrush/di": "^5.0.0",
+        "@cleverbrush/auth": "^5.0.0"
     }
 }
