@@ -21,7 +21,7 @@
         "schema",
         "cleverbrush"
     ],
-    "license": "BSD 3-Clause",
+    "license": "BSD-3-Clause",
     "main": "./dist/index.js",
     "exports": {
         ".": {
@@ -31,6 +31,9 @@
     },
     "sideEffects": false,
     "name": "@cleverbrush/di",
+    "engines": {
+        "node": ">=24"
+    },
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/di#readme",
     "repository": {
         "type": "git",

@@ -18,6 +18,7 @@ import type {
 import {
     arrayExtensions,
     defineExtension,
+    defineMetadataMethod,
     EXTRA_TYPE_BRAND,
     METHOD_LITERAL_BRAND,
     NumberSchemaBuilder as NumberSchemaBuilderClass,
@@ -28,6 +29,7 @@ import {
     stringExtensions,
     withExtensions
 } from '@cleverbrush/schema';
+import type { QueryScope } from './query-scope.js';
 import type {
     ResolvedVariantConfig,
     ResolvedVariantRelationSpec,
@@ -47,7 +49,7 @@ export { EXTRA_TYPE_BRAND, METHOD_LITERAL_BRAND } from '@cleverbrush/schema';
 
 /**
  * Phantom-type brand placed on a column schema by `.primaryKey()`.
- * Carried on the property schema's type so that {@link PrimaryKeyOf} can
+ * Carried on the property schema's type so that `PrimaryKeyOf` can
  * locate primary-key columns at the type level.
  *
  * @public
@@ -55,6 +57,9 @@ export { EXTRA_TYPE_BRAND, METHOD_LITERAL_BRAND } from '@cleverbrush/schema';
 export const PRIMARY_KEY_BRAND: unique symbol = Symbol.for(
     '@cleverbrush/knex-schema:primaryKey'
 );
+
+/** @internal Named primary-key result so exported consumer schemas emit portable declarations. */
+export type PrimaryKeyColumn<S> = S & { readonly [PRIMARY_KEY_BRAND]?: true };
 
 /**
  * Phantom-type brand placed on an object schema by `.hasPrimaryKey([cols])`
@@ -97,7 +102,7 @@ function hasColumnName(this: SchemaBuilder<any, any, any>, name: string) {
 
 /**
  * Stores the SQL table name for an `ObjectSchemaBuilder` using the schema
- * extension system. Required for {@link query} to build queries — throws at
+ * extension system. Required for `query` to build queries — throws at
  * query creation time if not set.
  */
 function hasTableName(
@@ -245,10 +250,17 @@ export const dbExtension = defineExtension({
         }
     },
     object: {
+        /** Override the SQL column name when this object is stored as JSON. */
+        hasColumnName(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            name: string
+        ) {
+            return hasColumnName.call(this, name);
+        },
         /**
          * Set the SQL table name for this object schema.
          *
-         * Required before creating a {@link query} builder — throws at
+         * Required before creating a `query` builder — throws at
          * query creation time when not set.
          *
          * @param name - The SQL table name (e.g. `'users'`).
@@ -334,34 +346,19 @@ export const ddlExtension = defineExtension({
             return this.withExtension('unique', name ?? true);
         },
         /** Override the SQL column type (e.g. `'bigint'`, `'smallint'`). */
-        columnType(
-            this: NumberSchemaBuilder<any, any, any, any, any>,
-            type: string
-        ) {
-            return this.withExtension('columnType', type);
-        },
+        columnType: defineMetadataMethod('columnType').argument<string>(),
         /** Shorthand for `.columnType('bigint')`. */
-        bigint(this: NumberSchemaBuilder<any, any, any, any, any>) {
-            return this.withExtension('columnType', 'bigint');
-        },
+        bigint: defineMetadataMethod('columnType').value('bigint'),
         /** Shorthand for `.columnType('smallint')`. */
-        smallint(this: NumberSchemaBuilder<any, any, any, any, any>) {
-            return this.withExtension('columnType', 'smallint');
-        },
+        smallint: defineMetadataMethod('columnType').value('smallint'),
         /** Shorthand for `.columnType('decimal(p,s)')` — exact numeric.
          * @param precision - Total digits.
          * @param scale     - Digits after decimal point.
          */
-        decimal(
-            this: NumberSchemaBuilder<any, any, any, any, any>,
-            precision: number,
-            scale: number
-        ) {
-            return this.withExtension(
-                'columnType',
-                `decimal(${precision},${scale})`
-            );
-        },
+        decimal: defineMetadataMethod('columnType').compute(
+            (precision: number, scale: number) =>
+                `decimal(${precision},${scale})` as const
+        ),
         /** Set a raw SQL default expression.
          * @param expression - Raw SQL expression (e.g. `"nextval('my_seq')"`).
          */
@@ -743,12 +740,15 @@ export const ddlExtension = defineExtension({
         },
         /** Register a named query scope.
          * @param name - Scope name to use with `.scoped(name)`.
-         * @param fn - Function that receives a `SchemaQueryBuilder` and applies filters.
+         * @param fn - Synchronous callback returning its configured immutable query (filters/order/paging only).
          */
-        scope<N extends string>(
-            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+        scope<
+            N extends string,
+            S extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+        >(
+            this: S,
             name: N,
-            fn: Function
+            fn: (query: QueryScope<S>) => QueryScope<S>
         ): typeof this & { readonly [METHOD_LITERAL_BRAND]?: N } {
             const existing =
                 (this.getExtension('scopes') as Record<string, Function>) ?? {};
@@ -803,7 +803,7 @@ export const ddlExtension = defineExtension({
          * // rows: Array<Pick<Post, 'id' | 'title'>>
          * ```
          *
-         * @see {@link SchemaQueryBuilder.projected}
+         * @see `SchemaQueryBuilder.select`
          */
         projection<
             TProperties extends Record<
@@ -898,12 +898,11 @@ export const ddlExtension = defineExtension({
             };
         },
         /** Set a default scope applied to all queries unless `.unscoped()` is called.
-         * @param fn - Function that receives a `SchemaQueryBuilder` and applies filters.
+         * @param fn - Synchronous function that returns its configured immutable query scope.
          */
-        defaultScope(
-            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
-            fn: Function
-        ) {
+        defaultScope<
+            S extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+        >(this: S, fn: (query: QueryScope<S>) => QueryScope<S>) {
             return this.withExtension('defaultScope', fn);
         },
         /** Register a before-insert lifecycle hook.
@@ -940,7 +939,7 @@ export const ddlExtension = defineExtension({
             return this.withExtension('beforeUpdate', [...existing, fn]);
         },
         /** Register a before-delete lifecycle hook.
-         * @param fn - Async function `(query)` called before deleting.
+         * @param fn - Observational async function `(query)` called before deleting; query configuration is immutable. Apply delete filters before calling delete().
          */
         beforeDelete(
             this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
@@ -951,72 +950,8 @@ export const ddlExtension = defineExtension({
             return this.withExtension('beforeDelete', [...existing, fn]);
         }
 
-        /**
-         * Declare polymorphic variants for this schema.
-         *
-         * Turns a base schema into a **polymorphic schema** where a discriminator
-         * column determines which variant each row belongs to. Variants can store
-         * their extra fields either in a separate table (CTI — Class Table
-         * Inheritance) or as nullable columns on the base table (STI — Single
-         * Table Inheritance).
-         *
-         * The return type carries a phantom brand
-         * (`[POLYMORPHIC_TYPE_BRAND]`) so that `query(db, schema)` automatically
-         * infers the full discriminated-union result type.
-         *
-         * @param config.discriminator - Property key (or accessor) of the
-         *   discriminator column on the base table (e.g. `'type'` or `t => t.type`).
-         * @param config.variants - Map from discriminator value to
-         *   `{ schema, storage, foreignKey?, allowOrphan?, enforceCheck? }`.
-         *   - `storage: 'cti'` — variant fields are in a separate table;
-         *     `foreignKey` (the FK column on the variant table) is required.
-         *   - `storage: 'sti'` — variant fields are nullable columns on the base table.
-         *
-         * @example
-         * ```ts
-         * const FileBase = object({ id: number().primaryKey(), name: string(), type: string() })
-         *   .hasTableName('files');
-         *
-         * const ImageExtras = object({ width: number(), height: number(), format: string() })
-         *   .hasTableName('image_file');
-         *
-         * const DocumentExtras = object({ size: number(), issueDate: date() })
-         *   .hasTableName('document_file');
-         *
-         * const ImageExtras = object({
-         *   fileId: number().hasColumnName('file_id'),
-         *   type:   string('image'),
-         *   width: number(), height: number(), format: string()
-         * }).hasTableName('image_file');
-         *
-         * const DocumentExtras = object({
-         *   fileId: number().hasColumnName('file_id'),
-         *   type:   string('document'),
-         *   size: number(), issueDate: date()
-         * }).hasTableName('document_file');
-         *
-         * const FileSchema = FileBase.withVariants({
-         *   discriminator: t => t.type,
-         *   variants: {
-         *     image:    { schema: ImageExtras,    storage: 'cti', foreignKey: t => t.fileId },
-         *     document: { schema: DocumentExtras, storage: 'cti', foreignKey: t => t.fileId },
-         *   },
-         * });
-         *
-         * // query(db, FileSchema) returns:
-         * // Array<
-         * //   | { id: number; name: string; type: 'image';    width: number; height: number; format: string }
-         * //   | { id: number; name: string; type: 'document'; size: number; issueDate: Date }
-         * // >
-         * ```
-         */
-        // NOTE: the public `.withVariants()` schema-level method has been
-        // removed. Variants are now declared on the {@link Entity} chain via
-        // `defineEntity(...).discriminator(...).ctiVariant(...).stiVariant(...)`.
-        // The internal worker {@link applyVariantsToSchema} (below this
-        // `defineExtension` block) is invoked by the Entity layer and stores
-        // the same `'variants'` / `'polymorphicVariants'` extensions that
-        // `SchemaQueryBuilder` reads at runtime.
+        // Entity declarations use applyVariantsToSchema to store the variant
+        // metadata consumed by polymorphic queries.
     }
 });
 
@@ -1047,9 +982,9 @@ export interface VariantInputForResolver {
 /**
  * @internal Validate + apply a fully-resolved variant config to a base
  * schema. Stores the `'variants'` and `'polymorphicVariants'` extensions
- * read by {@link SchemaQueryBuilder}.
+ * read by query execution.
  *
- * Called by the {@link Entity} chain (`.discriminator().ctiVariant().stiVariant()`).
+ * Called by the `Entity` chain (`.discriminator().ctiVariant().stiVariant()`).
  * Replaces the previous schema-level `.withVariants()` method.
  */
 export function applyVariantsToSchema(
@@ -1146,14 +1081,41 @@ const extended = withExtensions(
     ddlExtension
 );
 
+/**
+ * Create a string schema with database column, key, reference and mapping extensions.
+ */
 export const string = extended.string;
+/**
+ * Create a numeric schema with database type, precision, key and reference extensions.
+ */
 export const number = extended.number;
+/**
+ * Create a boolean schema with database column mapping and DDL metadata extensions.
+ */
 export const boolean = extended.boolean;
+/**
+ * Create a date schema with database column mapping and DDL metadata extensions.
+ */
 export const date = extended.date;
+/**
+ * Create an object schema with table, relation, scope, projection and lifecycle extensions.
+ */
 export const object = extended.object;
+/**
+ * Create an array schema from its element schema; use object elements for collection navigation properties.
+ */
 export const array = extended.array;
+/**
+ * Create a union schema using the database-extended schema factory.
+ */
 export const union = extended.union;
+/**
+ * Create a function schema using the database-extended schema factory; this does not create a SQL function.
+ */
 export const func = extended.func;
+/**
+ * Create an unconstrained schema with database extensions; prefer a specific schema when value typing matters.
+ */
 export const any = extended.any;
 
 // ---------------------------------------------------------------------------
@@ -1188,9 +1150,7 @@ declare module '@cleverbrush/schema' {
         /** Mark this column as a primary key.
          * @param opts - Options. `autoIncrement` defaults to `true`.
          */
-        primaryKey(opts?: { autoIncrement?: boolean }): this & {
-            readonly [PRIMARY_KEY_BRAND]?: true;
-        };
+        primaryKey(opts?: { autoIncrement?: boolean }): PrimaryKeyColumn<this>;
     }
 
     interface StringSchemaBuilder<
@@ -1201,9 +1161,7 @@ declare module '@cleverbrush/schema' {
         TExtensions
     > {
         /** Mark this column as a primary key (non-auto-increment). */
-        primaryKey(): this & {
-            readonly [PRIMARY_KEY_BRAND]?: true;
-        };
+        primaryKey(): PrimaryKeyColumn<this>;
     }
 
     interface ObjectSchemaBuilder<
@@ -1322,7 +1280,7 @@ export function getProjections(
  * Retrieve the resolved variant configuration stored by `.withVariants()`.
  * Returns `null` when the schema is not polymorphic.
  *
- * @internal — used by {@link SchemaQueryBuilder}.
+ * @internal — used by query execution.
  */
 export function getVariants(
     schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>

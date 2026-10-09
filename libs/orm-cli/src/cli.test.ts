@@ -189,13 +189,9 @@ describe('generate command', () => {
 
 // ═══════════════════════════════════════════════════════════════════════════
 describe('push command — production guard', () => {
-    it('exits 1 in NODE_ENV=production without --yes', async () => {
+    it('rejects production writes without --yes before opening a transaction', async () => {
         const originalEnv = process.env.NODE_ENV;
         process.env.NODE_ENV = 'production';
-
-        const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
-            throw new Error('process.exit called');
-        }) as any);
 
         const { push } = await import('./commands/push.js');
         const config = {
@@ -204,10 +200,9 @@ describe('push command — production guard', () => {
             migrations: { directory: './migrations' }
         };
 
-        await expect(push(config, {})).rejects.toThrow('process.exit called');
-        expect(exitSpy).toHaveBeenCalledWith(1);
-
-        exitSpy.mockRestore();
+        await expect(push(config, {})).rejects.toThrow(
+            'without the --yes flag'
+        );
         process.env.NODE_ENV = originalEnv;
     });
 });
@@ -262,15 +257,12 @@ describe('validate command', () => {
         }
     });
 
-    it('exits 1 when schema drift is detected', async () => {
+    it('reports schema drift to the command router', async () => {
         _mockValidateEntitiesAgainstDatabase.mockResolvedValueOnce({
             valid: false,
             checkedTables: ['users'],
             issues: [{ type: 'missing-table', tableName: 'users' }]
         });
-        const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
-            throw new Error('process.exit called');
-        }) as any);
         const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
         const { validate } = await import('./commands/validate.js');
@@ -280,13 +272,11 @@ describe('validate command', () => {
             migrations: { directory: './migrations' }
         };
 
-        await expect(validate(config)).rejects.toThrow('process.exit called');
-        expect(exitSpy).toHaveBeenCalledWith(1);
+        await expect(validate(config)).rejects.toThrow('Schema drift detected');
         expect(errSpy.mock.calls.flat().join('\n')).toMatch(
             /Missing table: users/
         );
 
-        exitSpy.mockRestore();
         errSpy.mockRestore();
     });
 });
@@ -332,49 +322,76 @@ describe('cli.run — knex pool cleanup', () => {
         }
     });
 
-    it('calls knex.destroy() even when the command throws', async () => {
-        const destroy = vi.fn().mockResolvedValue(undefined);
-        const fakeKnex = {
-            schema: {},
-            destroy,
-            migrate: {
-                list: vi.fn().mockRejectedValue(new Error('boom'))
-            }
-        };
+    it.each(['migrate', 'validate', 'db'])(
+        'closes the pool before %s command failure exits',
+        async command => {
+            const originalEnv = process.env.NODE_ENV;
+            process.env.NODE_ENV = 'production';
+            _mockValidateEntitiesAgainstDatabase.mockResolvedValue({
+                valid: false,
+                checkedTables: [],
+                issues: []
+            });
+            const destroy = vi.fn().mockResolvedValue(undefined);
+            const fakeKnex = {
+                schema: {},
+                destroy,
+                migrate: {
+                    list: vi.fn().mockRejectedValue(new Error('boom'))
+                }
+            };
 
-        const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
-            throw new Error('process.exit called');
-        }) as any);
-        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            const exitSpy = vi
+                .spyOn(process, 'exit')
+                .mockImplementation((() => {
+                    throw new Error('process.exit called');
+                }) as any);
+            const errSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
 
-        const tmp = path.join(os.tmpdir(), `orm-cli-destroy-err-${Date.now()}`);
-        mkdirSync(tmp, { recursive: true });
-        const cfgPath = path.join(tmp, 'db.config.mjs');
-        const stash = (globalThis as any).__cbOrmFakeKnex;
-        (globalThis as any).__cbOrmFakeKnex = fakeKnex;
-        try {
-            const cfgSrc = `
+            const tmp = path.join(
+                os.tmpdir(),
+                `orm-cli-destroy-err-${Date.now()}`
+            );
+            mkdirSync(tmp, { recursive: true });
+            const cfgPath = path.join(tmp, 'db.config.mjs');
+            const stash = (globalThis as any).__cbOrmFakeKnex;
+            (globalThis as any).__cbOrmFakeKnex = fakeKnex;
+            try {
+                const cfgSrc = `
                 export default {
                     knex: globalThis.__cbOrmFakeKnex,
                     entities: {},
                     migrations: { directory: ${JSON.stringify(tmp)} }
                 };
             `;
-            const fs = await import('node:fs');
-            fs.writeFileSync(cfgPath, cfgSrc, 'utf-8');
+                const fs = await import('node:fs');
+                fs.writeFileSync(cfgPath, cfgSrc, 'utf-8');
 
-            const { run } = await import('./cli.js');
-            await expect(
-                run(['migrate', 'status', '--config', cfgPath])
-            ).rejects.toThrow('process.exit called');
+                const { run } = await import('./cli.js');
+                await expect(
+                    run([
+                        command,
+                        ...(command === 'migrate'
+                            ? ['status']
+                            : command === 'db'
+                              ? ['push']
+                              : []),
+                        '--config',
+                        cfgPath
+                    ])
+                ).rejects.toThrow('process.exit called');
 
-            expect(destroy).toHaveBeenCalledTimes(1);
-            expect(exitSpy).toHaveBeenCalledWith(1);
-        } finally {
-            (globalThis as any).__cbOrmFakeKnex = stash;
-            exitSpy.mockRestore();
-            errSpy.mockRestore();
-            rmSync(tmp, { recursive: true, force: true });
+                expect(destroy).toHaveBeenCalledTimes(1);
+                expect(exitSpy).toHaveBeenCalledWith(1);
+            } finally {
+                process.env.NODE_ENV = originalEnv;
+                (globalThis as any).__cbOrmFakeKnex = stash;
+                exitSpy.mockRestore();
+                errSpy.mockRestore();
+                rmSync(tmp, { recursive: true, force: true });
+            }
         }
-    });
+    );
 });

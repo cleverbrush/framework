@@ -218,6 +218,38 @@ const registry = mapper()
                     </pre>
                 </div>
 
+                <div className="card" id="synchronous-mapping">
+                    <h2>Synchronous mapping and query row schemas</h2>
+                    <p>
+                        Keep the existing configure() API. When the final
+                        computations and nested mappings are synchronous,
+                        getSyncMapper() returns ordinary values while retaining
+                        completeness checks. getMapper() remains asynchronous.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const read = db.users
+    .select(u => ({ id: u.id, name: u.name }));
+const Source = read.rowSchema; // no SQL
+const toDto = mapper().configure(Source, UserDto, m => m)
+    .getSyncMapper(Source, UserDto);
+const result = (await read).map(toDto);`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Known async mappings are rejected; disguised promises or
+                        thenables throw at invocation. Configuration never
+                        probes callbacks. Fetching, enrichment, authorization
+                        and union dispatch remain explicit application code.
+                    </p>
+                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#projection-aware-reads">
+                        Read the multi-file consumer guide and compatibility
+                        rules
+                    </a>
+                </div>
+
                 {/* ── Compile-time safety ─────────────────────────── */}
                 <div className="card">
                     <h2>Compile-time completeness</h2>

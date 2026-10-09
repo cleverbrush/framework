@@ -1,0 +1,34 @@
+{
+    "name": "@cleverbrush/storage-s3",
+    "version": "4.4.3",
+    "description": "S3-compatible object storage for self-hosted and hosted providers",
+    "type": "module",
+    "sideEffects": false,
+    "license": "BSD-3-Clause",
+    "engines": {
+        "node": ">=24"
+    },
+    "files": [
+        "dist"
+    ],
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "devDependencies": {
+        "@types/node": "^25.4.0"
+    },
+    "scripts": {
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.tsbuildinfo"
+    },
+    "dependencies": {
+        "@cleverbrush/storage": "^4.4.3",
+        "@aws-sdk/client-s3": "^3.1145.0",
+        "@aws-sdk/lib-storage": "^3.1145.0"
+    }
+}

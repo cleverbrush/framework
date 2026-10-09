@@ -95,8 +95,8 @@ type TupleSchemaBuilderCreateProps<
  * Use it when you need to validate function arguments, CSV rows, coordinate
  * pairs, structured event payloads, or any other fixed-structure array.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link tuple | tuple()} function instead.
  *
  * @example
@@ -162,6 +162,18 @@ export class TupleSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'tuple',
+        TElements,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TRestSchema,
+        TResult
+    ];
+
     #elements!: TElements;
     #restSchema:
         | (TRestSchema & SchemaBuilder<any, any, any, any, any>)
@@ -215,9 +227,12 @@ export class TupleSchemaBuilder<
         TRestSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -233,9 +248,12 @@ export class TupleSchemaBuilder<
         TRestSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #getLengthError(arr: any[]): string | null {
@@ -381,7 +399,7 @@ export class TupleSchemaBuilder<
     }
 
     /**
-     * Performs synchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validate}
+     * {@inheritDoc SchemaBuilder.validate}
      */
     public validate(
         object: TResult,
@@ -394,7 +412,7 @@ export class TupleSchemaBuilder<
     }
 
     /**
-     * Performs asynchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validateAsync}
+     * {@inheritDoc SchemaBuilder.validateAsync}
      */
     public async validateAsync(
         object: TResult,
@@ -914,7 +932,7 @@ export class TupleSchemaBuilder<
         TSchema
     > &
         TExtensions {
-        return TupleSchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             restSchema: schema
         } as any) as any;
@@ -934,7 +952,7 @@ export class TupleSchemaBuilder<
         undefined
     > &
         TExtensions {
-        return TupleSchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             restSchema: undefined
         } as any) as any;

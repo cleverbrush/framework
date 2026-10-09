@@ -7,12 +7,36 @@
 <!-- bundle-badge-end -->
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-97.7%25-brightgreen)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-97.7%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A schema definition and validation library for TypeScript — faster than Zod in 14/15 benchmarks (up to 204× faster on invalid input), 3× smaller than Zod v4, and compatible with 50+ ecosystem tools via [Standard Schema v1](https://standardschema.dev/).
 
 Define a schema **once** and get TypeScript type inference, runtime validation, object mapping ([`@cleverbrush/mapper`](../mapper)), auto-generated React forms ([`@cleverbrush/react-form`](../react-form)), and bidirectional JSON Schema conversion ([`@cleverbrush/schema-json`](../schema-json)) — all from the same immutable, fluent API.
+
+## Indexed property descriptors
+
+Array descriptors keep their whole-array binding and expose lazy, cached indexed
+children for primitive, object and nested-array elements:
+
+```ts
+import { object, array, string, SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR } from '@cleverbrush/schema';
+const Profile = object({ addresses: array(object({ city: string().minLength(2) })) });
+const profile = { addresses: [{ city: 'Rome' }] };
+const properties = object.getPropertiesFor(Profile);
+const city = properties.addresses[0].city[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+city.toJsonPointer(); // '/addresses/0/city'
+city.setValue(profile, 'Paris', { createMissingStructure: true });
+const result = Profile.validate(profile, { doNotStopOnFirstError: true });
+result.getErrorsFor(t => t.addresses[0].city);
+```
+
+Both sync and async validation expose precise indexed paths in
+`getInvalidProperties()`, while retaining aggregate array errors. Indexed setters
+create actual arrays when requested; with `createMissingStructure: false` they
+do not create missing containers. Valid indices are canonical non-negative array
+indices, not negative/fractional positions. Descriptors are positional, not keyed
+item identities, and do not add array mutation methods to the descriptor tree.
 
 ## Why @cleverbrush/schema?
 
@@ -98,10 +122,6 @@ if (result.valid) {
     const nameErrors = result.getErrorsFor((p) => p.name);
     console.log(nameErrors.isValid); // false
     console.log(nameErrors.errors); // ['Name must be at least 2 characters']
-
-    // result.errors on object schemas is deprecated — use getErrorsFor() instead
-    console.log('Errors:', result.errors);
-    // Array of { message: string }
 }
 ```
 
@@ -694,7 +714,7 @@ const result = ShapeSchema.validate({ type: 'circle', radius: 5 });
 
 ### Real-World Example: Job Scheduler
 
-The `@cleverbrush/scheduler` library uses this exact pattern to validate job schedules. The `every` field acts as the discriminator, and each variant adds its own set of allowed properties:
+An application's schedule-input form can use this pattern. The `every` field acts as the discriminator, and each variant adds its own set of allowed properties:
 
 ```typescript
 import { object, string, number, array, date, union, type InferType } from '@cleverbrush/schema';
@@ -841,8 +861,7 @@ const result = UserSchema.validate(someObject);
 if (result.valid) {
     console.log(result.object); // typed as InferType<typeof UserSchema>
 } else {
-    // For object schemas, prefer getErrorsFor() for per-property error inspection (see below)
-    console.log(result.errors); // deprecated for object schemas — Array of { message: string }
+    console.log(result.getErrorsFor(t => t.name).errors); // field error strings
 }
 
 // Async validation (use when validators/preprocessors are async)
@@ -859,12 +878,12 @@ const result = UserSchema.validate(
     { doNotStopOnFirstError: true }
 );
 
-console.log(result.errors);
-// [
-//   { message: 'Name must be at least 2 characters' },
-//   { message: 'Please enter a valid email' },
-//   { message: 'Age cannot be negative' }
-// ]
+console.log(result.getErrorsFor(t => t.name).errors);
+// ['Name must be at least 2 characters']
+console.log(result.getErrorsFor(t => t.email).errors);
+// ['Please enter a valid email']
+console.log(result.getErrorsFor(t => t.age).errors);
+// ['Age cannot be negative']
 ```
 
 ### Custom Error Messages
@@ -955,11 +974,11 @@ result.getErrorsFor((t) => t.password).errors;
 // → []
 ```
 
-You can target multiple properties from a single validator by returning multiple errors with different `property` selectors. Errors without a `property` selector are attached to the root object as before.
+You can target multiple properties from a single validator by returning multiple errors with different `property` selectors. Errors without a `property` selector are attached to the root object.
 
 ### Per-Property Errors with `getErrorsFor()` (Recommended)
 
-`ObjectSchemaBuilder.validate()` returns an extended result with a `getErrorsFor()` method for inspecting errors on individual properties — perfect for showing inline form errors. **This is the recommended way to inspect validation errors on object schemas** and replaces the deprecated `errors` array on `ObjectSchemaValidationResult`:
+`ObjectSchemaBuilder.validate()` returns a result with a `getErrorsFor()` method for inspecting errors on individual properties — useful for showing inline form errors:
 
 ```typescript
 const PersonSchema = object({
@@ -1125,6 +1144,43 @@ console.log(info.hasCatch);    // true
 console.log(info.catchValue);  // 'unknown'
 ```
 
+### Optional and nullable fallbacks
+
+Fallback values and factories respect the schema's resolved output type:
+optional schemas allow `undefined`, and nullable schemas allow `null`.
+
+```typescript
+const optionalText = string().optional().catch(undefined);
+const nullableText = string().nullable().catch(() => null);
+
+optionalText.parse(42); // undefined
+nullableText.parse(42); // null
+object({ text: optionalText }).parse({ text: false }); // { text: undefined }
+array(optionalText).parse(['ok', 42]); // ['ok', undefined] — no entries dropped
+```
+
+Fallbacks are opt-in: a fallback on a property does not make a malformed required
+root object valid. A fallback factory runs only when validation fails.
+
+**Null handling:** optional schemas accept `null` at runtime even
+though their inferred type does not include it. `.optional().catch(undefined)`
+therefore leaves `null` unchanged. Normalize it explicitly when needed:
+
+```typescript
+const normalizedText = string().optional()
+    .addPreprocessor(value => value == null ? undefined : value)
+    .catch(undefined);
+
+normalizedText.parse(null); // undefined
+```
+
+Preprocessors can return optional/nullable values, including asynchronously.
+Their existing callback parameter typing does not guarantee that unknown input
+already has that type: guard untrusted values before using type-specific methods.
+Use `parseAsync` / `validateAsync` for async preprocessors or validators.
+`InferType` and `hasType` keep their existing meaning; static overrides and casts
+do not perform runtime conversion or validation.
+
 ## Readonly Modifier
 
 Every schema builder supports `.readonly()`. This is a **type-level-only** modifier — it marks the inferred TypeScript type as immutable, but does not alter validation behaviour or freeze the validated value at runtime.
@@ -1189,7 +1245,7 @@ export const UserSchema = object({
 UserSchema.introspect().schemaName; // 'User'
 ```
 
-Chains naturally with all other modifiers:
+Annotations can be applied after naming a definition:
 
 ```typescript
 const ProductSchema = object({
@@ -1210,12 +1266,64 @@ import { generateOpenApiSpec } from '@cleverbrush/server-openapi';
 generateOpenApiSpec({ registrations, info: { title: 'My API', version: '1.0.0' } });
 ```
 
-> **Name uniqueness:** Registering two *different* schema instances under the same name throws an error. Always export named schemas as constants and reuse the same reference everywhere.
+### Reusing a named definition
+
+Use the plain constant directly, or apply ordinary use-site modifiers. No wrapper
+is needed; the concrete builder, fluent and extension methods, inferred types,
+and nested property selectors are preserved. The original remains unchanged.
+
+```typescript
+const History = object({
+    current: UserSchema,
+    previous: UserSchema.optional().nullable().describe('Previous user')
+});
+// One canonical User component; previous has local annotations/nullability.
+```
+
+These modifiers retain the canonical named definition for document exporters:
+
+- Presence/nullability: `optional`, `required`, `nullable`, `notNullable`.
+- Annotations: `describe`, `example`, `readonly`.
+- Type-only changes: `brand`, `hasType`, `clearHasType`, `optimize`.
+
+Modifier chains reference the original definition, not another alias. JSON Schema,
+OpenAPI and AsyncAPI compose local annotations and nullability around that
+definition, including Draft 07 references. Runtime validation still follows the
+ordinary builder's behavior; canonical-reference metadata is for exporters.
+
+### Shape and rule changes discard inherited names
+
+Property additions/removals, `partial`, `pick`, `omit`, constraints, validators,
+preprocessors, defaults, fallbacks and their available clear methods produce
+unnamed derivatives. Extension changes detach conservatively too. Later
+annotations or optionality do not reconnect the derivative to the original.
+
+```typescript
+const PatchUser = UserSchema.partial(); // unnamed, changed shape
+const UserWithEmail = UserSchema.addProp('email', string()); // unnamed
+const PublicUser = UserSchema.omit('id').schemaName('PublicUser'); // new definition
+const ShortName = string().schemaName('Name').maxLength(20); // unnamed rule change
+```
+
+Existing nested named schemas still reuse their own definitions. Apply
+`schemaName` **after** shape/rule edits when the result needs a stable component
+name. This changes inherited-name behavior: code that relied on property or
+constraint edits retaining a name should name the final result explicitly.
+
+Defaults and fallbacks keep ordinary builder semantics. Adding or clearing them
+detaches the inherited name; `clearDefault()` removes the default completely,
+without revealing a hidden default from the canonical definition.
+
+> **Name uniqueness:** Independent definitions with the same name still conflict,
+> even with identical shapes; there is no name-only or structural deduplication.
+> Use-site modifiers reuse the original definition and do not conflict. Calling
+> `schemaName` explicitly always establishes a fresh independent definition,
+> even on an alias or when the previous name is reused.
 
 | Method / Property | Signature | Notes |
 |---|---|---|
 | `.schemaName(name)` | `schemaName(name: string): this` | Returns a new builder; original is unchanged |
-| `.introspect().schemaName` | `string \| undefined` | The name passed to `.schemaName()`, or `undefined` |
+| `.introspect().schemaName` | `string \| undefined` | The explicit or preserved name; `undefined` after a shape/rule change |
 
 ## Describe
 
@@ -1451,6 +1559,55 @@ const priceSchema = s.number().currency({ maxDecimals: 4 });
 console.log(priceSchema.introspect().extensions.currency);
 // { maxDecimals: 4 }  — structured metadata, not the raw args
 ```
+
+### Typed metadata methods
+
+Use `defineMetadataMethod()` when a method only records metadata and its value
+must also be available to TypeScript consumers. It works inside the same
+`defineExtension()` / `withExtensions()` system:
+
+```ts
+import {
+    defineExtension, defineMetadataMethod, withExtensions,
+    type InferExtensionMetadata, type InferType
+} from '@cleverbrush/schema';
+
+const labels = defineExtension({
+    string: {
+        label: defineMetadataMethod('label').argument<string>(),
+        internal: defineMetadataMethod('visibility').value('internal'),
+        lengthHint: defineMetadataMethod('lengthHint').compute(
+            (min: number, max: number) => ({ min, max })
+        )
+    }
+});
+const s = withExtensions(labels);
+const title = s.string().label('Title').internal().optional();
+type Value = InferType<typeof title>; // string | undefined
+type Label = InferExtensionMetadata<typeof title>['label']; // 'Title'
+
+const renamed = title.label('Display name').lengthHint(1, 80);
+type UpdatedLabel = InferExtensionMetadata<typeof renamed>['label']; // 'Display name'
+renamed.introspect().extensions.lengthHint; // { min: 1, max: 80 }
+title.introspect().extensions.label; // 'Title' — original is unchanged
+```
+
+- `.argument<T>()` creates a one-argument method constrained to `T` and retains
+  the caller's literal type. Omit `T` to accept any metadata value.
+- `.value(value)` creates a zero-argument method storing a fixed value.
+- `.compute(fn)` retains the callback's parameter and return types. Use a literal
+  or template-literal return type when that precision matters; arbitrary callback
+  results cannot be evaluated by TypeScript.
+
+The key passed to `defineMetadataMethod` controls runtime storage independently
+of the method name. A subsequent write replaces that key's value and inferred
+type. Metadata and ordinary extension methods compose through native modifiers
+without resetting optionality, nullability or defaults. Only factories produced
+by `withExtensions()` receive the methods; global builder prototypes are not
+modified. Metadata is descriptive: these helpers do not add validators, transform
+schema values or assign domain meaning to keys. Consumers decide how to use it.
+Ordinary `defineExtension()` methods remain appropriate for validation and other
+behavior; use `this.withExtension()` inside them for runtime-only metadata.
 
 ### Stacking Extensions
 

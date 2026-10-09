@@ -1,4 +1,5 @@
 import {
+    type EntityResult,
     array,
     boolean,
     date,
@@ -144,12 +145,7 @@ const TodoSchema = object({
         'attachmentMimeType'
     )
     .projection('ownership', 'id', 'userId')
-    .scope(
-        'recentFirst',
-        (q: {
-            orderBy: (column: string, direction: 'asc' | 'desc') => unknown;
-        }) => q.orderBy('created_at', 'desc')
-    );
+    .scope('recentFirst', q => q.orderBy('createdAt', 'desc'));
 
 export const TodoEntity = defineEntity(TodoSchema)
     .belongsTo(
@@ -187,32 +183,6 @@ export const entityMap: AppEntityMap = {
 
 // ── Plain row types (used by mappers) ───────────────────────────────────────
 
-export type ActivityDb = {
-    id: number;
-    todoId: number;
-    type: string;
-    actorUserId?: number;
-    completedAt?: Date | null;
-    createdAt: Date;
-};
-
-export type UserDb = {
-    id: number;
-    email: string;
-    passwordHash?: string;
-    role: string;
-    authProvider: string;
-    createdAt: Date;
-};
-
-export type TodoDb = {
-    id: number;
-    title: string;
-    description?: string;
-    completed: boolean;
-    userId: number;
-    createdAt: Date;
-    updatedAt: Date;
-    attachmentName?: string;
-    attachmentMimeType?: string;
-};
+export type ActivityDb = EntityResult<typeof TodoActivityBaseEntity>;
+export type UserDb = EntityResult<typeof UserEntity>;
+export type TodoDb = EntityResult<typeof TodoEntity>;

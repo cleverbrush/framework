@@ -258,3 +258,8 @@ test('deepExtend does not recurse into inherited target properties', () => {
 function removePollutedMarker(): void {
     delete (Object.prototype as { polluted?: unknown }).polluted;
 }
+test('rejects an empty merge and invalid first sources', () => {
+    expect(() => deepExtend()).toThrow('no arguments');
+    expect(() => deepExtend(null)).toThrow('not a non-null object');
+    expect(() => deepExtend('value')).toThrow('not a non-null object');
+});

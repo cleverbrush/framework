@@ -1,4 +1,5 @@
-// @cleverbrush/knex-schema — Extracted helper functions from SchemaQueryBuilder
+import { encodeJsonColumn } from '../json-storage.js';
+// @cleverbrush/knex-schema — Extracted helper functions from QuerySource
 
 import type { InferType } from '@cleverbrush/schema';
 import {
@@ -19,13 +20,14 @@ import {
     POLYMORPHIC_TYPE_BRAND
 } from '../extension.js';
 import { clearRow } from '../mappers.js';
-import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
+import type { QuerySource } from '../QuerySource.js';
 import type {
     ColumnRef,
     ResolvedVariantConfig,
     ResolvedVariantRelationSpec,
     ValidatedSpec
 } from '../types.js';
+import { compileOrder, privateColumn } from './ordering.js';
 import { getState } from './state.js';
 
 // ---------------------------------------------------------------------------
@@ -64,7 +66,7 @@ export type QueryResultType<TLocalSchema> = TLocalSchema extends {
 // ---------------------------------------------------------------------------
 
 export function resolveColumn(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     ref: any,
     label = 'column'
 ): string | Knex.Raw {
@@ -77,12 +79,12 @@ export function resolveColumn(
     );
 }
 
-export function invalidateCache(builder: SchemaQueryBuilder<any, any>): void {
+export function invalidateCache(builder: QuerySource<any, any>): void {
     getState(builder).cachedBuiltQuery = null;
 }
 
 export function getSoftDelete(
-    builder: SchemaQueryBuilder<any, any>
+    builder: QuerySource<any, any>
 ): { column: string } | null {
     const state = getState(builder);
     const ext = (state.localSchema as any).getExtension?.('softDelete');
@@ -90,7 +92,7 @@ export function getSoftDelete(
 }
 
 export function getDefaultScope(
-    builder: SchemaQueryBuilder<any, any>
+    builder: QuerySource<any, any>
 ): Function | null {
     const state = getState(builder);
     const fn = (state.localSchema as any).getExtension?.('defaultScope');
@@ -98,7 +100,7 @@ export function getDefaultScope(
 }
 
 export function getTimestamps(
-    builder: SchemaQueryBuilder<any, any>
+    builder: QuerySource<any, any>
 ): { createdAt: string; updatedAt: string } | null {
     const state = getState(builder);
     const ts = (state.localSchema as any).getExtension?.('timestamps');
@@ -126,7 +128,7 @@ const ALLOWED_OPS = new Set([
 export { ALLOWED_OPS };
 
 export function getVariantConfig(
-    builder: SchemaQueryBuilder<any, any>
+    builder: QuerySource<any, any>
 ): ResolvedVariantConfig | null {
     const state = getState(builder);
     if (state.variantConfig !== undefined) return state.variantConfig;
@@ -148,7 +150,7 @@ export function getVariantConfig(
 }
 
 export function applyVariantJoins(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     base: Knex.QueryBuilder,
     variantConfig: ResolvedVariantConfig
 ): Knex.QueryBuilder {
@@ -288,24 +290,22 @@ export function applyVariantJoins(
     return qb;
 }
 
-// Circular-dependency-safe SchemaQueryBuilder constructor reference
-// Set by SchemaQueryBuilder.ts after the class is defined.
-let SchemaQueryBuilderCtor: new (...args: any[]) => any = null!;
-export function registerSchemaQueryBuilder(
-    ctor: new (...args: any[]) => any
-): void {
-    SchemaQueryBuilderCtor = ctor;
+// Circular-dependency-safe QuerySource constructor reference
+// Set by QuerySource.ts after the class is defined.
+let QuerySourceCtor: new (...args: any[]) => any = null!;
+export function registerQuerySource(ctor: new (...args: any[]) => any): void {
+    QuerySourceCtor = ctor;
 }
-export function getSchemaQueryBuilderCtor(): new (...args: any[]) => any {
-    return SchemaQueryBuilderCtor;
+export function getQuerySourceCtor(): new (...args: any[]) => any {
+    return QuerySourceCtor;
 }
 
 export function buildVariantRelationSelect(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     foreignSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     relAlias: string,
     foreignTableName: string,
-    customize?: (q: SchemaQueryBuilder<any, any>) => void
+    customize?: (q: QuerySource<any, any>) => void
 ): Knex.Raw[] {
     const state = getState(builder);
     const knex = state.knex;
@@ -317,7 +317,7 @@ export function buildVariantRelationSelect(
     let columnsToSelect: string[];
 
     if (customize) {
-        const probe = new (SchemaQueryBuilderCtor as any)(
+        const probe = new (QuerySourceCtor as any)(
             state.knex,
             foreignSchema,
             state.knex(foreignTableName)
@@ -347,7 +347,7 @@ export function buildVariantRelationSelect(
 }
 
 export function mapPolymorphicRow(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     row: Record<string, any>,
     variantConfig: ResolvedVariantConfig
 ): Record<string, any> {
@@ -457,14 +457,14 @@ export function mapPolymorphicRow(
 }
 
 export function resolveSchema(
-    _builder: SchemaQueryBuilder<any, any>,
+    _builder: QuerySource<any, any>,
     schema: any
 ): ObjectSchemaBuilder<any, any, any, any, any, any, any> {
     return typeof schema === 'function' ? schema() : schema;
 }
 
 export function findPrimaryKeyColumn(
-    _builder: SchemaQueryBuilder<any, any>,
+    _builder: QuerySource<any, any>,
     schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
 ): string {
     const pk = getPrimaryKeyColumns(schema);
@@ -472,7 +472,7 @@ export function findPrimaryKeyColumn(
     return 'id';
 }
 
-export function resolvePkColumns(builder: SchemaQueryBuilder<any, any>): {
+export function resolvePkColumns(builder: QuerySource<any, any>): {
     propertyKeys: readonly string[];
     columnNames: readonly string[];
 } {
@@ -487,7 +487,7 @@ export function resolvePkColumns(builder: SchemaQueryBuilder<any, any>): {
 }
 
 export function getEffectiveBaseQuery(
-    builder: SchemaQueryBuilder<any, any>
+    builder: QuerySource<any, any>
 ): Knex.QueryBuilder {
     const state = getState(builder);
     let effectiveBase = state.baseQuery;
@@ -515,7 +515,7 @@ export function getEffectiveBaseQuery(
                 effectiveBase = effectiveBase.clone();
                 cloned = true;
             }
-            const proxy = new (SchemaQueryBuilderCtor as any)(
+            const proxy = new (QuerySourceCtor as any)(
                 state.knex,
                 state.localSchema,
                 effectiveBase
@@ -530,7 +530,7 @@ export function getEffectiveBaseQuery(
 }
 
 export function buildJoinOne(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     resultQuery: Knex.QueryBuilder,
     spec: ValidatedSpec & { type: 'one' },
     relationAlias: string
@@ -591,7 +591,7 @@ export function buildJoinOne(
 }
 
 export function buildJoinMany(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     resultQuery: Knex.QueryBuilder,
     spec: ValidatedSpec & { type: 'many' },
     relationAlias: string,
@@ -737,9 +737,7 @@ export function buildJoinMany(
     });
 }
 
-export function buildQuery(
-    builder: SchemaQueryBuilder<any, any>
-): Knex.QueryBuilder {
+export function buildQuery(builder: QuerySource<any, any>): Knex.QueryBuilder {
     const state = getState(builder);
     const effectiveBase = getEffectiveBaseQuery(builder);
 
@@ -751,32 +749,74 @@ export function buildQuery(
     if (state.specs.length === 0) {
         return queryBase;
     }
+    if (Object.keys(state.projectionDecoders).length) {
+        throw new Error(
+            'Aggregate projections cannot include entity relations; use a flat grouped query'
+        );
+    }
 
     const knex = state.knex;
     const specs = state.specs;
 
     const requiredLocalColumns = [...new Set(specs.map(s => s.localColumn))];
 
-    let cteQuery = queryBase;
+    const cteQuery = queryBase.clone();
     let extraColumns: string[] = [];
 
     if (state.explicitSelects !== null) {
-        const selectedSet = new Set(state.explicitSelects);
+        const selectedSet = new Set(
+            state.projectionColumns
+                ? Object.keys(state.projectionColumns)
+                : state.explicitSelects
+        );
         extraColumns = requiredLocalColumns.filter(
             col => !selectedSet.has(col)
         );
         if (extraColumns.length > 0) {
-            cteQuery = queryBase.clone();
             for (const col of extraColumns) {
                 cteQuery.column(col);
             }
         }
     }
 
+    const order = compileOrder(
+        knex,
+        queryBase,
+        state.projectionColumns,
+        state.explicitSelects
+    );
+    const ordinal = privateColumn(
+        [
+            ...buildColumnMap(state.localSchema).colToProp.keys(),
+            ...Object.keys(state.projectionColumns ?? {}),
+            ...state.hiddenColumns
+        ],
+        'order'
+    );
+    if (order) {
+        // DENSE_RANK, unlike ROW_NUMBER, does not turn equal DISTINCT rows
+        // into different rows. The outer join cannot discard the requested order.
+        if (
+            !(cteQuery as any)._statements.some(
+                (s: any) => s.grouping === 'columns'
+            )
+        ) {
+            cteQuery.select(`${state.tableName}.*`);
+        }
+        cteQuery.select(
+            knex.raw('dense_rank() over (?) as ??', [order, ordinal])
+        );
+        state.hiddenColumns.add(ordinal);
+    }
     const resultQuery = knex.queryBuilder().with('originalQuery', cteQuery);
 
-    if (extraColumns.length > 0 && state.explicitSelects !== null) {
-        for (const col of state.explicitSelects) {
+    if (
+        state.projectionColumns ||
+        (extraColumns.length > 0 && state.explicitSelects !== null)
+    ) {
+        for (const col of state.projectionColumns
+            ? Object.keys(state.projectionColumns)
+            : state.explicitSelects!) {
             resultQuery.select(
                 knex.raw(':originalQuery:.:col: as :col:', {
                     originalQuery: 'originalQuery',
@@ -805,12 +845,12 @@ export function buildQuery(
         }
     }
 
+    if (order) resultQuery.orderBy(`originalQuery.${ordinal}`, 'asc');
+
     return resultQuery;
 }
 
-export function getQuery(
-    builder: SchemaQueryBuilder<any, any>
-): Knex.QueryBuilder {
+export function getQuery(builder: QuerySource<any, any>): Knex.QueryBuilder {
     const state = getState(builder);
     if (!state.cachedBuiltQuery) {
         state.cachedBuiltQuery = buildQuery(builder);
@@ -819,7 +859,7 @@ export function getQuery(
 }
 
 export function mapRow(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     row: Record<string, any>
 ): Record<string, any> {
     if (!row) return row;
@@ -842,11 +882,11 @@ export function mapRow(
         }
     }
 
-    return result;
+    return state.decodeRow ? state.decodeRow(result) : result;
 }
 
 export function cleanAndMapRow(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     row: Record<string, any>
 ): Record<string, any> {
     const state = getState(builder);
@@ -856,22 +896,28 @@ export function cleanAndMapRow(
     const manySpecs = state.specs.filter(
         (s): s is ValidatedSpec & { type: 'many' } => s.type === 'many'
     );
-    const cleaned = clearRow(row, oneSpecs, manySpecs);
-    return mapRow(builder, cleaned);
+    const cleaned = clearRow({ ...row }, oneSpecs, manySpecs);
+    for (const key of state.hiddenColumns) delete cleaned[key];
+    for (const [key, decode] of Object.entries(state.projectionDecoders)) {
+        if (Object.hasOwn(cleaned, key)) cleaned[key] = decode(cleaned[key]);
+    }
+    // An explicit DTO alias is already the public property name.
+    return state.projectionColumns ? cleaned : mapRow(builder, cleaned);
 }
 
 export function mapObjectToColumns(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     obj: Record<string, any>
 ): Record<string, any> {
     const state = getState(builder);
     const { propToCol } = buildColumnMap(state.localSchema);
     const result: Record<string, any> = {};
+    const properties = state.localSchema.introspect().properties;
 
     for (const [key, value] of Object.entries(obj)) {
         const colName = propToCol.get(key);
         if (colName) {
-            result[colName] = value;
+            result[colName] = encodeJsonColumn(properties[key], value);
         } else {
             result[key] = value;
         }
@@ -881,14 +927,14 @@ export function mapObjectToColumns(
 }
 
 export function mapRecordToColumns(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     record: Record<string, any>
 ): Record<string, any> {
     return mapObjectToColumns(builder, record);
 }
 
 export function resolveColumnArg(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     col: any
 ): string | Knex.Raw {
     if (typeof col === 'string') {
@@ -901,7 +947,7 @@ export function resolveColumnArg(
 }
 
 export function isColumnAccessor(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     fn: Function
 ): boolean {
     const state = getState(builder);
@@ -922,7 +968,7 @@ export function isColumnAccessor(
 }
 
 export function assertNotProjection(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     method: string
 ): void {
     const state = getState(builder);
@@ -936,7 +982,7 @@ export function assertNotProjection(
 }
 
 export function assertNotExplicitSelect(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     method: string
 ): void {
     const state = getState(builder);

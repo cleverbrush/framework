@@ -1,5 +1,15 @@
 // @cleverbrush/knex-schema — Type-safe schema-driven query builder for Knex
 
+export type { ReadAliasTables } from './AliasedQueryBuilder.js';
+export { AliasedQueryBuilder } from './AliasedQueryBuilder.js';
+export type {
+    AliasTables,
+    JoinedProjection,
+    JoinPredicate,
+    TableAlias
+} from './aliased-query.js';
+// Types
+export { alias, and, eq, or } from './aliased-query.js';
 export type {
     PrimaryKeyColumns,
     RowVersionColumn,
@@ -13,6 +23,12 @@ export {
     resolveColumnRef,
     resolvePropertyKey
 } from './columns.js';
+/** @internal Shared query/ORM composition contract. */
+export {
+    assertParametersBound,
+    COMPILED_READER,
+    isParameterizedQuery
+} from './compiled-query.js';
 // DDL generation
 export {
     generateCreatePolymorphicTables,
@@ -33,7 +49,16 @@ export type {
 } from './entity.js';
 // Entity wrapper
 export { defineEntity, Entity } from './entity.js';
+export type {
+    AggregateExpression,
+    AggregateOptions,
+    AggregateResult,
+    AliasedColumn,
+    OutputSchema
+} from './expressions.js';
+export { aggregate } from './expressions.js';
 // Schema extension (hasColumnName / hasTableName + DDL/ORM)
+export type { PrimaryKeyColumn } from './extension.js';
 export {
     any,
     array,
@@ -57,6 +82,7 @@ export {
     string,
     union
 } from './extension.js';
+export { encodeJsonColumn, isJsonColumn } from './json-storage.js';
 // Mappers (from knex-eager)
 export { clearRow, MAPPERS, mapObject, mapValue } from './mappers.js';
 // Migration generation
@@ -73,23 +99,76 @@ export {
     tableExistsInDb,
     validateEntitiesAgainstDatabase
 } from './migration.js';
+export { OpaqueQuery, type QueryOutput } from './OpaqueQuery.js';
+export type { CompositeCursorOptions } from './operations/composite-cursor.js';
+export type {
+    PolymorphicRowSchema,
+    VariantReadSchema,
+    VariantReadSchemas
+} from './PolymorphicQueryBuilder.js';
+export { PolymorphicQueryBuilder } from './PolymorphicQueryBuilder.js';
+export { parameter, type QueryParameter } from './parameter.js';
+export type {
+    AttachParameters,
+    BoundQuerySql,
+    CheckParameterState,
+    MergeParameters,
+    ParameterizedQuery,
+    ParameterReader,
+    ParameterState,
+    ParametersOf,
+    QueryArguments,
+    QueryDefinition,
+    QueryView
+} from './parameter-types.js';
+/** @internal Shared query/ORM fluent typing. */
+export { PARAMETER_READER, PARAMETER_STATE } from './parameter-types.js';
+export type { BoundQuery } from './query.js';
+// Main entry point
+export { createQuery, query } from './query.js';
+export type { QueryScope } from './query-scope.js';
 // Raw query execution
 export { rawQuery } from './raw.js';
-export type { BoundQuery } from './SchemaQueryBuilder.js';
-// Main entry point
-export {
-    createQuery,
-    query,
-    SchemaQueryBuilder
+export type {
+    EntityReadSchema,
+    ReadRelations,
+    ReadVariant,
+    ReadVariantMetadata,
+    ReadVariants,
+    WithReadVariant
+} from './read-entity.js';
+export { READ_ENTITY } from './read-entity.js';
+export type {
+    ReadMembership,
+    ReadPredicateBuilder,
+    ReadPredicateGroup,
+    ReadPredicateMethods,
+    ReadPredicateSelector
+} from './read-predicates.js';
+export type {
+    ColumnReadSchema,
+    ObjectReadSchema,
+    ReadObject,
+    ReadSchema,
+    ReadValue,
+    SchemaForValue
+} from './read-schema.js';
+export { ReadSchemaError } from './read-schema.js';
+export type {
+    ReadColumn,
+    ReadColumns,
+    ReadProjection,
+    ReadQueryShape,
+    SchemaAwareQuery
 } from './SchemaQueryBuilder.js';
+export { SchemaQueryBuilder } from './SchemaQueryBuilder.js';
 // Snapshot-based migration
 export {
     entitiesToSnapshot,
     loadSnapshot,
     writeSnapshot
 } from './snapshot.js';
-
-// Types
+export { isSqlIdentifier } from './sql-identifiers.js';
 export type {
     AddColumnDiff,
     AddForeignKeyDiff,

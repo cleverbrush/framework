@@ -1,5 +1,5 @@
 /**
- * Throttling cache middleware for the `@cleverbrush/web` client.
+ * Throttling cache middleware for the `@cleverbrush/client` client.
  *
  * Caches successful GET responses for a configurable TTL, avoiding
  * redundant network requests. Mutating requests (POST, PUT, DELETE, PATCH)
@@ -7,8 +7,8 @@
  *
  * @example
  * ```ts
- * import { createClient } from '@cleverbrush/web';
- * import { throttlingCache } from '@cleverbrush/web/cache';
+ * import { createClient } from '@cleverbrush/client';
+ * import { throttlingCache } from '@cleverbrush/client/cache';
  *
  * const client = createClient(api, {
  *     middlewares: [throttlingCache({ throttle: 2000 })],

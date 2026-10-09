@@ -14,11 +14,16 @@
 
 import {
     buildColumnMap,
+    encodeJsonColumn,
     getPrimaryKeyColumns,
-    getRowVersionColumn
+    getRowVersionColumn,
+    getVariants,
+    isJsonColumn,
+    query as schemaQuery
 } from '@cleverbrush/knex-schema';
 import type { Knex } from 'knex';
 import { ConcurrencyError, InvariantViolationError } from './errors.js';
+import { insertVariant, mutateVariant } from './variant-write.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -204,31 +209,107 @@ function extractPkValues(
     return pkInfo.propertyKeys.map(k => entity[k]);
 }
 
-/** Take a shallow snapshot of the entity's persisted (non-relation) columns. */
+// Document columns need independent snapshots; relational values keep their
+// existing identity semantics. Metadata stays outside the public snapshot.
+const documentKeys = new WeakMap<object, Set<string>>();
+
+function cloneDocument(value: any): any {
+    if (value === null || typeof value !== 'object') return value;
+    if (value instanceof Date) return new Date(value.getTime());
+    if (Array.isArray(value)) return value.map(cloneDocument);
+    const result = Object.create(Object.getPrototypeOf(value));
+    for (const key of Object.keys(value))
+        Object.defineProperty(result, key, {
+            value: cloneDocument(value[key]),
+            enumerable: true,
+            writable: true,
+            configurable: true
+        });
+    return result;
+}
+
+function documentsEqual(a: any, b: any): boolean {
+    if (Object.is(a, b)) return true;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object')
+        return false;
+    if (a instanceof Date || b instanceof Date)
+        return (
+            a instanceof Date &&
+            b instanceof Date &&
+            a.getTime() === b.getTime()
+        );
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    const prototype = Object.getPrototypeOf(b);
+    if (
+        !Array.isArray(b) &&
+        prototype !== Object.prototype &&
+        prototype !== null
+    )
+        return false;
+    const keys = Reflect.ownKeys(a);
+    if (keys.length !== Reflect.ownKeys(b).length) return false;
+    return keys.every(key => {
+        const descriptor = Object.getOwnPropertyDescriptor(b, key);
+        return (
+            descriptor &&
+            descriptor.enumerable ===
+                Object.getOwnPropertyDescriptor(a, key)!.enumerable &&
+            'value' in descriptor &&
+            documentsEqual(a[key], descriptor.value)
+        );
+    });
+}
+
+function sameColumn(
+    snapshot: Record<string, unknown>,
+    key: string,
+    current: unknown
+): boolean {
+    return documentKeys.get(snapshot)?.has(key)
+        ? documentsEqual(snapshot[key], current)
+        : Object.is(snapshot[key], current);
+}
+
+function restoreColumn(
+    snapshot: Record<string, unknown>,
+    key: string
+): unknown {
+    return documentKeys.get(snapshot)?.has(key)
+        ? cloneDocument(snapshot[key])
+        : snapshot[key];
+}
+
+/** Snapshot document contents independently, preserving other column semantics. */
 function snapshotEntity(entity: object, schema: any): Record<string, unknown> {
-    const introspected = (schema as any).introspect?.() as {
-        properties?: Record<string, unknown>;
-    };
-    const propKeys = new Set(Object.keys(introspected?.properties ?? {}));
+    const properties = { ...schema.introspect().properties };
+    const variants = getVariants(schema);
+    const variant =
+        variants?.variants[(entity as any)[variants.discriminatorKey]];
+    if (variant)
+        Object.assign(properties, variant.schema.introspect().properties);
     const snap: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(entity as Record<string, unknown>)) {
-        if (propKeys.has(k)) snap[k] = v;
+    const documents = new Set<string>();
+    for (const [k, v] of Object.entries(entity)) {
+        if (!Object.hasOwn(properties, k)) continue;
+        if (isJsonColumn(properties[k])) {
+            // Validate before snapshotting, including invalid nested mutations.
+            encodeJsonColumn(properties[k], v);
+            documents.add(k);
+            snap[k] = cloneDocument(v);
+        } else snap[k] = v;
     }
+    documentKeys.set(snap, documents);
     return Object.freeze(snap);
 }
 
-/** Check if two values differ (shallow). */
 function isDirty(
     original: Record<string, unknown>,
     current: Record<string, unknown>
 ): boolean {
-    for (const key of Object.keys(original)) {
-        if (!Object.is(original[key], current[key])) return true;
-    }
-    // Check for new keys on current that weren't in original
-    for (const key of Object.keys(current)) {
+    for (const key of Object.keys(original))
+        if (!sameColumn(original, key, current[key])) return true;
+    for (const key of Object.keys(current))
         if (!(key in original) && current[key] !== undefined) return true;
-    }
     return false;
 }
 
@@ -429,8 +510,9 @@ export class ChangeTracker {
             isModified(field?: keyof T): boolean {
                 const current = entity as Record<string, unknown>;
                 if (field !== undefined) {
-                    return !Object.is(
-                        rawEntry.originalSnapshot[field as string],
+                    return !sameColumn(
+                        rawEntry.originalSnapshot,
+                        field as string,
                         current[field as string]
                     );
                 }
@@ -439,10 +521,8 @@ export class ChangeTracker {
             reset(): void {
                 // Restore current values from snapshot
                 const current = entity as Record<string, unknown>;
-                for (const [k, v] of Object.entries(
-                    rawEntry.originalSnapshot
-                )) {
-                    current[k] = v;
+                for (const k of Object.keys(rawEntry.originalSnapshot)) {
+                    current[k] = restoreColumn(rawEntry.originalSnapshot, k);
                 }
                 rawEntry.state = rawEntry.pkKey ? 'Unchanged' : 'Added';
             }
@@ -475,8 +555,8 @@ export class ChangeTracker {
             ) {
                 // Restore values from snapshot
                 const current = entry.entity as Record<string, unknown>;
-                for (const [k, v] of Object.entries(entry.originalSnapshot)) {
-                    current[k] = v;
+                for (const k of Object.keys(entry.originalSnapshot)) {
+                    current[k] = restoreColumn(entry.originalSnapshot, k);
                 }
                 entry.state = 'Unchanged';
             }
@@ -498,16 +578,15 @@ export class ChangeTracker {
         const tableName = config.schema.getExtension?.('tableName') as string;
         if (!tableName || pkInfo.propertyKeys.length === 0) return;
 
-        const { propToCol, colToProp } = buildColumnMap(config.schema);
-        const qb = knex(tableName);
+        let qb = schemaQuery(knex, config.schema as any)
+            .unscoped()
+            .withDeleted();
         const pkValues = extractPkValues(
             config.schema,
             entity as Record<string, unknown>
         );
         for (let i = 0; i < pkInfo.propertyKeys.length; i++) {
-            const colName =
-                propToCol.get(pkInfo.propertyKeys[i]) ?? pkInfo.propertyKeys[i];
-            qb.andWhere(colName, pkValues[i] as any);
+            qb = qb.andWhere(pkInfo.propertyKeys[i], pkValues[i]);
         }
         const row = await qb.first();
         if (!row) return;
@@ -517,7 +596,7 @@ export class ChangeTracker {
         for (const [col, val] of Object.entries(
             row as Record<string, unknown>
         )) {
-            mapped[colToProp.get(col) ?? col] = val;
+            mapped[col] = val;
         }
         // Refresh snapshot and rowVersion
         entry.originalSnapshot = snapshotEntity(entity, config.schema);
@@ -667,6 +746,9 @@ export class ChangeTracker {
             }
         }
 
+        // Keep generated values local until every statement has committed.
+        // A later concurrency failure must not advance in-memory IDs/versions.
+        const committedValues = new Map<object, Record<string, unknown>>();
         // 4. Execute all changes in a single transaction
         await knex.transaction(async (trx: Knex.Transaction) => {
             // Inserts (Added)
@@ -678,27 +760,20 @@ export class ChangeTracker {
                 ) as string;
                 if (!tableName) continue;
 
-                const { propToCol } = buildColumnMap(config.schema);
                 const current = entry.entity as Record<string, unknown>;
-                const row: Record<string, unknown> = {};
-                for (const [propKey, val] of Object.entries(current)) {
-                    const colName = propToCol.get(propKey) ?? propKey;
-                    if (val !== undefined) row[colName] = val;
-                }
-                const result = await trx(tableName).insert(row).returning('*');
-                const returned =
-                    Array.isArray(result) && result.length > 0
-                        ? result[0]
-                        : null;
-                if (returned && typeof returned === 'object') {
-                    const { colToProp } = buildColumnMap(config.schema);
-                    const mapped = entry.entity as Record<string, unknown>;
-                    for (const [col, val] of Object.entries(
-                        returned as Record<string, unknown>
-                    )) {
-                        mapped[colToProp.get(col) ?? col] = val;
-                    }
-                }
+                const variants = getVariants(config.schema as any);
+                const returned = variants
+                    ? await insertVariant(
+                          trx,
+                          config.schema,
+                          String(current[variants.discriminatorKey]),
+                          current,
+                          trx
+                      )
+                    : await schemaQuery(trx, config.schema as any).insert(
+                          current as any
+                      );
+                if (returned) committedValues.set(current, returned);
                 inserted++;
             }
 
@@ -715,19 +790,97 @@ export class ChangeTracker {
                 const pkInfo = getPrimaryKeyColumns(config.schema);
                 const current = entry.entity as Record<string, unknown>;
 
+                if (entry.variantKey !== undefined) {
+                    const variants = getVariants(config.schema)!;
+                    const patch: Record<string, unknown> = {};
+                    for (const key of new Set([
+                        ...Object.keys(entry.originalSnapshot),
+                        ...Object.keys(current)
+                    ])) {
+                        if (
+                            pkInfo.propertyKeys.includes(key) ||
+                            key === variants.discriminatorKey
+                        )
+                            continue;
+                        if (
+                            !sameColumn(
+                                entry.originalSnapshot,
+                                key,
+                                current[key]
+                            )
+                        )
+                            patch[key] = current[key];
+                    }
+                    const managed: Record<string, unknown> = {};
+                    const rv = entry.rowVersion;
+                    if (rv?.strategy === 'increment') {
+                        const value =
+                            typeof rv.snapshotValue === 'string'
+                                ? (BigInt(rv.snapshotValue) + 1n).toString()
+                                : Number(rv.snapshotValue ?? 0) + 1;
+                        if (
+                            typeof value === 'number' &&
+                            !Number.isSafeInteger(value)
+                        )
+                            throw new Error(
+                                'Row-version increment exceeds the safe integer range; use a bigint storage column'
+                            );
+                        managed[rv.propertyKey] = value;
+                    } else if (rv?.strategy === 'timestamp')
+                        managed[rv.propertyKey] = new Date();
+                    let selected = (schemaQuery(trx, config.schema) as any)
+                        .selectVariants([entry.variantKey])
+                        .unscoped()
+                        .withDeleted()
+                        .where(
+                            pkInfo.propertyKeys[0],
+                            current[pkInfo.propertyKeys[0]]
+                        );
+                    if (rv)
+                        selected = selected.where(
+                            rv.propertyKey,
+                            rv.snapshotValue
+                        );
+                    const result = await mutateVariant(
+                        trx,
+                        config.schema,
+                        entry.variantKey,
+                        selected,
+                        'update',
+                        patch,
+                        managed
+                    );
+                    if (!result.count && rv)
+                        throw new ConcurrencyError(
+                            tableName,
+                            extractPkValues(config.schema, current),
+                            rv.snapshotValue
+                        );
+                    if (result.rows[0])
+                        committedValues.set(current, result.rows[0]);
+                    updated++;
+                    continue;
+                }
+
                 // Build the SET clause — only changed columns, excluding PK
                 const pkPropSet = new Set(pkInfo.propertyKeys);
                 const updateData: Record<string, unknown> = {};
+                const put = (key: string, value: unknown) => {
+                    updateData[propToCol.get(key) ?? key] = encodeJsonColumn(
+                        config.schema.introspect().properties[key],
+                        value
+                    );
+                };
                 for (const propKey of Object.keys(entry.originalSnapshot)) {
                     if (pkPropSet.has(propKey)) continue;
                     if (
-                        !Object.is(
-                            entry.originalSnapshot[propKey],
+                        !sameColumn(
+                            entry.originalSnapshot,
+                            propKey,
                             current[propKey]
                         )
                     ) {
-                        updateData[propToCol.get(propKey) ?? propKey] =
-                            current[propKey];
+                        put(propKey, current[propKey]);
                     }
                 }
                 // Also pick up new keys not in snapshot
@@ -737,7 +890,7 @@ export class ChangeTracker {
                         !(propKey in entry.originalSnapshot) &&
                         val !== undefined
                     ) {
-                        updateData[propToCol.get(propKey) ?? propKey] = val;
+                        put(propKey, val);
                     }
                 }
 
@@ -747,13 +900,25 @@ export class ChangeTracker {
                     const rvCol =
                         propToCol.get(rv.propertyKey) ?? rv.propertyKey;
                     if (rv.strategy === 'increment') {
-                        const newVal = Number(rv.snapshotValue ?? 0) + 1;
+                        const newVal =
+                            typeof rv.snapshotValue === 'string'
+                                ? (BigInt(rv.snapshotValue) + 1n).toString()
+                                : Number(rv.snapshotValue ?? 0) + 1;
+                        if (
+                            typeof newVal === 'number' &&
+                            !Number.isSafeInteger(newVal)
+                        )
+                            throw new Error(
+                                'Row-version increment exceeds the safe integer range; use a bigint storage column'
+                            );
                         updateData[rvCol] = newVal;
-                        current[rv.propertyKey] = newVal;
+                        committedValues.set(current, {
+                            [rv.propertyKey]: newVal
+                        });
                     } else if (rv.strategy === 'timestamp') {
                         const now = new Date();
                         updateData[rvCol] = now;
-                        current[rv.propertyKey] = now;
+                        committedValues.set(current, { [rv.propertyKey]: now });
                     }
                     // 'manual': caller already set the new value in current
                 }
@@ -807,6 +972,37 @@ export class ChangeTracker {
                 const pkInfo = getPrimaryKeyColumns(config.schema);
                 const current = entry.entity as Record<string, unknown>;
 
+                if (entry.variantKey !== undefined) {
+                    let selected = (schemaQuery(trx, config.schema) as any)
+                        .selectVariants([entry.variantKey])
+                        .unscoped()
+                        .withDeleted()
+                        .where(
+                            pkInfo.propertyKeys[0],
+                            current[pkInfo.propertyKeys[0]]
+                        );
+                    if (entry.rowVersion)
+                        selected = selected.where(
+                            entry.rowVersion.propertyKey,
+                            entry.rowVersion.snapshotValue
+                        );
+                    const result = await mutateVariant(
+                        trx,
+                        config.schema,
+                        entry.variantKey,
+                        selected,
+                        'delete'
+                    );
+                    if (!result.count && entry.rowVersion)
+                        throw new ConcurrencyError(
+                            tableName,
+                            extractPkValues(config.schema, current),
+                            entry.rowVersion.snapshotValue
+                        );
+                    deleted++;
+                    continue;
+                }
+
                 let qb = trx(tableName);
                 for (let i = 0; i < pkInfo.propertyKeys.length; i++) {
                     const colName =
@@ -835,6 +1031,9 @@ export class ChangeTracker {
                 deleted++;
             }
         });
+
+        for (const [entity, values] of committedValues)
+            Object.assign(entity, values);
 
         // 5. Refresh snapshots for inserted and updated entries; detach deleted
         for (const entry of added) {

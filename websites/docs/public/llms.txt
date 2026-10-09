@@ -1,401 +1,232 @@
 # Cleverbrush Framework
 
-> A schema-first TypeScript web framework. Define schemas once — get a type-safe HTTP server, auto-typed client with resilience, OpenAPI 3.1 docs, auth, dependency injection, schema-driven forms, and object mapping. Zero codegen, zero type duplication.
+> Schema-first TypeScript libraries for validation, HTTP APIs, typed clients,
+> database access, forms and object mapping. Libraries compose without codegen.
 
-The key differentiator is **contract-first architecture**: a shared API contract (defined with `@cleverbrush/schema`) is the single source of truth for both server and client. TypeScript enforces exhaustive handler mapping at compile time — add an endpoint to the contract and forget a handler? Compilation fails.
+Start with schemas, share a browser-safe API contract, implement its handlers on
+the server, then create a client from that same contract. Database schemas and
+public response schemas can differ; select and map fields explicitly.
 
-## Packages
+## Package map
 
-| Package | Description | Docs |
-|---------|-------------|------|
-| `@cleverbrush/server` | HTTP server with typed endpoints, middleware, batching, WebSocket | [/server](/server) |
-| `@cleverbrush/client` | Auto-typed REST client with retry, timeout, dedup, cache, batching | [/client/getting-started](/client/getting-started) |
-| `@cleverbrush/auth` | JWT, cookies, OAuth2, OIDC, policy-based authorization | [/auth](/auth) |
-| `@cleverbrush/di` | Dependency injection with schema-as-key tokens | [/di](/di) |
-| `@cleverbrush/server-openapi` | OpenAPI 3.1 generation (links, callbacks, webhooks, security) | [/server-openapi](/server-openapi) |
-| `@cleverbrush/env` | Typed environment config with schema validation | [/env](/env) |
-| `@cleverbrush/knex-schema` | Schema-aware Knex query builder (`.hasTableName()`, `.hasColumnName()`) | [/knex-schema](/knex-schema) |
-| `@cleverbrush/react-form` | Headless schema-driven React forms | [/react-form](/react-form) |
-| `@cleverbrush/mapper` | Schema-to-schema object mapping with compile-time completeness | [/mapper](/mapper) |
-| `@cleverbrush/scheduler` | Job scheduling with worker thread isolation | [/scheduler](/scheduler) |
-| `@cleverbrush/schema` | Schema validation library (see [schema.cleverbrush.com](https://schema.cleverbrush.com)) | — |
+| Area | Package | Documentation |
+| --- | --- | --- |
+| Validation and extensions | `@cleverbrush/schema` | [Schema](https://schema.cleverbrush.com) |
+| JSON Schema conversion | `@cleverbrush/schema-json` | [README](https://github.com/cleverbrush/framework/tree/development/libs/schema-json) |
+| HTTP contracts and handlers | `@cleverbrush/server` | [Server](/server) |
+| HTTP clients and React hooks | `@cleverbrush/client` | [Client](/client/getting-started) |
+| API specifications | `@cleverbrush/server-openapi` | [OpenAPI / AsyncAPI](/server-openapi) |
+| Authentication and authorization | `@cleverbrush/auth` | [Auth](/auth) |
+| Dependency injection | `@cleverbrush/di` | [DI](/di) |
+| Environment configuration | `@cleverbrush/env` | [Env](/env) |
+| SQL queries and schema metadata | `@cleverbrush/knex-schema` | [Queries](/knex-schema) |
+| Entities, relations and tracking | `@cleverbrush/orm` | [ORM](/orm) |
+| Database migrations | `@cleverbrush/orm-cli` | [README](https://github.com/cleverbrush/framework/tree/development/libs/orm-cli) |
+| Object transformations | `@cleverbrush/mapper` | [Mapper](/mapper) |
+| Schema-driven React forms | `@cleverbrush/react-form` | [Forms](/react-form) |
+| Worker-thread jobs | `@cleverbrush/scheduler` | [Scheduler](/scheduler) |
 
-## Core Workflow
+## Core workflow
 
-### 1. Define schemas (shared)
+This small example uses an in-memory collection, not persistent storage. Keep
+`contracts.ts` shared; do not import server implementations into browser bundles.
+
+### 1. Define schemas and the shared contract
 
 ```typescript
-import { object, string, number, array } from '@cleverbrush/schema';
+// contracts.ts
+import { defineApi, endpoint } from '@cleverbrush/server/contract';
+import { array, boolean, number, object, string } from '@cleverbrush/schema';
 
-const CreateTodoBody = object({
-  title: string().minLength(1).maxLength(200),
-  description: string().optional(),
+export const Todo = object({
+    id: number(),
+    title: string(),
+    completed: boolean()
 });
+const CreateTodo = object({ title: string().minLength(1).maxLength(200) });
 
-const Todo = object({
-  id: number().integer(),
-  title: string(),
-  description: string().optional(),
-  completed: boolean(),
-});
-```
-
-### 2. Define the API contract (shared)
-
-```typescript
-import { defineApi, endpoint } from '@cleverbrush/server';
-
-const api = defineApi({
-  todos: {
-    list: endpoint.get('/api/todos').returns(array(Todo)),
-    create: endpoint.post('/api/todos').body(CreateTodoBody).returns(Todo),
-    update: endpoint.patch('/api/todos/:id').body(UpdateTodoBody).returns(Todo),
-    delete: endpoint.delete('/api/todos/:id'),
-  },
-});
-```
-
-### 3. Server — exhaustive handler mapping
-
-```typescript
-import { createServer, mapHandlers } from '@cleverbrush/server';
-
-const server = createServer()
-  .useAuthentication({ defaultScheme: 'jwt', schemes: [jwtScheme({ secret })] })
-  .useAuthorization()
-  .services(svc => configureDI(svc))
-  .useBatching()
-  .withHealthcheck();
-
-mapHandlers(server, api, {
-  todos: {
-    list: async ({ query }) => db.todos.findAll(query),
-    create: async ({ body }) => db.todos.insert(body),
-    update: async ({ params, body }) => db.todos.update(params.id, body),
-    delete: async ({ params }) => db.todos.delete(params.id),
-    // TypeScript error if any endpoint is missing
-  },
-});
-
-server.listen(3000);
-```
-
-### 4. Client — typed, resilient
-
-```typescript
-import { createClient, retry, timeout, dedupe, throttlingCache, batching } from '@cleverbrush/client';
-
-const client = createClient(api, {
-  baseUrl: 'http://localhost:3000',
-  getToken: () => loadToken(),
-  middlewares: [
-    retry({ limit: 3 }),
-    timeout({ timeout: 10_000 }),
-    dedupe(),
-    throttlingCache({ throttle: 2000 }),
-    batching({ maxSize: 10 }),
-  ],
-});
-
-// Fully typed — autocomplete on endpoints and params
-const todos = await client.todos.list();
-const newTodo = await client.todos.create({ body: { title: 'Buy milk' } });
-```
-
-## @cleverbrush/server
-
-Install: `npm install @cleverbrush/server @cleverbrush/schema`
-
-### Endpoint builder
-
-```typescript
-import { endpoint, route } from '@cleverbrush/server';
-
-const myEndpoint = endpoint
-  .get('/api/users/:id')           // HTTP method + path (path params auto-typed)
-  .query(QuerySchema)              // query string schema
-  .body(BodySchema)                // request body schema
-  .headers(HeadersSchema)          // typed request headers
-  .returns(ResponseSchema)         // 200 response schema
-  .responses({                     // multi-status responses
-    200: SuccessSchema,
-    404: NotFoundSchema,
-  })
-  .produces('application/json')    // content type(s)
-  .producesFile()                  // binary file response
-  .deprecated()                    // OpenAPI deprecated flag
-  .tags('users')                   // OpenAPI tags
-  .summary('Get user by ID')       // OpenAPI summary
-  .description('...')              // OpenAPI description
-  .example({ ... })               // OpenAPI request example
-  .examples([...])                 // multiple examples
-  .links({ ... })                  // OpenAPI response links
-  .callbacks({ ... })              // OpenAPI callbacks (webhooks)
-  .security([{ bearerAuth: [] }]); // OpenAPI security schemes
-```
-
-### Server setup
-
-```typescript
-const server = createServer()
-  .use(myMiddleware)                                    // global middleware
-  .services(svc => { svc.addSingleton(Token, impl); })  // DI registration
-  .useAuthentication({ defaultScheme, schemes })         // auth middleware
-  .useAuthorization()                                    // authorization middleware
-  .withHealthcheck()                                     // GET /health
-  .useBatching();                                        // request batching support
-```
-
-### ActionResult helpers
-
-```typescript
-import { ActionResult } from '@cleverbrush/server';
-
-// In handlers:
-return ActionResult.ok(data);           // 200
-return ActionResult.created(data);      // 201
-return ActionResult.noContent();        // 204
-return ActionResult.notFound();         // 404
-return ActionResult.conflict();         // 409
-return ActionResult.redirect(url);      // 302
-return ActionResult.file(buffer, mime); // binary file
-return ActionResult.stream(readable);   // streaming response
-```
-
-### WebSocket subscriptions
-
-```typescript
-const api = defineApi({
-  live: {
-    updates: endpoint.ws('/ws/updates')
-      .receives(ClientMessageSchema)
-      .sends(ServerMessageSchema),
-  },
+export const api = defineApi({
+    todos: {
+        list: endpoint.get('/api/todos').responses({ 200: array(Todo) }),
+        create: endpoint.post('/api/todos')
+            .body(CreateTodo).responses({ 201: Todo })
+    }
 });
 ```
 
-## @cleverbrush/client
-
-Install: `npm install @cleverbrush/client @cleverbrush/schema`
-
-### Client creation
+### 2. Implement the handlers
 
 ```typescript
+// todos.ts
+import { ActionResult, implement } from '@cleverbrush/server';
+import type { InferType } from '@cleverbrush/schema';
+import { api, Todo } from './contracts.js';
+
+const rows: InferType<typeof Todo>[] = [];
+let nextId = 1;
+export const todosModule = implement(api).group('todos').withHandlers({
+    list: () => rows,
+    create: ({ body }) => {
+        const todo = { id: nextId++, title: body.title, completed: false };
+        rows.push(todo);
+        return ActionResult.created(todo);
+    }
+});
+```
+
+For large APIs, export a configured scope and define each handler in its own file
+using `Handler<typeof scope.endpoints.operation>`. Compose feature modules at the
+root. See the [multi-file example](https://github.com/cleverbrush/framework/blob/development/libs/server/README.md#large-apis-and-shared-error-handling).
+
+### 3. Register the complete implementation
+
+```typescript
+// server.ts
+import { createServer, implement } from '@cleverbrush/server';
+import { api } from './contracts.js';
+import { todosModule } from './todos.js';
+
+const server = createServer().withHealthcheck();
+server.handleAll(implement(api).use(todosModule).complete());
+await server.listen(3000);
+```
+
+`complete()` checks contract coverage. Server request validation and response
+types come from the endpoint schemas. Application persistence, permissions and
+business rules remain application code.
+
+### 4. Call the API from a typed client
+
+```typescript
+// client.ts
 import { createClient } from '@cleverbrush/client';
-// Or for React: import { createClient } from '@cleverbrush/client/react';
+import { timeout } from '@cleverbrush/client/timeout';
+import { api } from './contracts.js';
 
-const client = createClient(api, {
-  baseUrl: 'http://localhost:3000',
-  getToken: () => localStorage.getItem('token'),
-  middlewares: [...],
+export const client = createClient(api, {
+    baseUrl: 'http://localhost:3000',
+    middlewares: [timeout({ timeout: 10_000 })]
 });
+const todos = await client.todos.list();
+const created = await client.todos.create({ body: { title: 'Buy milk' } });
 ```
 
-### Resilience middleware
+## Schemas and extension authoring
 
-| Middleware | Purpose |
-|-----------|---------|
-| `retry({ limit, backoff, jitter })` | Retry failed requests with exponential backoff |
-| `timeout({ timeout })` | Abort requests after N ms |
-| `dedupe()` | Deduplicate identical concurrent GET requests |
-| `throttlingCache({ throttle })` | TTL cache for GET requests |
-| `batching({ maxSize, delay })` | Batch multiple requests into one HTTP call |
+Schemas are immutable. Capture the returned builder when adding properties,
+validators or modifiers. `number()` validates integers by default;
+`.clearIsInteger()` permits fractional values. Use `.coerce()` explicitly when
+parsing strings such as query parameters. `InferType<typeof schema>` derives the
+value type. Named schemas and `schemaRef()` support composition across packages.
 
-### React integration
+Define custom methods with `defineExtension()` and apply them with
+`withExtensions()`. Metadata is available from `schema.introspect().extensions`.
+For metadata-only methods whose values must also survive in TypeScript, use
+`defineMetadataMethod(key).argument<T>()`, `.value(value)` or `.compute(fn)` and
+`InferExtensionMetadata<S>`. These do not alter global builder prototypes or
+interpret application-specific metadata. See [schema extensions](https://github.com/cleverbrush/framework/blob/development/libs/schema/README.md#extensions).
 
-```typescript
-import { createClient } from '@cleverbrush/client/react';
+## HTTP APIs and supporting services
 
-const client = createClient(api, { baseUrl, getToken });
+- **Server:** endpoint builders describe request schemas, response statuses,
+  injection and authorization. `route()` supports schema-typed path parameters.
+  `implement()` binds modular handlers; `errorMap()` / `withErrors()` translate
+  known exceptions only into responses declared by the endpoint. `ActionResult`
+  supplies status-specific, file and streaming results. Unexpected errors retain
+  the server's Problem Details handling. [Server reference](/server).
+- **Subscriptions:** use `endpoint.subscription()` with `.incoming()` and
+  `.outgoing()` schemas and async-generator handlers. Subscriptions participate
+  in implementation coverage but do not use HTTP error policies. [Subscriptions](https://github.com/cleverbrush/framework/blob/development/libs/server/README.md#websocket-subscriptions).
+- **Client:** `createClient(contract, options)` infers calls from the contract.
+  Middleware is imported from subpaths such as `/retry`, `/timeout`, `/dedupe`,
+  `/cache` and `/batching`. Authentication, retry and cache policy must match the
+  application. The `/react` client adds TanStack Query hooks including
+  `.useQuery()` and `.useMutation()`; query state uses `isLoading`.
+  `decodeValidationIssues()` extracts structured request-validation issues.
+  [Client reference](/client/getting-started).
+- **OpenAPI / AsyncAPI:** configure `serveOpenApi({ server, info })` or
+  `serveAsyncApi({ server, info })` as middleware before listening. For generation
+  without middleware, pass registration metadata to `generateOpenApiSpec()` or
+  `generateAsyncApiSpec()`. Named schemas become reusable components.
+  [Specification generation](/server-openapi).
+- **Authentication:** configure authentication schemes and authorization policies
+  on the server; declare endpoint principal requirements with `.authorize()`.
+  JWT, cookies, OAuth2 and OIDC are supported. Keep signing keys and server-only
+  configuration out of shared contracts. [Authentication](/auth).
+- **Dependency injection:** schemas act as typed service tokens. Register values
+  or factories with singleton/scoped/transient lifetimes. Endpoint `.inject()`
+  declares dependencies supplied as the handler's second argument.
+  [Dependency injection](/di).
+- **Environment:** `env(name, schema)` binds leaves in a nested configuration;
+  `parseEnv()` validates and resolves it. `parseEnvFlat()` supports flat configs.
+  Use explicit coercion and `envBoolean()` for environment boolean conventions.
+  [Environment configuration](/env).
 
-// In components:
-const { data, error, loading } = client.todos.list.useQuery({ query: { page: 1 } });
-```
+## Database queries, entities and result mapping
 
-## @cleverbrush/auth
+Import database-capable schema factories from `@cleverbrush/knex-schema` or
+`@cleverbrush/orm`, not plain `@cleverbrush/schema`. Table and column metadata
+belong to these packages. Knex is a peer dependency; PostgreSQL also needs `pg`.
 
-Install: `npm install @cleverbrush/auth @cleverbrush/schema`
+- **Queries:** `query(knex, schema)` / `createQuery(knex)` provide typed selectors,
+  CRUD, scopes, named projections, eager loading and transactions. Aliases express
+  flat joins; aggregate expressions support summaries and explicit output schemas.
+  Composite cursors require a deterministic, non-null sort with a unique
+  tie-breaker. [Query guide](/knex-schema).
+- **ORM:** `defineEntity(schema)` declares relations; `createDb(knex, entities)`
+  exposes typed DbSets. Ordinary entity queries support identity tracking,
+  change persistence, optimistic concurrency and STI/CTI variants. Use
+  `@cleverbrush/orm-cli` for migrations. [ORM guide](/orm).
+- **Immutable queries:** every Framework query exposes `rowSchema` automatically.
+  Retain returned builders. `rowSchema` describes
+  the decoded selection, and accessing it never executes SQL. Full ORM entities
+  remain tracked when enabled; projected, grouped, distinct and raw rows are detached. SQL nulls stay `null`, dates
+  decode to `Date` throughout nested graphs, and declared decimal/bigint columns
+  retain exact strings. Input defaults and preprocessors are not replayed.
+  [Read schemas](/knex-schema#row-schemas), [detached ORM reads](/orm#detached-read-schemas).
+- **Shape-preserving predicates:** ordinary/aliased readers and ordinary ORM reads
+  support grouped `where`/`andWhere`/`orWhere`, null checks, IN/NOT IN value arrays
+  or SELECT subqueries, EXISTS/NOT EXISTS, and OR variants. Use `whereRaw` /
+  `orWhereRaw` / `orderByRaw` with positional bindings and `ref(selector)` for
+  quoted mapped columns, including generated child aliases. Group callbacks run
+  synchronously once and receive only predicate methods; retained groups are
+  immutable too. Return the configured group, never void or a Promise. Subquery SQL/bindings are captured without executing
+  SQL. These operations retain rowSchema identity; assign their returned reader.
+  Raw fragments are trusted application SQL, not a sandbox. Keep authorization
+  outside grouped search ORs. Opaque SELECTs use `apply(configure, { output })` or
+  `selectRaw(sql, bindings, { output })` with a synchronous Framework object schema.
+  Numbered pagination retains ordering; composite cursors replace it with their
+  explicit orderBy specification. [Read predicates](/knex-schema#read-predicates).
+- **Nested and polymorphic reads:** child customizers return their configured
+  queries. Nested includes execute in one SQL statement. STI/CTI readers expose
+  a union `rowSchema` and per-variant `variantRowSchemas`; DTO selection and
+  discriminator dispatch remain explicit application code.
+- **Mapping:** `mapper().configure(Source, Target, configure)` checks that every
+  target property is mapped, auto-mapped or ignored. `.from()` copies values;
+  `.compute()` transforms them. `getMapper()` returns an asynchronous function.
+  `getSyncMapper()` returns ordinary values when all final steps and nested
+  mappings are synchronous; known async mappings are rejected and disguised
+  thenables throw when invoked. Configuration does not probe callbacks. Reuse
+  schema instances and configured mappings; the registry uses schema identity.
+  Mapping does not fetch data or authorize access. [Mapper guide](/mapper),
+  [synchronous mapping](/mapper#synchronous-mapping).
 
-```typescript
-import { jwtScheme, signJwt } from '@cleverbrush/auth';
+For separate query, mapping and service files, storage representation rules and
+supported read operations, see the [complete query README](https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#projection-aware-reads).
 
-// Configure JWT auth scheme
-const jwt = jwtScheme({
-  secret: process.env.JWT_SECRET,
-  mapClaims: (claims) => ({
-    userId: claims.sub,
-    role: claims.role,
-  }),
-});
+## Forms and background work
 
-// Sign tokens
-const token = await signJwt({ sub: user.id, role: 'admin' }, secret, { expiresIn: '1h' });
+- **React Form:** schema-driven fields, validation and submission state.
+  Structured `FormIssue` values carry server validation errors to nested fields;
+  application business errors require explicit paths. [Forms](/react-form).
+- **Scheduler:** `JobScheduler` runs configured jobs in worker threads with
+  scheduling, retry, timeout and lifecycle events. Configure job files and
+  timezone explicitly. [Scheduler](/scheduler).
 
-// Server setup
-server.useAuthentication({
-  defaultScheme: 'jwt',
-  schemes: [jwt],
-});
+## Further reading
 
-// Per-endpoint authorization
-endpoint.get('/admin/users')
-  .authorize('admin')  // role-based
-  .authorize((principal) => principal.role === 'admin');  // policy-based
-```
-
-## @cleverbrush/di
-
-Install: `npm install @cleverbrush/di @cleverbrush/schema`
-
-Uses schema builders as DI tokens — fully typed, no string keys or decorators.
-
-```typescript
-import { any } from '@cleverbrush/schema';
-
-// Define tokens
-const DbToken = any().hasType<Database>();
-const LoggerToken = any().hasType<Logger>();
-
-// Register services
-server.services(svc => {
-  svc.addSingleton(DbToken, () => new Database(config));
-  svc.addScoped(LoggerToken, () => new Logger());
-});
-
-// Resolve in handlers (injected via context)
-const handler = async ({ services }) => {
-  const db = services.resolve(DbToken);     // typed as Database
-  const logger = services.resolve(LoggerToken); // typed as Logger
-};
-```
-
-## @cleverbrush/server-openapi
-
-Install: `npm install @cleverbrush/server-openapi`
-
-```typescript
-import { generateOpenApiSpec, serveAsyncApi } from '@cleverbrush/server-openapi';
-
-// Generate OpenAPI 3.1 spec
-const spec = generateOpenApiSpec(server, api, {
-  info: { title: 'My API', version: '1.0.0' },
-  servers: [{ url: 'https://api.example.com' }],
-});
-
-// Serve at GET /openapi.json
-server.get('/openapi.json', () => ActionResult.ok(spec));
-
-// AsyncAPI for WebSocket endpoints
-const asyncSpec = serveAsyncApi(server, api, { ... });
-```
-
-Features: response links, callbacks, webhooks, response headers, security schemes, discriminated union `discriminator` mapping, tags, deprecation.
-
-## @cleverbrush/env
-
-Install: `npm install @cleverbrush/env @cleverbrush/schema`
-
-```typescript
-import { env, parseEnv } from '@cleverbrush/env';
-import { string, number } from '@cleverbrush/schema';
-
-const config = parseEnv({
-  db: {
-    host: env('DB_HOST', string().default('localhost')),
-    port: env('DB_PORT', number().coerce().default(5432)),
-    name: env('DB_NAME', string()),
-  },
-  jwt: {
-    secret: env('JWT_SECRET', string().minLength(32)),
-  },
-  port: env('PORT', number().coerce().default(3000)),
-});
-// config is fully typed: { db: { host: string; port: number; name: string }; ... }
-// Throws with clear error messages if env vars are missing or invalid
-```
-
-## @cleverbrush/knex-schema
-
-Install: `npm install @cleverbrush/knex-schema @cleverbrush/schema knex`
-
-Schema-aware Knex query builder. Attach table/column metadata to schemas, then query with type-safe selectors.
-
-```typescript
-import { object, string, number } from '@cleverbrush/schema';
-
-// Attach DB metadata to schemas
-const UserSchema = object({
-  id: number().integer(),
-  name: string(),
-  email: string().email(),
-  createdAt: date().hasColumnName('created_at'),
-}).hasTableName('users');
-
-// Query with type-safe selectors
-import { createQuery } from '@cleverbrush/knex-schema';
-
-const db = createQuery(knex);
-const users = await db(UserSchema)
-  .where(u => u.email, 'alice@example.com')
-  .orderBy(u => u.createdAt, 'desc')
-  .select();
-```
-
-## @cleverbrush/mapper
-
-Install: `npm install @cleverbrush/mapper @cleverbrush/schema`
-
-Schema-to-schema object mapping with compile-time completeness. Unmapped target properties are TypeScript errors.
-
-```typescript
-import { mapper } from '@cleverbrush/mapper';
-
-const registry = mapper()
-  .configure(SourceSchema, TargetSchema, (m) =>
-    m
-      .for(t => t.fullName).compute(s => `${s.firstName} ${s.lastName}`)
-      .for(t => t.age).from(s => s.birthYear)  // auto-transform
-      .for(t => t.internal).ignore()
-      // Same-name, same-type properties are auto-mapped
-  );
-
-const mapFn = registry.getMapper(SourceSchema, TargetSchema);
-const result = await mapFn(sourceObject);
-```
-
-## @cleverbrush/scheduler
-
-Install: `npm install @cleverbrush/scheduler`
-
-Job scheduling with worker thread isolation, retries, and event streaming. Requires Node.js 16+.
-
-```typescript
-import { JobScheduler } from '@cleverbrush/scheduler';
-
-const scheduler = new JobScheduler({ rootFolder: './jobs' });
-
-scheduler.addJob({
-  id: 'cleanup',
-  path: 'cleanup.js',
-  schedule: { every: 'day', interval: 1, hour: 3, minute: 0 },
-  timeout: 60_000,
-  maxRetries: 3,
-  noConcurrentRuns: true,
-});
-
-scheduler.on('job:end', ({ jobId }) => console.log(`${jobId} done`));
-scheduler.on('job:error', ({ jobId, error }) => console.error(jobId, error));
-
-scheduler.start();
-```
-
-Schedule types: `minute`, `day`, `week`, `month`, `year` — each with `interval` and time fields.
-
-## Links
-
-- [Getting Started](/getting-started): End-to-end tutorial
-- [Why Cleverbrush?](/why): Problem statement and design philosophy
-- [Comparisons](/comparisons): Feature matrix vs tRPC, ts-rest, Hono
-- [Examples](/examples): Full-stack Todo app demo
-- [Schema Library](https://schema.cleverbrush.com): Schema validation docs, playground, benchmarks
-- [GitHub](https://github.com/cleverbrush/framework): Source code
+- [Getting Started](/getting-started): full-stack tutorial
+- [Examples](/examples): Todo application
+- [Why Cleverbrush?](/why): design goals
+- [Schema library](https://schema.cleverbrush.com): validation and playground
+- [GitHub](https://github.com/cleverbrush/framework): source and tests

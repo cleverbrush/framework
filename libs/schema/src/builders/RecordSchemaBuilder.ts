@@ -243,6 +243,18 @@ export class RecordSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'record',
+        TKeySchema,
+        TValueSchema,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResult
+    ];
+
     #keySchema!: TKeySchema;
     #valueSchema!: TValueSchema;
 
@@ -288,9 +300,12 @@ export class RecordSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -306,9 +321,12 @@ export class RecordSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**

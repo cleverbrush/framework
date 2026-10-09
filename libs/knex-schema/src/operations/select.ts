@@ -6,8 +6,9 @@ import {
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import { buildColumnMap } from '../columns.js';
+import { compileAggregate, isAggregate } from '../expressions.js';
 import { getProjections } from '../extension.js';
-import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
+import type { QuerySource } from '../QuerySource.js';
 import type { ColumnRef } from '../types.js';
 import {
     assertNotExplicitSelect,
@@ -19,7 +20,7 @@ import {
 import { getState } from './state.js';
 
 export function selectImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     ...args: unknown[]
 ): any {
     const state = getState(builder);
@@ -40,11 +41,26 @@ export function selectImpl(
             state.selectionMode = 'projection';
             state.appliedProjection = '<inline>';
 
-            const aliasMap: Record<string, string> = {};
+            const aliasMap: Record<string, string | Knex.Raw> = {};
             state.explicitSelects ??= [];
             for (const [alias, descriptor] of Object.entries(
                 result as Record<string, unknown>
             )) {
+                if (isAggregate(descriptor)) {
+                    const compiled = compileAggregate(
+                        state.knex,
+                        descriptor,
+                        column =>
+                            resolveColumn(
+                                builder,
+                                () => column,
+                                `select(selector).${alias}`
+                            )
+                    );
+                    aliasMap[alias] = compiled.sql;
+                    state.projectionDecoders[alias] = compiled.decode;
+                    continue;
+                }
                 if (
                     !descriptor ||
                     typeof descriptor !== 'object' ||
@@ -65,6 +81,7 @@ export function selectImpl(
                 aliasMap[alias] = col as string;
                 state.explicitSelects.push(col as string);
             }
+            state.projectionColumns = aliasMap;
             state.baseQuery.select(aliasMap);
             return builder;
         }
@@ -87,7 +104,7 @@ export function selectImpl(
 }
 
 export function distinctImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     ...columns: (ColumnRef<any> | Knex.Raw)[]
 ): any {
     invalidateCache(builder);
@@ -97,7 +114,7 @@ export function distinctImpl(
 }
 
 export function countImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column?: ColumnRef<any> | Knex.Raw
 ): any {
     const state = getState(builder);
@@ -113,7 +130,7 @@ export function countImpl(
 }
 
 export function countDistinctImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column?: ColumnRef<any> | Knex.Raw
 ): any {
     const state = getState(builder);
@@ -131,7 +148,7 @@ export function countDistinctImpl(
 }
 
 export function minImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any> | Knex.Raw
 ): any {
     const state = getState(builder);
@@ -143,7 +160,7 @@ export function minImpl(
 }
 
 export function maxImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any> | Knex.Raw
 ): any {
     const state = getState(builder);
@@ -155,7 +172,7 @@ export function maxImpl(
 }
 
 export function sumImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any> | Knex.Raw
 ): any {
     const state = getState(builder);
@@ -167,7 +184,7 @@ export function sumImpl(
 }
 
 export function avgImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any> | Knex.Raw
 ): any {
     const state = getState(builder);
@@ -179,7 +196,7 @@ export function avgImpl(
 }
 
 export function selectRawImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     sql: string,
     bindings?: any[]
 ): any {
@@ -194,7 +211,7 @@ export function selectRawImpl(
 }
 
 export function projectedImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     name: string
 ): any {
     const state = getState(builder);
@@ -228,10 +245,7 @@ export function projectedImpl(
     return builder;
 }
 
-export function scopedImpl(
-    builder: SchemaQueryBuilder<any, any>,
-    name: string
-): any {
+export function scopedImpl(builder: QuerySource<any, any>, name: string): any {
     const state = getState(builder);
     invalidateCache(builder);
     const scopes = (state.localSchema as any).getExtension?.('scopes') as
@@ -247,7 +261,7 @@ export function scopedImpl(
     return builder;
 }
 
-export function unscopedImpl(builder: SchemaQueryBuilder<any, any>): any {
+export function unscopedImpl(builder: QuerySource<any, any>): any {
     const state = getState(builder);
     invalidateCache(builder);
     state.skipDefaultScope = true;

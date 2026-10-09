@@ -22,6 +22,30 @@ async function registerAndLogin(
 }
 
 describe('UI — todo CRUD', () => {
+    it('shows a real server rejection beside the field, preserves edits and retries', async () => {
+        await withPage(async page => {
+            await registerAndLogin(page, uniqueEmail('ui-field-errors'), 'TestPass123!');
+            await page.goto('/todos/new');
+            const title = page.locator('input').first();
+            await title.fill(uniqueTitle('rejected'));
+            await page.locator('textarea').fill('Keep this description');
+            // Simulate a stale client's request shape while keeping the browser
+            // input locally valid. The actual backend produces the 400 response.
+            await page.route(/\/api\/todos\/?$/, async route => {
+                if (route.request().method() !== 'POST') return route.continue();
+                await route.continue({postData: JSON.stringify({...route.request().postDataJSON(), title: ''})});
+            });
+            await page.getByRole('button', {name: 'Create Todo', exact: true}).click();
+            await page.getByText('Check the highlighted fields.').waitFor();
+            expect(await title.getAttribute('aria-invalid')).toBe('true');
+            expect(await page.locator('textarea').inputValue()).toBe('Keep this description');
+            await page.unroute(/\/api\/todos\/?$/);
+            await title.fill(uniqueTitle('corrected'));
+            expect(await title.getAttribute('aria-invalid')).toBe('false');
+            await page.getByRole('button', {name: 'Create Todo', exact: true}).click();
+            await page.waitForURL(/\/todos\/\d+$/);
+        });
+    });
     it('create → appears in list → delete → disappears; DB row removed', async () => {
         const email = uniqueEmail('ui-crud');
         const title = uniqueTitle('crud');
@@ -38,6 +62,12 @@ describe('UI — todo CRUD', () => {
 
             // Detail page after creation
             await page.waitForURL(/\/todos\/\d+$/, { timeout: 10_000 });
+            // Stay on the detail page until its requests settle: an admin-only
+            // picker lookup must not sign out an ordinary user after creation.
+            await page.getByRole('button', { name: 'Save Changes', exact: true }).waitFor();
+            await page.waitForLoadState('networkidle');
+            expect(page.url()).toMatch(/\/todos\/\d+$/);
+            expect(await page.locator('input').first().inputValue()).toBe(title);
             const url = page.url();
             const todoId = Number(url.match(/\/todos\/(\d+)$/)![1]);
 

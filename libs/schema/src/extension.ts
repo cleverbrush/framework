@@ -91,6 +91,19 @@ import type {
 import { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
 import { TupleSchemaBuilder, tuple } from './builders/TupleSchemaBuilder.js';
 import { UnionSchemaBuilder, union } from './builders/UnionSchemaBuilder.js';
+import type { MetadataExtended } from './metadata-extension.js';
+import { isMetadataMethod } from './metadata-extension.js';
+
+export type {
+    ExtraProperties,
+    InferExtensionMetadata,
+    MetadataExtended,
+    MetadataMethod,
+    MetadataMethodBuilder,
+    MetadataMethods,
+    MetadataState
+} from './metadata-extension.js';
+export { defineMetadataMethod } from './metadata-extension.js';
 
 // ---------------------------------------------------------------------------
 // Builder type name mapping
@@ -432,9 +445,7 @@ export type FixedMethods<
  * `withExtension` / `getExtension` overridden to `never` so they
  * don't appear as callable in consumer code.
  */
-export type CleanExtended<TBuilder, TExt> = TBuilder &
-    FixedMethods<TExt, TBuilder> &
-    HiddenExtensionMethods;
+export type CleanExtended<TBuilder, TExt> = MetadataExtended<TBuilder, TExt>;
 
 // -- Factory types that return builders with corrected extension methods ------
 
@@ -747,6 +758,10 @@ export function defineExtension<T extends ExtensionConfig>(
                     `Extension method "${builderName}.${methodName}" must be a function`
                 );
             }
+            if (isMetadataMethod(origMethod)) {
+                wrappedConfig[builderName][methodName] = origMethod;
+                continue;
+            }
             // Wrap the method to auto-infer extension key if not already set
             wrappedConfig[builderName][methodName] = function (
                 this: any,
@@ -898,7 +913,6 @@ export function withExtensions<
 
         // Create a dynamic subclass
         const ExtendedClass = class extends BaseClass {
-            // biome-ignore lint/complexity/noUselessConstructor: required
             constructor(...args: any[]) {
                 super(...args);
             }

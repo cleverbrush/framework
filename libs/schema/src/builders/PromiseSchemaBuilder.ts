@@ -17,8 +17,8 @@ type PromiseSchemaBuilderCreateProps<R extends boolean = true> = Partial<
  * function) and optionally carries a typed resolved-value schema so that
  * the inferred TypeScript type is `Promise<T>` instead of `Promise<any>`.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link promise | promise()} function instead.
  *
  * @example Basic validation
@@ -73,6 +73,17 @@ export class PromiseSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'promise',
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResolvedTypeSchema,
+        TResult
+    ];
+
     #resolvedType?: SchemaBuilder<any, any, any, any, any>;
 
     /**
@@ -107,9 +118,12 @@ export class PromiseSchemaBuilder<
         TResolvedTypeSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -124,9 +138,12 @@ export class PromiseSchemaBuilder<
         TResolvedTypeSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -410,7 +427,7 @@ export class PromiseSchemaBuilder<
         TSchema
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             resolvedType: schema
         } as any) as any;

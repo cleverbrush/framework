@@ -326,7 +326,14 @@ export function generateAsyncApiSpec(
     if (!registry.isEmpty) {
         const schemas: Record<string, unknown> = {};
         for (const [name, schema] of registry.entries()) {
-            schemas[name] = convertSchema(schema, registry);
+            let rootInlined = false;
+            schemas[name] = convertSchema(schema, candidate => {
+                if (candidate === schema && !rootInlined) {
+                    rootInlined = true;
+                    return null;
+                }
+                return registry.getName(candidate);
+            });
         }
         doc.components = { schemas };
     }

@@ -47,8 +47,12 @@ class CookieAuthenticationScheme<T> implements AuthenticationScheme<T> {
         context: AuthenticationContext
     ): Promise<AuthenticationResult<T>> {
         // Try pre-parsed cookies first, fall back to header parsing
-        let cookieValue: string | undefined =
-            context.cookies[this.#options.cookieName];
+        let cookieValue: string | undefined = Object.hasOwn(
+            context.cookies,
+            this.#options.cookieName
+        )
+            ? context.cookies[this.#options.cookieName]
+            : undefined;
 
         if (cookieValue === undefined) {
             const cookieHeader = context.headers['cookie'];
@@ -58,7 +62,7 @@ class CookieAuthenticationScheme<T> implements AuthenticationScheme<T> {
             }
         }
 
-        if (cookieValue === undefined || cookieValue === '') {
+        if (typeof cookieValue !== 'string' || cookieValue === '') {
             return {
                 succeeded: false,
                 failure: `Cookie "${this.#options.cookieName}" not found`

@@ -22,6 +22,7 @@ export {
     formUrlEncodedContentTypeHandler,
     jsonContentTypeHandler
 } from './ContentNegotiator.js';
+export type { ServerCorsOptions } from './Cors.js';
 export {
     type ApiContract,
     type ApiGroup,
@@ -50,6 +51,18 @@ export {
     type ResponsesOf,
     type ScopedEndpointFactory
 } from './Endpoint.js';
+export type {
+    EndpointIdempotencyLimits,
+    EndpointOptions,
+    IdempotencyScope
+} from './EndpointOptions.js';
+export {
+    ErrorMap,
+    type ErrorResponse,
+    type ErrorResponsesOf,
+    errorMap,
+    withErrors
+} from './ErrorMap.js';
 export {
     BadRequestError,
     ConflictError,
@@ -58,6 +71,17 @@ export {
     NotFoundError,
     UnauthorizedError
 } from './HttpError.js';
+export {
+    ApiImplementation,
+    type ImplementationDefaults,
+    type ImplementationGroupOptions,
+    type ImplementationHandlerEntry,
+    type ImplementationHandlers,
+    ImplementationModule,
+    type ImplementationOperationOptions,
+    ImplementationScope,
+    implement
+} from './Implementation.js';
 export {
     idempotency,
     type ServerIdempotencyOptions
@@ -105,4 +129,11 @@ export type {
     SubscriptionRegistration,
     UploadOptions
 } from './types.js';
+export {
+    file,
+    type UploadConfiguration,
+    type UploadContract,
+    type UploadFiles,
+    type UploadSchema
+} from './upload.js';
 export { defineWebhook, type WebhookDefinition } from './Webhook.js';

@@ -21,8 +21,8 @@ type InferParameters<TParams extends SchemaBuilder<any, any, any, any, any>[]> =
  * It can be required or optional, and may carry typed parameter and return-type
  * schemas so that the inferred TypeScript function signature is fully typed.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link func | func()} function instead.
  *
  * @example Basic validation
@@ -87,6 +87,18 @@ export class FunctionSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'func',
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TParameters,
+        TReturnTypeSchema,
+        TResult
+    ];
+
     #parameters: SchemaBuilder<any, any, any, any, any>[] = [];
     #returnType?: SchemaBuilder<any, any, any, any, any>;
 
@@ -129,9 +141,12 @@ export class FunctionSchemaBuilder<
         TReturnTypeSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -147,9 +162,12 @@ export class FunctionSchemaBuilder<
         TReturnTypeSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -436,7 +454,7 @@ export class FunctionSchemaBuilder<
         TReturnTypeSchema
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             parameters: [...this.#parameters, schema]
         } as any) as any;
@@ -477,7 +495,7 @@ export class FunctionSchemaBuilder<
         TSchema
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             returnType: schema
         } as any) as any;

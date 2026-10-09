@@ -1,0 +1,39 @@
+{
+    "name": "@cleverbrush/scheduler-postgres",
+    "engines": {
+        "node": ">=24"
+    },
+    "version": "4.4.3",
+    "description": "Transactional PostgreSQL repository for the Cleverbrush durable scheduler",
+    "type": "module",
+    "sideEffects": false,
+    "license": "BSD-3-Clause",
+    "files": [
+        "dist"
+    ],
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "dependencies": {
+        "@cleverbrush/scheduler": "^4.4.3",
+        "@cleverbrush/schema": "^4.4.3",
+        "@cleverbrush/orm": "^4.4.3",
+        "@cleverbrush/knex-schema": "^4.4.3"
+    },
+    "peerDependencies": {
+        "knex": ">=3.1.0",
+        "pg": ">=8"
+    },
+    "devDependencies": {
+        "@types/node": "^25.4.0"
+    },
+    "scripts": {
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.tsbuildinfo"
+    }
+}

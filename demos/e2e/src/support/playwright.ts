@@ -11,6 +11,7 @@ let browser: Browser | null = null;
 async function getBrowser(): Promise<Browser> {
     if (!browser) {
         browser = await chromium.launch({
+            executablePath: process.env.E2E_BROWSER_EXECUTABLE_PATH || undefined,
             headless: !config.headed,
             slowMo: config.slowMo
         });

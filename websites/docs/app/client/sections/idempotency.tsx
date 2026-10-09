@@ -5,7 +5,7 @@ export default function IdempotencySection() {
     return (
         <>
             <div className="section-header">
-                <h1>Idempotency Middleware</h1>
+                <h1>HTTP Idempotency</h1>
                 <p className="subtitle">
                     Deduplicate replays of mutating requests via idempotency
                     keys
@@ -13,23 +13,21 @@ export default function IdempotencySection() {
             </div>
 
             <div className="card">
-                <h2>Basic Usage</h2>
+                <h2>Contract-declared retries</h2>
                 <pre>
                     <code
                         dangerouslySetInnerHTML={{
-                            __html: highlightTS(`import { idempotency } from '@cleverbrush/client/idempotency';
+                            __html: highlightTS(`// Shared contract: opt in once.
+const CreateTodo = endpoint.post('/todos').idempotent().body(CreateTodoSchema);
 
 const client = createClient(api, {
-    middlewares: [
-        idempotency(),           // adds X-Idempotency-Key to mutations
-        retry({ limit: 3 }),     // preserves the key across retries
-    ],
+    middlewares: [retry({ limit: 3 }), timeout({ timeout: 10_000 })]
 });
 
-// First call — key is generated
+// Framework generates a key and retains it across HTTP retries.
 await client.todos.create({ body: { title: 'Buy milk' } });
 
-// Retry — same key, server returns stored response
+// A new client call represents a new operation and gets a fresh key.
 `)
                         }}
                     />
@@ -39,18 +37,24 @@ await client.todos.create({ body: { title: 'Buy milk' } });
             <div className="card">
                 <h2>Server Integration</h2>
                 <p>
-                    The server-side <code>idempotency()</code> middleware reads
-                    the header, stores the response, and replays it for
-                    duplicate keys.
+                    Endpoint preparation runs after authentication and
+                    validation, before every replay. It receives typed request
+                    data and injected services. Scope resolution uses the
+                    prepared request. Concurrent duplicates share one execution
+                    within a bounded, process-local store.
                 </p>
                 <pre>
                     <code
                         dangerouslySetInnerHTML={{
-                            __html: highlightTS(`import { idempotency } from '@cleverbrush/server';
-
-server.handle(CreateTodo, createHandler, {
-    middlewares: [idempotency({ ttl: 86_400_000 })],
+                            __html: highlightTS(`server.handle(CreateTodo.authorize(UserPrincipal).inject({ db: DbToken }), createHandler, {
+    prepare: authorizeAndResolveWorkspace,
+    idempotency: {
+        scope: ({ principal, body }) => [principal.userId, body.workspaceId]
+    },
+    errors: todoErrors
 });
+
+// The same options work in implement(api).group(...).withHandlers(...).
 `)
                         }}
                     />
@@ -58,7 +62,7 @@ server.handle(CreateTodo, createHandler, {
             </div>
 
             <div className="card">
-                <h2>How It Works</h2>
+                <h2>How replay works</h2>
                 <ul>
                     <li>
                         <strong>On mutation:</strong> Client auto-generates a
@@ -78,7 +82,7 @@ server.handle(CreateTodo, createHandler, {
             </div>
 
             <div className="card">
-                <h2>Options (Client)</h2>
+                <h2>Low-level middleware options (Client)</h2>
                 <div className="table-wrap">
                     <table className="api-table">
                         <caption className="visually-hidden">
@@ -145,6 +149,37 @@ server.handle(CreateTodo, createHandler, {
                             </tr>
                         </thead>
                         <tbody>
+                            <tr>
+                                <td>
+                                    <code>scope</code>
+                                </td>
+                                <td>
+                                    <code>(ctx) =&gt; string | undefined</code>
+                                </td>
+                                <td>Required; undefined skips replay</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <code>maxEntries</code>
+                                </td>
+                                <td>
+                                    <code>number</code>
+                                </td>
+                                <td>
+                                    <code>1000</code> (pending and completed)
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <code>maxResponseBytes</code>
+                                </td>
+                                <td>
+                                    <code>number</code>
+                                </td>
+                                <td>
+                                    <code>65536</code> bytes
+                                </td>
+                            </tr>
                             <tr>
                                 <td>
                                     <code>ttl</code>

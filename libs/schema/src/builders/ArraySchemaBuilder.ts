@@ -86,8 +86,8 @@ type ArraySchemaBuilderCreateProps<
  * Also you can limit the length of the array by using `minLength`
  * and `maxLength` methods.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link array | array()} function instead.
  * @see {@link array}
  */
@@ -112,6 +112,17 @@ export class ArraySchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'array',
+        TElementSchema,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResult
+    ];
+
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
         ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType>
@@ -188,9 +199,12 @@ export class ArraySchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -205,9 +219,12 @@ export class ArraySchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #createValidationSetup(
@@ -358,8 +375,19 @@ export class ArraySchemaBuilder<
         ) as any;
     }
 
+    /** Keep indexed object validators attached to their actual root descriptor. */
+    #elementContext(
+        context: ValidationContext,
+        index: number
+    ): ValidationContext {
+        const descriptor = (context.currentPropertyDescriptor as any)?.[index];
+        return descriptor?.[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+            ? { ...context, currentPropertyDescriptor: descriptor }
+            : { ...context };
+    }
+
     /**
-     * Performs synchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validate}
+     * {@inheritDoc SchemaBuilder.validate}
      */
     public validate(
         object: TResult,
@@ -372,7 +400,7 @@ export class ArraySchemaBuilder<
     }
 
     /**
-     * Performs asynchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validateAsync}
+     * {@inheritDoc SchemaBuilder.validateAsync}
      */
     public async validateAsync(
         object: TResult,
@@ -529,9 +557,10 @@ export class ArraySchemaBuilder<
 
                 for (let i = 0; i < objToValidate.length; i++) {
                     results.push(
-                        this.#elementSchema.validate(objToValidate[i], {
-                            ...prevalidationContext
-                        })
+                        this.#elementSchema.validate(
+                            objToValidate[i],
+                            this.#elementContext(prevalidationContext, i)
+                        )
                     );
                 }
 
@@ -545,9 +574,7 @@ export class ArraySchemaBuilder<
                 for (let i = 0; i < objToValidate.length; i++) {
                     const result = this.#elementSchema.validate(
                         objToValidate[i],
-                        {
-                            ...prevalidationContext
-                        }
+                        this.#elementContext(prevalidationContext, i)
                     );
                     elementResults[i] = result as any;
                     if (result.valid) {
@@ -624,10 +651,10 @@ export class ArraySchemaBuilder<
         ) {
             if (prevalidationContext.doNotStopOnFirstError) {
                 const results = await Promise.all(
-                    objToValidate.map(o =>
+                    objToValidate.map((o, i) =>
                         this.#elementSchema?.validateAsync(
                             o,
-                            prevalidationContext
+                            this.#elementContext(prevalidationContext, i)
                         )
                     )
                 );
@@ -642,9 +669,7 @@ export class ArraySchemaBuilder<
                 for (let i = 0; i < objToValidate.length; i++) {
                     const result = await this.#elementSchema.validateAsync(
                         objToValidate[i],
-                        {
-                            ...prevalidationContext
-                        }
+                        this.#elementContext(prevalidationContext, i)
                     );
                     elementResults[i] = result as any;
                     if (result.valid) {
@@ -839,7 +864,7 @@ export class ArraySchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return ArraySchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             elementSchema: schema
         } as any) as any;
@@ -858,7 +883,7 @@ export class ArraySchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return ArraySchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             elementSchema: undefined
         } as any) as any;
@@ -891,7 +916,7 @@ export class ArraySchemaBuilder<
         TExtensions {
         if (typeof length !== 'number' || length < 0)
             throw new Error('length is expected to be a number which is >= 0');
-        return ArraySchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             minLength: length,
             minLengthValidationErrorMessageProvider: errorMessage
@@ -912,7 +937,7 @@ export class ArraySchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.minLength;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         } as any) as any;
     }
@@ -944,7 +969,7 @@ export class ArraySchemaBuilder<
         TExtensions {
         if (typeof length !== 'number' || length < 0)
             throw new Error('length is expected to be a number which is >= 0');
-        return ArraySchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             maxLength: length,
             maxLengthValidationErrorMessageProvider: errorMessage
@@ -965,7 +990,7 @@ export class ArraySchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.maxLength;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         } as any) as any;
     }

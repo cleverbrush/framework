@@ -1,5 +1,5 @@
 /**
- * Request deduplication middleware for the `@cleverbrush/web` client.
+ * Request deduplication middleware for the `@cleverbrush/client` client.
  *
  * Prevents duplicate in-flight requests by sharing the response from
  * an already-pending request with the same key. Non-GET requests are
@@ -7,8 +7,8 @@
  *
  * @example
  * ```ts
- * import { createClient } from '@cleverbrush/web';
- * import { dedupe } from '@cleverbrush/web/dedupe';
+ * import { createClient } from '@cleverbrush/client';
+ * import { dedupe } from '@cleverbrush/client/dedupe';
  *
  * const client = createClient(api, {
  *     middlewares: [dedupe()],
@@ -110,6 +110,8 @@ export function dedupe(options: DedupeOptions = {}): Middleware {
             () => inflight.delete(k)
         );
 
-        return promise;
+        // Never hand out the shared original: an earlier caller may consume
+        // its body before the next caller's clone callback runs.
+        return promise.then(res => res.clone());
     };
 }

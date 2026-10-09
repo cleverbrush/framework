@@ -36,11 +36,10 @@ export async function push(
     const confirmed = flags['--yes'] === true;
 
     if (isProduction && !confirmed) {
-        console.error(
-            '\nError: `db push` is not allowed in NODE_ENV=production ' +
-                'without the --yes flag.\n'
+        // Let the command router close the database pool before exiting.
+        throw new Error(
+            '`db push` is not allowed in NODE_ENV=production without the --yes flag'
         );
-        process.exit(1);
     }
 
     if (!confirmed) {

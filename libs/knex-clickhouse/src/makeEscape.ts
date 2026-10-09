@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer';
+
 /*
  *  NOTE: functions below are taken from knex npm package,
  *  unfortunately they are not exported, so we have to copy them here

@@ -4,7 +4,7 @@ import { type Meter, metrics, type Tracer, trace } from '@opentelemetry/api';
  * DI service key for an OpenTelemetry `Tracer`.
  *
  * Resolved from the global `TracerProvider` set by
- * {@link import('./setupOtel.js').setupOtel}. Components that prefer
+ * `setupOtel`. Components that prefer
  * dependency injection over the global API can inject this token.
  */
 export const ITracer = Symbol.for('ITracer') as unknown as {
@@ -15,7 +15,7 @@ export const ITracer = Symbol.for('ITracer') as unknown as {
  * DI service key for an OpenTelemetry `Meter`.
  *
  * Resolved from the global `MeterProvider` set by
- * {@link import('./setupOtel.js').setupOtel}.
+ * `setupOtel`.
  */
 export const IMeter = Symbol.for('IMeter') as unknown as {
     __brand: 'IMeter';
@@ -47,7 +47,7 @@ export interface ConfigureOtelOptions {
  * Registers OTel `Tracer` and `Meter` instances in the DI container.
  *
  * Both are resolved lazily from the global providers configured by
- * {@link import('./setupOtel.js').setupOtel}, so this helper can be
+ * `setupOtel`, so this helper can be
  * called at DI setup time even before the SDK has fully started.
  *
  * @param services - the `ServiceCollection` to register with

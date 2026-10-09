@@ -3,7 +3,8 @@
 import type { InferType } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import { buildColumnMap } from '../columns.js';
-import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
+import type { QuerySource } from '../QuerySource.js';
+import { returningReadColumns } from '../read-schema.js';
 import {
     getTimestamps,
     mapObjectToColumns,
@@ -13,7 +14,7 @@ import {
 import { getState } from './state.js';
 
 export async function updateImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     data: Partial<InferType<any>>
 ): Promise<any[]> {
     const state = getState(builder);
@@ -35,12 +36,14 @@ export async function updateImpl(
         mapped[timestamps.updatedAt] = state.knex.fn.now();
     }
 
-    const rows = await state.baseQuery.update(mapped).returning('*');
+    const rows = await state.baseQuery
+        .update(mapped)
+        .returning(returningReadColumns(state.knex, state.localSchema));
     return rows.map((row: any) => mapRow(builder, row));
 }
 
 export async function bulkUpdateImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     updates: ReadonlyArray<{
         where: Partial<InferType<any>>;
         set: Partial<InferType<any>>;
@@ -124,7 +127,8 @@ export async function bulkUpdateImpl(
         ] as any);
     }
 
-    let qb: any = knex(state.tableName).update(updateExpr);
+    // Preserve the immutable caller's captured visibility and predicates.
+    let qb: any = state.baseQuery.clone().update(updateExpr);
     if (pk.columnNames.length === 1) {
         qb = qb.whereIn(
             pk.columnNames[0],

@@ -193,7 +193,16 @@ export class ServiceProvider implements IServiceProvider {
      * @see {@link FunctionSchemaBuilder.hasReturnType}
      */
     public invoke<
-        TFuncSchema extends FunctionSchemaBuilder<any, any, any, any, any, any>
+        TFuncSchema extends FunctionSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
     >(
         funcSchema: TFuncSchema,
         implementation: InferType<TFuncSchema>
@@ -351,9 +360,11 @@ export class ServiceProvider implements IServiceProvider {
     resolveScoped(
         schema: SchemaBuilder<any, any, any, any, any>,
         resolutionStack: Set<SchemaBuilder<any, any, any, any, any>>,
-        scopedCache: Map<SchemaBuilder<any, any, any, any, any>, any>,
-        trackDisposable: (instance: any) => void
+        scopedCache?: Map<SchemaBuilder<any, any, any, any, any>, any>,
+        trackDisposable?: (instance: any) => void,
+        optional = false
     ): any {
+        if (optional && !this.#descriptors.has(schema)) return undefined;
         return this.#resolve(
             schema,
             resolutionStack,
@@ -394,18 +405,20 @@ class ScopedResolverProxy implements IServiceProvider {
         return this.#provider.resolveScoped(
             schema,
             this.#resolutionStack,
-            this.#scopedCache ?? new Map(),
-            this.#trackDisposable ?? (() => {})
+            this.#scopedCache,
+            this.#trackDisposable
         );
     }
 
     getOptional<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         schema: TSchema
     ): InferType<TSchema> | undefined {
-        try {
-            return this.get(schema);
-        } catch {
-            return undefined;
-        }
+        return this.#provider.resolveScoped(
+            schema,
+            this.#resolutionStack,
+            this.#scopedCache,
+            this.#trackDisposable,
+            true
+        );
     }
 }

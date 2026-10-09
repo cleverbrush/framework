@@ -9,11 +9,12 @@
  * @module
  */
 
-import type { ServerResponse } from 'node:http';
+import type { OutgoingHttpHeaders, ServerResponse } from 'node:http';
 import type { CacheTagDefinition } from '../CacheTag.js';
 import { computeCacheKey } from '../cacheKey.js';
 import type { RequestContext } from '../RequestContext.js';
 import type { Middleware } from '../types.js';
+import { captureResponse } from './ResponseSnapshot.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -33,6 +34,10 @@ export interface ServerCacheOptions {
      * Per-tag TTL overrides: `{ [tagName]: ttlMs }`.
      */
     ttlByTag?: Record<string, number>;
+    /** Maximum retained cache keys. Default: 1000 (oldest keys are evicted). */
+    maxEntries?: number;
+    /** Maximum retained response body size. Default: 65,536 bytes. */
+    maxResponseBytes?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -41,7 +46,7 @@ export interface ServerCacheOptions {
 
 interface CacheEntry {
     status: number;
-    headers: Record<string, string | string[] | undefined>;
+    headers: OutgoingHttpHeaders;
     body: Buffer;
     expiresAt: number;
     generations: ReadonlyArray<readonly [string, number]>;
@@ -68,6 +73,9 @@ function isMutating(method: string): boolean {
  * - **Mutation (POST/PUT/PATCH/DELETE)**: Lets the handler run, then
  *   invalidates all cache entries whose tag names start with any of the
  *   endpoint's cache tag names. Older in-flight reads cannot refill them.
+ * - By default, retain at most 1000 keys and bodies up to 65,536 bytes. Private/no-store and
+ *   Set-Cookie responses are not cached. Install after authorization and encode
+ *   every identity/tenant/representation dimension in tag properties.
  *
  * @param options - Cache configuration.
  * @returns A server-side {@link Middleware}.
@@ -80,7 +88,23 @@ function isMutating(method: string): boolean {
  * ```
  */
 export function cacheResponse(options: ServerCacheOptions = {}): Middleware {
-    const { ttlByTag = {}, defaultTtl = 60_000 } = options;
+    const {
+        defaultTtl = 60_000,
+        maxEntries = 1000,
+        maxResponseBytes = 65_536
+    } = options;
+    const ttlByTag = { ...options.ttlByTag };
+    for (const [name, value] of Object.entries({
+        maxEntries,
+        maxResponseBytes
+    })) {
+        if (!Number.isSafeInteger(value) || value <= 0)
+            throw new TypeError(name + ' must be a positive safe integer');
+    }
+    for (const value of [defaultTtl, ...Object.values(ttlByTag)]) {
+        if (!Number.isFinite(value) || value < 0)
+            throw new TypeError('Cache TTL must be finite and non-negative');
+    }
 
     const cache = new Map<string, CacheEntry>();
     const generations = new Map<string, number>();
@@ -119,6 +143,8 @@ export function cacheResponse(options: ServerCacheOptions = {}): Middleware {
         }
 
         if (ctx.method === 'GET') {
+            for (const [key, entry] of cache)
+                if (entry.expiresAt <= Date.now()) cache.delete(key);
             // Build root for key computation
             const root = {
                 params: ctx.pathParams ?? {},
@@ -153,45 +179,29 @@ export function cacheResponse(options: ServerCacheOptions = {}): Middleware {
                 }
             }
 
-            // Cache miss — run handler, then capture the response
-            const originalWriteHead = (
-                ctx.response as ServerResponse
-            ).writeHead.bind(ctx.response);
-            const originalEnd = (ctx.response as ServerResponse).end.bind(
-                ctx.response
+            const snapshotResponse = await captureResponse(
+                ctx.response,
+                next,
+                maxResponseBytes
             );
-
-            let capturedStatus = 200;
-            let capturedHeaders: Record<string, string | string[] | undefined> =
-                {};
-            const chunks: Buffer[] = [];
-
-            (ctx.response as ServerResponse).writeHead = function (
-                this: ServerResponse,
-                statusCode: number,
-                ...args: any[]
-            ) {
-                capturedStatus = statusCode;
-                if (args.length > 0) {
-                    capturedHeaders = args[0];
-                }
-                return originalWriteHead(statusCode, ...args) as ServerResponse;
-            } as any;
-
-            (ctx.response as ServerResponse).end = function (
-                this: ServerResponse,
-                chunk?: any,
-                ...args: any[]
-            ) {
-                if (chunk) {
-                    chunks.push(
-                        Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-                    );
-                }
-                return originalEnd(chunk, ...args) as ServerResponse;
-            } as any;
-
-            await next();
+            if (!snapshotResponse) return;
+            const {
+                status: capturedStatus,
+                headers: capturedHeaders,
+                body
+            } = snapshotResponse;
+            if (
+                Object.keys(capturedHeaders).some(
+                    name => name.toLowerCase() === 'set-cookie'
+                )
+            )
+                return;
+            if (
+                /\b(?:private|no-store)\b/i.test(
+                    String(capturedHeaders['cache-control'] ?? '')
+                )
+            )
+                return;
 
             // Store in cache on success
             if (
@@ -199,7 +209,6 @@ export function cacheResponse(options: ServerCacheOptions = {}): Middleware {
                 capturedStatus < 300 &&
                 isCurrent(snapshot)
             ) {
-                const body = Buffer.concat(chunks);
                 const ttl = tags.reduce((max, tag) => {
                     const t =
                         ttlByTag[tag.name] !== undefined
@@ -210,6 +219,8 @@ export function cacheResponse(options: ServerCacheOptions = {}): Middleware {
 
                 if (ttl > 0) {
                     for (const key of keys) {
+                        if (!cache.has(key) && cache.size >= maxEntries)
+                            cache.delete(cache.keys().next().value!);
                         cache.set(key, {
                             status: capturedStatus,
                             headers: capturedHeaders,

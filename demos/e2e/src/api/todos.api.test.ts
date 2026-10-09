@@ -228,10 +228,17 @@ describe('Todos — attachment & legacyReplace', () => {
                 body: { title: uniqueTitle('attach') }
             })
         );
+        const boundary = 'framework-attachment-fixture';
+        const uploaded = await r('POST', `/api/todos/${created.id}/attachment`, {
+            raw: true,
+            headers: { 'content-type': `multipart/form-data; boundary=${boundary}` },
+            body: `--${boundary}\r\nContent-Disposition: form-data; name="attachment"; filename="example.txt"\r\nContent-Type: text/plain\r\n\r\nImmutable query demo\r\n--${boundary}--\r\n`
+        });
+        expect(uploaded.status).toBe(201);
         const res = await r('GET', `/api/todos/${created.id}/attachment`);
         expect(res.status).toBe(200);
         expect(res.headers['content-type']).toMatch(/text\/plain/);
-        expect(res.body.length).toBeGreaterThan(0);
+        expect(res.body).toBe('Immutable query demo');
     });
 
     it('legacyReplace (PUT) returns a redirect', async () => {

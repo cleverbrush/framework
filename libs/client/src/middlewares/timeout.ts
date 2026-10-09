@@ -1,13 +1,13 @@
 /**
- * Timeout middleware for the `@cleverbrush/web` client.
+ * Timeout middleware for the `@cleverbrush/client` client.
  *
  * Aborts requests that exceed a configurable duration, throwing a
  * {@link TimeoutError}.
  *
  * @example
  * ```ts
- * import { createClient } from '@cleverbrush/web';
- * import { timeout } from '@cleverbrush/web/timeout';
+ * import { createClient } from '@cleverbrush/client';
+ * import { timeout } from '@cleverbrush/client/timeout';
  *
  * const client = createClient(api, {
  *     middlewares: [timeout({ timeout: 10000 })],
@@ -41,7 +41,7 @@ export interface TimeoutOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Creates a timeout middleware for the `@cleverbrush/web` client.
+ * Creates a timeout middleware for the `@cleverbrush/client` client.
  *
  * If the request does not complete within the configured duration,
  * the request is aborted and a {@link TimeoutError} is thrown.
@@ -60,23 +60,20 @@ export interface TimeoutOptions {
 export function timeout(options: TimeoutOptions = {}): Middleware {
     const { timeout: ms = 10000 } = options;
 
-    return next => (url, init) => {
+    return next => async (url, init) => {
         // Per-call override (e.g. { timeout: 30000 })
         const perCall = getPerCallOptions<number>(init, 'timeout');
         const effectiveMs = perCall ?? ms;
 
         const controller = new AbortController();
+        const onAbort = () => controller.abort(init.signal!.reason);
 
         // If the caller already set a signal, listen to it too.
         if (init.signal) {
             if (init.signal.aborted) {
                 controller.abort(init.signal.reason);
             } else {
-                init.signal.addEventListener(
-                    'abort',
-                    () => controller.abort(init.signal!.reason),
-                    { once: true }
-                );
+                init.signal.addEventListener('abort', onAbort, { once: true });
             }
         }
 
@@ -84,19 +81,17 @@ export function timeout(options: TimeoutOptions = {}): Middleware {
             controller.abort();
         }, effectiveMs);
 
-        return next(url, { ...init, signal: controller.signal }).then(
-            response => {
-                clearTimeout(timer);
-                return response;
-            },
-            error => {
-                clearTimeout(timer);
-                // Only wrap in TimeoutError if *we* caused the abort.
-                if (controller.signal.aborted && !init.signal?.aborted) {
-                    throw new TimeoutError(effectiveMs);
-                }
-                throw error;
+        try {
+            return await next(url, { ...init, signal: controller.signal });
+        } catch (error) {
+            // Only wrap in TimeoutError if *we* caused the abort.
+            if (controller.signal.aborted && !init.signal?.aborted) {
+                throw new TimeoutError(effectiveMs);
             }
-        );
+            throw error;
+        } finally {
+            clearTimeout(timer);
+            init.signal?.removeEventListener('abort', onAbort);
+        }
     };
 }

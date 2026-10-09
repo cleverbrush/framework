@@ -125,7 +125,7 @@ async function wrapAndRunBeforeError(
  * @example
  * ```ts
  * import { api } from 'todo-shared';
- * import { createClient } from '@cleverbrush/web';
+ * import { createClient } from '@cleverbrush/client';
  *
  * const client = createClient(api, {
  *     baseUrl: 'https://api.example.com',
@@ -196,6 +196,22 @@ export function createClient<T extends ApiContract>(
             ...args?.headers
         };
 
+        if (meta.idempotent) {
+            const existing = Object.keys(reqHeaders).filter(
+                name => name.toLowerCase() === 'x-idempotency-key'
+            );
+            const key =
+                new Headers(args?.headers).get('x-idempotency-key') ??
+                new Headers(extraHeaders).get('x-idempotency-key') ??
+                crypto.randomUUID();
+            if (typeof key !== 'string' || key.length === 0 || key.length > 256)
+                throw new TypeError(
+                    'Idempotency key must contain 1 to 256 characters'
+                );
+            for (const name of existing) delete reqHeaders[name];
+            reqHeaders['x-idempotency-key'] = key;
+        }
+
         const token = getToken?.();
         if (token && meta.authRoles !== null) {
             reqHeaders['Authorization'] = `Bearer ${token}`;
@@ -203,41 +219,49 @@ export function createClient<T extends ApiContract>(
 
         // -- Body --
         let body: string | FormData | undefined;
-        if (args?.body !== undefined && hasBody(method)) {
+        if (hasBody(method) && (meta.fileUpload || args?.body !== undefined)) {
             if (meta.fileUpload) {
                 // Build FormData for multipart uploads
                 const fd = new FormData();
                 if (
-                    args.body &&
+                    args?.body &&
                     typeof args.body === 'object' &&
                     !(args.body instanceof Blob)
                 ) {
                     for (const [key, val] of Object.entries(args.body)) {
-                        fd.append(key, String(val));
+                        if (val !== undefined) fd.append(key, String(val));
                     }
                 }
                 // Append file fields from args.files
-                if (args.files) {
+                if (args?.files) {
                     for (const [key, value] of Object.entries(
                         args.files as Record<string, FilePart | Blob>
                     )) {
-                        if (value instanceof Blob) {
-                            fd.append(key, value);
-                        } else {
-                            const fp = value as FilePart;
-                            fd.append(
-                                key,
-                                new Blob([fp.buffer], {
-                                    type: fp.mimeType
-                                }),
-                                fp.filename
-                            );
+                        for (const part of Array.isArray(value)
+                            ? value
+                            : [value]) {
+                            if (part === undefined) continue;
+                            if (part instanceof Blob) {
+                                fd.append(key, part);
+                            } else {
+                                const fp = part as FilePart;
+                                fd.append(
+                                    key,
+                                    new Blob([fp.buffer], {
+                                        type: fp.mimeType
+                                    }),
+                                    fp.filename
+                                );
+                            }
                         }
                     }
                 }
                 body = fd;
                 // Let the browser set Content-Type with boundary
-                delete reqHeaders['Content-Type'];
+                for (const name of Object.keys(reqHeaders)) {
+                    if (name.toLowerCase() === 'content-type')
+                        delete reqHeaders[name];
+                }
             } else {
                 reqHeaders['Content-Type'] = JSON_CONTENT_TYPE;
                 body = JSON.stringify(args.body);
@@ -247,26 +271,14 @@ export function createClient<T extends ApiContract>(
         return { url, method, headers: reqHeaders, body };
     }
 
-    // The actual fetch logic, shared by every endpoint proxy method.
-    async function execute(
+    // Every response mode carries the same contract metadata and retry options.
+    function attachRequestOptions(
         ep: any,
         args: any,
+        init: RequestInit,
         groupName?: string,
         endpointName?: string
-    ): Promise<any> {
-        const {
-            url,
-            method,
-            headers: reqHeaders,
-            body
-        } = buildRequest(ep, args);
-
-        const init: RequestInit = {
-            method,
-            headers: reqHeaders,
-            body
-        };
-
+    ): void {
         // Attach per-call middleware overrides if provided.
         const perCallOptions: Record<string, unknown> = {};
         if (args?.retry !== undefined) perCallOptions.retry = args.retry;
@@ -322,13 +334,37 @@ export function createClient<T extends ApiContract>(
                 headers: args?.headers ?? ({} as Record<string, string>),
                 operationId: meta.operationId ?? null,
                 tags: meta.tags ?? [],
-                cacheTags: meta.cacheTags ?? []
+                cacheTags: meta.cacheTags ?? [],
+                idempotent: meta.idempotent ?? false
             };
 
             if (!(init as any).__endpointMeta) {
                 (init as any).__endpointMeta = epMeta;
             }
         }
+    }
+
+    // The actual fetch logic, shared by every endpoint proxy method.
+    async function execute(
+        ep: any,
+        args: any,
+        groupName?: string,
+        endpointName?: string
+    ): Promise<any> {
+        const {
+            url,
+            method,
+            headers: reqHeaders,
+            body
+        } = buildRequest(ep, args);
+
+        const init: RequestInit = {
+            method,
+            headers: reqHeaders,
+            body
+        };
+
+        attachRequestOptions(ep, args, init, groupName, endpointName);
 
         // -- beforeRequest hooks --
         await runBeforeRequest(hooks, url, init);
@@ -384,7 +420,12 @@ export function createClient<T extends ApiContract>(
     }
 
     // Streaming fetch — yields newline-delimited chunks (e.g. NDJSON).
-    async function* streamLines(ep: any, args: any): AsyncIterable<string> {
+    async function* streamLines(
+        ep: any,
+        args: any,
+        groupName?: string,
+        endpointName?: string
+    ): AsyncIterable<string> {
         const {
             url,
             method,
@@ -398,6 +439,8 @@ export function createClient<T extends ApiContract>(
             body,
             signal: args?.signal
         };
+
+        attachRequestOptions(ep, args, init, groupName, endpointName);
 
         // -- beforeRequest hooks --
         await runBeforeRequest(hooks, url, init);
@@ -481,7 +524,8 @@ export function createClient<T extends ApiContract>(
                     // Regular HTTP endpoints return a callable with .stream() and .file()
                     const call = (args?: any) =>
                         execute(ep, args, groupName, endpointName);
-                    call.stream = (args?: any) => streamLines(ep, args);
+                    call.stream = (args?: any) =>
+                        streamLines(ep, args, groupName, endpointName);
                     call.file = async (args?: any): Promise<Blob> => {
                         const {
                             url,
@@ -494,6 +538,13 @@ export function createClient<T extends ApiContract>(
                             headers: reqHeaders,
                             body
                         };
+                        attachRequestOptions(
+                            ep,
+                            args,
+                            init,
+                            groupName,
+                            endpointName
+                        );
                         await runBeforeRequest(hooks, url, init);
                         const response = await composedFetch(url, init);
                         if (!response.ok) {

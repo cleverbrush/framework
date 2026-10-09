@@ -1,4 +1,7 @@
 # `@cleverbrush/orm-cli`
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-98.7%25-brightgreen)
+<!-- coverage-badge-end -->
 
 A standalone CLI for managing PostgreSQL schema migrations for projects built
 with [`@cleverbrush/orm`](https://github.com/cleverbrush/framework).
@@ -95,7 +98,7 @@ npx cb-orm migrate run
 #   ✓ 20260423120000_add_role_column.ts
 ```
 
-Use `--to <filename>` to migrate up to a specific file:
+Use `--to <filename>` to apply that one pending file (not every preceding file):
 
 ```sh
 npx cb-orm migrate run --to 20260423000001_init.ts
@@ -157,7 +160,7 @@ npx cb-orm db push --yes    # skip confirmation
 |------|----------|-------------|
 | `--config <path>` | all | Path to config file (default: `db.config.ts` in cwd) |
 | `--dir <path>` | all | Migrations directory (overrides `config.migrations.directory`) |
-| `--to <name>` | `migrate run` | Apply up to a specific migration filename |
+| `--to <name>` | `migrate run` | Apply one pending migration filename |
 | `--all` | `migrate rollback` | Roll back all batches |
 | `--yes` | `db push` | Skip the interactive confirmation prompt |
 

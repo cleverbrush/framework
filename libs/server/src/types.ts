@@ -1,4 +1,5 @@
 import type { EndpointMetadata } from './Endpoint.js';
+import type { RuntimeEndpointOptions } from './EndpointOptions.js';
 import type { RequestContext } from './RequestContext.js';
 import type { SubscriptionMetadata } from './Subscription.js';
 
@@ -10,7 +11,7 @@ import type { SubscriptionMetadata } from './Subscription.js';
  * A registered endpoint pairing its metadata (method, path, schemas) with
  * the handler function and any per-endpoint middleware.
  */
-export interface EndpointRegistration {
+export interface EndpointRegistration extends RuntimeEndpointOptions {
     readonly endpoint: EndpointMetadata;
     readonly handler: (...args: any[]) => any;
     readonly middlewares?: readonly Middleware[];
@@ -140,6 +141,8 @@ export interface FilePart {
  * Describes a file that was rejected during multipart parsing.
  */
 export interface RejectedFile {
+    /** Multipart field name, when available. */
+    readonly fieldName?: string;
     /** Original filename as provided by the client. */
     readonly filename: string;
     /** MIME type of the file (e.g. `'application/xlsx'`). */
@@ -153,6 +156,14 @@ export interface RejectedFile {
  * `EndpointBuilder.upload()`.
  */
 export interface UploadOptions {
+    /** Maximum bytes per text field. Default: 1 MiB. */
+    maxFieldSize?: number;
+    /** Maximum text fields per request. Default: 100. */
+    maxFieldCount?: number;
+    /** Maximum UTF-8 bytes per field name. Default: 100. */
+    maxFieldNameSize?: number;
+    /** Maximum parts. Default: maxFileCount + maxFieldCount. */
+    maxPartCount?: number;
     /**
      * Maximum allowed file size per uploaded file in bytes.
      * @default 10_485_760 (10 MB)

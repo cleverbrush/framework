@@ -241,6 +241,39 @@ try {
                     </pre>
                 </div>
 
+                <div className="card" id="detached-read-schemas">
+                    <h2>Detached reads with projection schemas</h2>
+                    <p>
+                        Every DbSet query is immutable, with metadata matching
+                        its decoded projection and relations. Full entities
+                        retain identity tracking when enabled. Projected,
+                        grouped, distinct and raw results remain detached, so
+                        incomplete selections cannot replace tracked entities.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const read = db.projects
+    .select(p => ({ id: p.id, name: p.name }))
+    .include(r => r.tasks, tasks => tasks
+        .select(t => ({ title: t.title })));
+const Source = read.rowSchema; // nested task schema included
+const projects = await read; // one SQL statement`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Return child queries from customizers. STI/CTI reads
+                        expose variantRowSchemas for explicit mapper dispatch.
+                        Entity objects remain mutable. Reads, reloads and
+                        returning writes share exact numeric, date and null
+                        representations.
+                    </p>
+                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#projection-aware-reads">
+                        Projection-aware consumer guide
+                    </a>
+                </div>
+
                 {/* ── Polymorphic entities ─────────────────────────── */}
                 <div className="card">
                     <h2>Polymorphic Entities (STI / CTI)</h2>
@@ -504,6 +537,51 @@ npx cb-orm db push`
                 </div>
 
                 {/* ── See Also ─────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Reliable query composition</h2>
+                    <p>
+                        For module-level queries, import <code>query</code> and{' '}
+                        <code>parameter</code> from{' '}
+                        <code>@cleverbrush/orm</code>, define{' '}
+                        <code>query(UserSchema)</code>, and supply{' '}
+                        <code>db.knex</code> when calling it. These reads are
+                        detached; use DbSets when identity tracking and ORM
+                        lookup helpers are needed. See{' '}
+                        <a href="/knex-schema#query-definitions">
+                            connection-independent query definitions
+                        </a>
+                        .
+                    </p>
+                    <p>
+                        Named parameters make DbSet reads callable: use{' '}
+                        <code>
+                            db.users.where(t =&gt; t.id, parameter('id'))
+                        </code>
+                        , then call the result with an ID. SQL compiles once;
+                        complete rows retain identity tracking and projections
+                        stay detached. Use <code>.query(...args)</code> for a
+                        bound ORM reader or <code>.toSQL(...args)</code> to
+                        inspect SQL. See{' '}
+                        <a href="/knex-schema#compiled-queries">
+                            compiled query examples
+                        </a>
+                        .
+                    </p>
+                    <p>
+                        Eager loading retains parent ordering and page size.
+                        Relation customization callbacks infer the foreign
+                        schema. Scalar aggregate helpers accept optional output
+                        schemas; typed projections support grouped aggregates.
+                        DTOs are not tracked as entities.
+                    </p>
+                    <p>
+                        ORM re-exports flat-join aliases and aggregate
+                        expressions. Composite cursors support non-null scalar
+                        sort fields with a declared unique tie-breaker. Read the{' '}
+                        <a href="/knex-schema">query guide</a> for examples and
+                        compatibility details.
+                    </p>
+                </div>
                 <div className="card">
                     <h2>See Also</h2>
                     <ul>

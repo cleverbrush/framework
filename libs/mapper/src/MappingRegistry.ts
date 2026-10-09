@@ -19,21 +19,129 @@ const SYMBOL_TARGET_PROPERTY_KEY: unique symbol = Symbol('targetPropertyKey');
  * unmapped target properties. Using a symbol keeps it out of IntelliSense.
  */
 const SYMBOL_UNMAPPED: unique symbol = Symbol('unmapped');
+const SYMBOL_STEPS: unique symbol = Symbol('mappingSteps');
+
+type Step<T, K extends string, Async extends boolean> = Omit<T, K> &
+    Record<K, Async>;
+type IsAsync<T> = 0 extends 1 & T
+    ? true
+    : [Extract<T, PromiseLike<any>>] extends [never]
+      ? false
+      : true;
+// Inspect metadata instead of recursively comparing the entire fluent builder.
+type ArraySchemaShape = { introspect(): { elementSchema: unknown } };
+type ObjectSchemaShape = { introspect(): { properties: unknown } };
+type SameProperties<A, B> = [keyof A, keyof B] extends [keyof B, keyof A]
+    ? [A, B] extends [B, A]
+        ? true
+        : false
+    : false;
+// Runtime registration still uses schema identity. At compile time compare the
+// declared fields, not every recursive builder/validation method. Exact key sets
+// prevent an empty or smaller schema from matching an unrelated registration.
+type RegisteredMatch<S, T, Registered> = S extends ObjectSchemaShape
+    ? T extends ObjectSchemaShape
+        ? Registered extends [infer From, infer To]
+            ? [InferType<S>, InferType<T>] extends [
+                  InferType<From>,
+                  InferType<To>
+              ]
+                ? [InferType<From>, InferType<To>] extends [
+                      InferType<S>,
+                      InferType<T>
+                  ]
+                    ? SameProperties<
+                          ExtractSchemaProperties<S>,
+                          ExtractSchemaProperties<From>
+                      > extends true
+                        ? SameProperties<
+                              ExtractSchemaProperties<T>,
+                              ExtractSchemaProperties<To>
+                          >
+                        : false
+                    : false
+                : false
+            : false
+        : false
+    : false;
+type NestedAsync<S, T, Registered> = S extends ArraySchemaShape
+    ? T extends ArraySchemaShape
+        ? NestedAsync<
+              ExtractArrayElementSchema<S>,
+              ExtractArrayElementSchema<T>,
+              Registered
+          >
+        : false
+    : true extends RegisteredMatch<S, T, Registered>
+      ? true
+      : false;
+type AsyncKeys<S, T, Registered, Steps> = {
+    [K in keyof ExtractSchemaProperties<T> & string]: K extends keyof Steps
+        ? Steps[K] extends false
+            ? never
+            : K
+        : K extends keyof ExtractSchemaProperties<S>
+          ? NestedAsync<
+                ExtractSchemaProperties<S>[K],
+                ExtractSchemaProperties<T>[K],
+                Registered
+            > extends false
+              ? never
+              : K
+          : never;
+}[keyof ExtractSchemaProperties<T> & string];
+
+/** Compile-time diagnostics for incomplete or asynchronous mapping steps. */
+type SyncMappingArguments<Unmapped extends string, Async> = [Unmapped] extends [
+    never
+]
+    ? [Async] extends [never]
+        ? []
+        : [error: 'Mapping contains asynchronous steps']
+    : [error: `Unmapped properties: ${Unmapped}`];
+
+/** Compile-time diagnostics for registered synchronous mapping pairs. */
+type RegisteredSyncArguments<Pair, Registered, Async> = Pair extends Registered
+    ? Pair extends Async
+        ? [error: 'Mapping contains asynchronous steps']
+        : []
+    : [error: 'Mapping is not registered'];
+
+const syncImplementations = new WeakMap<Function, (source: any) => any>();
+
+function assertSync(value: any, key: string): any {
+    if (value != null && typeof value.then === 'function') {
+        throw new MapperConfigurationError(
+            `Synchronous mapping returned a thenable for property "${key}"`
+        );
+    }
+    return value;
+}
+
+function synchronous(fn: Function): (source: any) => any {
+    const result = syncImplementations.get(fn);
+    if (!result)
+        throw new MapperConfigurationError(
+            'Mapping contains an asynchronous computation or nested mapper'
+        );
+    return result;
+}
 
 // ── Helper Types ──────────────────────────────────────────────────────
 
 /**
  * Extracts the properties record from an ObjectSchemaBuilder.
  */
-type ExtractSchemaProperties<T> =
-    T extends ObjectSchemaBuilder<infer TProperties, any, any>
-        ? TProperties
-        : never;
+type ExtractSchemaProperties<T> = T extends {
+    introspect(): { properties: infer TProperties };
+}
+    ? TProperties
+    : never;
 
 /**
  * Gets all top-level property key names of an ObjectSchemaBuilder.
  */
-type SchemaKeys<T extends ObjectSchemaBuilder<any, any, any>> =
+type SchemaKeys<T extends ObjectSchemaShape> =
     keyof ExtractSchemaProperties<T> & string;
 
 /**
@@ -53,10 +161,13 @@ type TargetPropertyKey<K extends string> = {
  * type of the selector callback.
  */
 type TargetPropertyTree<
-    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TAllowedKeys extends string
 > = {
-    [K in SchemaKeys<TSchema> & TAllowedKeys]: TargetPropertyKey<K> &
+    // Filter source properties without detaching the target key's declaration.
+    -readonly [K in keyof ExtractSchemaProperties<TSchema> as K extends TAllowedKeys
+        ? K
+        : never]-?: TargetPropertyKey<K & string> &
         PropertyDescriptor<TSchema, ExtractSchemaProperties<TSchema>[K], any>;
 };
 
@@ -65,7 +176,7 @@ type TargetPropertyTree<
  * by its key name.
  */
 type SchemaPropertyInferredType<
-    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     K extends string
 > = K extends keyof ExtractSchemaProperties<TSchema>
     ? InferType<ExtractSchemaProperties<TSchema>[K]>
@@ -76,7 +187,7 @@ type SchemaPropertyInferredType<
  * ObjectSchemaBuilder by its key name.
  */
 type TargetPropertySchema<
-    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     K extends string
 > = K extends keyof ExtractSchemaProperties<TSchema>
     ? ExtractSchemaProperties<TSchema>[K]
@@ -85,10 +196,11 @@ type TargetPropertySchema<
 /**
  * Extracts the element schema from an ArraySchemaBuilder.
  */
-type ExtractArrayElementSchema<T> =
-    T extends ArraySchemaBuilder<infer TElementSchema, any, any>
-        ? TElementSchema
-        : never;
+type ExtractArrayElementSchema<T> = T extends {
+    introspect(): { elementSchema: infer TElementSchema };
+}
+    ? NonNullable<TElementSchema>
+    : never;
 
 /**
  * Extracts the property schema from a PropertyDescriptor's `getSchema()`
@@ -117,19 +229,23 @@ type ExtractPropertySchema<T> = T extends {
  * - Neither is ObjectSchemaBuilder + incompatible InferType → `true`
  */
 type NeedsMapping<TSourcePropSchema, TTargetPropSchema, TRegistered> =
-    TSourcePropSchema extends ArraySchemaBuilder<any, any, any>
-        ? TTargetPropSchema extends ArraySchemaBuilder<any, any, any>
+    TSourcePropSchema extends ArraySchemaShape
+        ? TTargetPropSchema extends ArraySchemaShape
             ? NeedsMapping<
                   ExtractArrayElementSchema<TSourcePropSchema>,
                   ExtractArrayElementSchema<TTargetPropSchema>,
                   TRegistered
               >
             : true
-        : TTargetPropSchema extends ArraySchemaBuilder<any, any, any>
+        : TTargetPropSchema extends ArraySchemaShape
           ? true
-          : TSourcePropSchema extends ObjectSchemaBuilder<any, any, any>
-            ? TTargetPropSchema extends ObjectSchemaBuilder<any, any, any>
-                ? [TSourcePropSchema, TTargetPropSchema] extends TRegistered
+          : TSourcePropSchema extends ObjectSchemaShape
+            ? TTargetPropSchema extends ObjectSchemaShape
+                ? true extends RegisteredMatch<
+                      TSourcePropSchema,
+                      TTargetPropSchema,
+                      TRegistered
+                  >
                     ? false
                     : InferType<TSourcePropSchema> extends InferType<TTargetPropSchema>
                       ? InferType<TTargetPropSchema> extends InferType<TSourcePropSchema>
@@ -137,7 +253,7 @@ type NeedsMapping<TSourcePropSchema, TTargetPropSchema, TRegistered> =
                           : true
                       : true
                 : true
-            : TTargetPropSchema extends ObjectSchemaBuilder<any, any, any>
+            : TTargetPropSchema extends ObjectSchemaShape
               ? true
               : InferType<TSourcePropSchema> extends InferType<TTargetPropSchema>
                 ? false
@@ -149,8 +265,8 @@ type NeedsMapping<TSourcePropSchema, TTargetPropSchema, TRegistered> =
  * Keys where `NeedsMapping` is `false` can be auto-mapped via the registry.
  */
 type KeysNeedingMapping<
-    TFromSchema extends ObjectSchemaBuilder<any, any, any>,
-    TToSchema extends ObjectSchemaBuilder<any, any, any>,
+    TFromSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    TToSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TRegistered
 > = {
     [K in SchemaKeys<TToSchema>]: K extends SchemaKeys<TFromSchema>
@@ -176,8 +292,8 @@ type CheckSchemaCompatible<TSourceSchema, TTargetSchema, TRegistered> =
     [InferType<TSourceSchema>] extends [InferType<TTargetSchema>]
         ? true
         : // Both arrays → recurse into element schemas
-          TSourceSchema extends ArraySchemaBuilder<any, any, any>
-          ? TTargetSchema extends ArraySchemaBuilder<any, any, any>
+          TSourceSchema extends ArraySchemaShape
+          ? TTargetSchema extends ArraySchemaShape
               ? CheckSchemaCompatible<
                     ExtractArrayElementSchema<TSourceSchema>,
                     ExtractArrayElementSchema<TTargetSchema>,
@@ -185,9 +301,13 @@ type CheckSchemaCompatible<TSourceSchema, TTargetSchema, TRegistered> =
                 >
               : false
           : // Both objects → check registration
-            TSourceSchema extends ObjectSchemaBuilder<any, any, any>
-            ? TTargetSchema extends ObjectSchemaBuilder<any, any, any>
-                ? [TSourceSchema, TTargetSchema] extends TRegistered
+            TSourceSchema extends ObjectSchemaShape
+            ? TTargetSchema extends ObjectSchemaShape
+                ? true extends RegisteredMatch<
+                      TSourceSchema,
+                      TTargetSchema,
+                      TRegistered
+                  >
                     ? true
                     : false
                 : false
@@ -204,7 +324,7 @@ type CheckSchemaCompatible<TSourceSchema, TTargetSchema, TRegistered> =
  */
 type IsFromCompatible<
     TReturn,
-    TToSchema extends ObjectSchemaBuilder<any, any, any>,
+    TToSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TKey extends string,
     TRegistered
 > = [ExtractPropertySchema<TReturn>] extends [never]
@@ -217,10 +337,17 @@ type IsFromCompatible<
 
 // ── Mapper Result Type ────────────────────────────────────────────────
 
+/** A mapping function that always returns a Promise, including for pure mappings. */
 export type SchemaToSchemaMapperResult<
-    TFromSchema extends ObjectSchemaBuilder<any, any, any>,
-    TToSchema extends ObjectSchemaBuilder<any, any, any>
+    TFromSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    TToSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > = (from: InferType<TFromSchema>) => Promise<InferType<TToSchema>>;
+
+/** A complete synchronous mapping; unexpected thenables throw instead of leaking into DTOs. */
+export type SyncSchemaToSchemaMapperResult<
+    TFromSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    TToSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> = (from: InferType<TFromSchema>) => InferType<TToSchema>;
 
 // ── Error Class ───────────────────────────────────────────────────────
 
@@ -264,7 +391,7 @@ type MappingEntry = {
 function resolveElementMapper(
     sourceElementSchema: SchemaBuilder<any, any, any>,
     targetElementSchema: SchemaBuilder<any, any, any>,
-    registry: MappingRegistry<any> | undefined
+    registry: MappingRegistry<any, any> | undefined
 ): ((element: any) => Promise<any>) | null {
     // Both element schemas are ObjectSchemaBuilder: look up registered mapper
     if (
@@ -290,7 +417,9 @@ function resolveElementMapper(
             fromKeys.length === toKeys.length &&
             fromKeys.every((k, i) => k === toKeys[i])
         ) {
-            return async (element: any) => element;
+            const copy = async (element: any) => element;
+            syncImplementations.set(copy, element => element);
+            return copy;
         }
         return null;
     }
@@ -311,11 +440,19 @@ function resolveElementMapper(
                 registry
             );
             if (innerMapper) {
-                return async (arr: any) => {
+                const mapArray = async (arr: any) => {
                     if (arr == null) return undefined;
                     if (!Array.isArray(arr)) return arr;
                     return Promise.all(arr.map(innerMapper));
                 };
+                const sync = syncImplementations.get(innerMapper);
+                if (sync)
+                    syncImplementations.set(mapArray, arr => {
+                        if (arr == null) return undefined;
+                        if (!Array.isArray(arr)) return arr;
+                        return arr.map(sync);
+                    });
+                return mapArray;
             }
         }
         return null;
@@ -345,7 +482,9 @@ function resolveElementMapper(
         ) {
             return null;
         }
-        return async (element: any) => element;
+        const copy = async (element: any) => element;
+        syncImplementations.set(copy, element => element);
+        return copy;
     }
 
     return null;
@@ -361,18 +500,34 @@ function resolveElementMapper(
  * - `ignore()` — explicitly skip the property
  */
 export class PropertyMappingBuilder<
-    TFromSchema extends ObjectSchemaBuilder<any, any, any>,
-    TToSchema extends ObjectSchemaBuilder<any, any, any>,
+    TFromSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    TToSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TKey extends string,
     TUnmapped extends string,
-    TRegistered = never
+    TRegistered = never,
+    TAsyncRegistered = never,
+    TSteps = {}
 > {
-    private readonly _mapper: Mapper<TFromSchema, TToSchema, any, TRegistered>;
+    private readonly _mapper: Mapper<
+        TFromSchema,
+        TToSchema,
+        any,
+        TRegistered,
+        TAsyncRegistered,
+        TSteps
+    >;
     private readonly _targetKey: TKey;
 
     /** @internal */
     constructor(
-        mapper: Mapper<TFromSchema, TToSchema, any, TRegistered>,
+        mapper: Mapper<
+            TFromSchema,
+            TToSchema,
+            any,
+            TRegistered,
+            TAsyncRegistered,
+            TSteps
+        >,
         targetKey: TKey
     ) {
         this._mapper = mapper;
@@ -407,11 +562,7 @@ export class PropertyMappingBuilder<
         }
     >(
         selector: (
-            tree: PropertyDescriptorTree<
-                TFromSchema,
-                TFromSchema,
-                SchemaPropertyInferredType<TToSchema, TKey>
-            >
+            tree: PropertyDescriptorTree<TFromSchema, TFromSchema, any>
         ) => TReturn,
         ..._args: [TReturn] extends [never]
             ? [
@@ -427,7 +578,22 @@ export class PropertyMappingBuilder<
               : [
                     error: `Property '${TKey}': source property type is not assignable to the target property type. Use compute() instead.`
                 ]
-    ): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>, TRegistered> {
+    ): Mapper<
+        TFromSchema,
+        TToSchema,
+        Exclude<TUnmapped, TKey>,
+        TRegistered,
+        TAsyncRegistered,
+        Step<
+            TSteps,
+            TKey,
+            NestedAsync<
+                ExtractPropertySchema<TReturn>,
+                TargetPropertySchema<TToSchema, TKey>,
+                TAsyncRegistered
+            >
+        >
+    > {
         const sourceTree = ObjectSchemaBuilder.getPropertiesFor(
             this._mapper['_fromSchema']
         );
@@ -466,10 +632,26 @@ export class PropertyMappingBuilder<
             targetPropSchema instanceof ArraySchemaBuilder
         ) {
             const sourceElementSchema = (
-                sourceSchema as ArraySchemaBuilder<any, any, any>
+                sourceSchema as ArraySchemaBuilder<
+                    any,
+                    any,
+                    any,
+                    any,
+                    any,
+                    any,
+                    any
+                >
             ).introspect().elementSchema;
             const targetElementSchema = (
-                targetPropSchema as ArraySchemaBuilder<any, any, any>
+                targetPropSchema as ArraySchemaBuilder<
+                    any,
+                    any,
+                    any,
+                    any,
+                    any,
+                    any,
+                    any
+                >
             ).introspect().elementSchema;
 
             if (sourceElementSchema && targetElementSchema) {
@@ -501,15 +683,20 @@ export class PropertyMappingBuilder<
      * Computes the target property value from the entire source object.
      * Supports both sync and async functions.
      */
-    public compute(
-        fn:
-            | ((
-                  obj: InferType<TFromSchema>
-              ) => SchemaPropertyInferredType<TToSchema, TKey>)
-            | ((
-                  obj: InferType<TFromSchema>
-              ) => Promise<SchemaPropertyInferredType<TToSchema, TKey>>)
-    ): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>, TRegistered> {
+    public compute<
+        TResult extends
+            | SchemaPropertyInferredType<TToSchema, TKey>
+            | Promise<SchemaPropertyInferredType<TToSchema, TKey>>
+    >(
+        fn: (obj: InferType<TFromSchema>) => TResult
+    ): Mapper<
+        TFromSchema,
+        TToSchema,
+        Exclude<TUnmapped, TKey>,
+        TRegistered,
+        TAsyncRegistered,
+        Step<TSteps, TKey, IsAsync<TResult>>
+    > {
         this._mapper['_mappings'].set(this._targetKey, {
             type: 'custom',
             fn: fn as any
@@ -526,7 +713,9 @@ export class PropertyMappingBuilder<
         TFromSchema,
         TToSchema,
         Exclude<TUnmapped, TKey>,
-        TRegistered
+        TRegistered,
+        TAsyncRegistered,
+        Step<TSteps, TKey, false>
     > {
         this._mapper['_mappings'].set(this._targetKey, {
             type: 'ignore'
@@ -555,17 +744,21 @@ export class PropertyMappingBuilder<
  * @typeParam TUnmapped - union of target property key names not yet mapped
  */
 export class Mapper<
-    TFromSchema extends ObjectSchemaBuilder<any, any, any>,
-    TToSchema extends ObjectSchemaBuilder<any, any, any>,
+    TFromSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    TToSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TUnmapped extends string = SchemaKeys<TToSchema>,
-    TRegistered = never
+    TRegistered = never,
+    TAsyncRegistered = never,
+    TSteps = {}
 > {
     /** Phantom property for structural type-checking of TUnmapped. */
     declare readonly [SYMBOL_UNMAPPED]: TUnmapped;
+    /** @internal Tracks final per-property computations without executing them. */
+    declare readonly [SYMBOL_STEPS]: TSteps;
 
     private readonly _fromSchema: TFromSchema;
     private readonly _toSchema: TToSchema;
-    private readonly _registry: MappingRegistry<any> | undefined;
+    private readonly _registry: MappingRegistry<any, any> | undefined;
     private readonly _mappings: Map<string, MappingEntry> = new Map();
 
     /**
@@ -577,7 +770,7 @@ export class Mapper<
     public constructor(
         fromSchema: TFromSchema,
         toSchema: TToSchema,
-        registry?: MappingRegistry<any>
+        registry?: MappingRegistry<any, any>
     ) {
         this._fromSchema = fromSchema;
         this._toSchema = toSchema;
@@ -602,7 +795,9 @@ export class Mapper<
         TToSchema,
         TKey,
         TUnmapped,
-        TRegistered
+        TRegistered,
+        TAsyncRegistered,
+        TSteps
     > {
         // At runtime, use a Proxy to detect which property was accessed
         let capturedKey: string | undefined;
@@ -635,6 +830,29 @@ export class Mapper<
         }
 
         return new PropertyMappingBuilder(this, capturedKey as TKey);
+    }
+
+    /**
+     * Compile a synchronous function when the complete mapping has no async steps.
+     * Eligibility is inferred through compute(), from(), nested mappings and overrides.
+     * Callbacks are never probed during configuration. A disguised Promise/thenable
+     * throws at invocation; known async functions/dependencies throw at compilation.
+     * @throws MapperConfigurationError for incomplete or asynchronous mappings.
+     */
+    public getSyncMapper(
+        ..._args: SyncMappingArguments<
+            TUnmapped,
+            AsyncKeys<TFromSchema, TToSchema, TAsyncRegistered, TSteps>
+        >
+    ): SyncSchemaToSchemaMapperResult<TFromSchema, TToSchema> {
+        return synchronous(
+            (
+                this.getMapper as () => SchemaToSchemaMapperResult<
+                    TFromSchema,
+                    TToSchema
+                >
+            )()
+        );
     }
 
     /**
@@ -852,6 +1070,60 @@ export class Mapper<
             return result;
         };
 
+        // The same finalized entries drive the sync executor. Only execution differs;
+        // descriptor selection, automatic mapping and completeness are shared above.
+        const syncEntries = [...mappings].map(([key, entry]) => {
+            const nested = entry.autoMapper ?? entry.elementMapper;
+            const nestedSync = nested
+                ? syncImplementations.get(nested)
+                : undefined;
+            if (
+                (nested && !nestedSync) ||
+                entry.fn?.constructor.name === 'AsyncFunction'
+            )
+                return null;
+            return { key, entry, nestedSync };
+        });
+        if (syncEntries.every(entry => entry !== null)) {
+            syncImplementations.set(mapperFn, source => {
+                const result: Record<string, any> = {};
+                for (const { key, entry, nestedSync } of syncEntries) {
+                    if (entry.type === 'ignore') continue;
+                    let value: any;
+                    if (entry.type === 'custom')
+                        value = assertSync(entry.fn!(source), key);
+                    else {
+                        const read =
+                            entry.sourceDescriptorInner.getValue(source);
+                        if (!read.success) continue;
+                        value = read.value;
+                        if (entry.type === 'auto') {
+                            if (value === undefined) continue;
+                            value = assertSync(nestedSync!(value), key);
+                        } else if (entry.type === 'autoArray') {
+                            if (value == null) continue;
+                            if (!Array.isArray(value))
+                                throw new MapperConfigurationError(
+                                    `Expected array for property "${key}" but got ${typeof value}`
+                                );
+                            value = value.map(element =>
+                                assertSync(nestedSync!(element), key)
+                            );
+                        }
+                    }
+                    const target = (targetTree as any)[key]?.[
+                        SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+                    ];
+                    if (target)
+                        target.setValue(result, value, {
+                            createMissingStructure: true
+                        });
+                    else result[key] = value;
+                }
+                return result;
+            });
+        }
+
         // Auto-register in the registry if available
         if (this._registry) {
             this._registry['_mappers']
@@ -865,18 +1137,18 @@ export class Mapper<
 
 // ── MappingRegistry ───────────────────────────────────────────────────
 
-export class MappingRegistry<TRegistered = never> {
+export class MappingRegistry<TRegistered = never, TAsyncRegistered = never> {
     protected readonly _mappers: Map<
-        ObjectSchemaBuilder<any, any, any>,
+        ObjectSchemaBuilder<any, any, any, any, any, any, any>,
         Map<
-            ObjectSchemaBuilder<any, any, any>,
+            ObjectSchemaBuilder<any, any, any, any, any, any, any>,
             SchemaToSchemaMapperResult<any, any>
         >
     > = new Map();
 
     #ensureObjectSchemas(
-        fromSchema: ObjectSchemaBuilder<any, any, any>,
-        toSchema: ObjectSchemaBuilder<any, any, any>
+        fromSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+        toSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
     ): boolean {
         return !(
             !fromSchema ||
@@ -903,8 +1175,25 @@ export class MappingRegistry<TRegistered = never> {
      *         properties remain that cannot be auto-mapped
      */
     public configure<
-        TFromSchema extends ObjectSchemaBuilder<any, any, any>,
-        TToSchema extends ObjectSchemaBuilder<any, any, any>
+        TFromSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >,
+        TToSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >,
+        TSteps = {}
     >(
         fromSchema: TFromSchema,
         toSchema: TToSchema,
@@ -913,10 +1202,26 @@ export class MappingRegistry<TRegistered = never> {
                 TFromSchema,
                 TToSchema,
                 KeysNeedingMapping<TFromSchema, TToSchema, TRegistered>,
-                TRegistered
+                TRegistered,
+                TAsyncRegistered
             >
-        ) => Mapper<TFromSchema, TToSchema, never, TRegistered>
-    ): MappingRegistry<TRegistered | [TFromSchema, TToSchema]> {
+        ) => Mapper<
+            TFromSchema,
+            TToSchema,
+            never,
+            TRegistered,
+            TAsyncRegistered,
+            TSteps
+        >
+    ): MappingRegistry<
+        TRegistered | [TFromSchema, TToSchema],
+        | TAsyncRegistered
+        | ([
+              AsyncKeys<TFromSchema, TToSchema, TAsyncRegistered, TSteps>
+          ] extends [never]
+              ? never
+              : [TFromSchema, TToSchema])
+    > {
         if (!this.#ensureObjectSchemas(fromSchema, toSchema)) {
             throw new Error(
                 'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
@@ -933,7 +1238,13 @@ export class MappingRegistry<TRegistered = never> {
 
         // Create new immutable registry with cloned mappings
         const newRegistry = new MappingRegistry<
-            TRegistered | [TFromSchema, TToSchema]
+            TRegistered | [TFromSchema, TToSchema],
+            | TAsyncRegistered
+            | ([
+                  AsyncKeys<TFromSchema, TToSchema, TAsyncRegistered, TSteps>
+              ] extends [never]
+                  ? never
+                  : [TFromSchema, TToSchema])
         >();
         for (const [from, toMap] of this._mappers) {
             newRegistry._mappers.set(from, new Map(toMap));
@@ -949,23 +1260,48 @@ export class MappingRegistry<TRegistered = never> {
             TFromSchema,
             TToSchema,
             KeysNeedingMapping<TFromSchema, TToSchema, TRegistered>,
-            TRegistered
+            TRegistered,
+            TAsyncRegistered
         >(fromSchema, toSchema, newRegistry);
 
         // Configure via user callback
         const configuredMapper = fn(mapper);
 
         // Implicit finalization: auto-map + validate + register
-        (
-            configuredMapper as Mapper<
-                TFromSchema,
-                TToSchema,
-                never,
-                TRegistered
-            >
-        ).getMapper();
+        configuredMapper.getMapper();
 
         return newRegistry;
+    }
+
+    /**
+     * Retrieve a registered synchronous mapper inferred from configure().
+     * The pair must be registered and its final steps must all be synchronous.
+     * Async mappings remain usable with getMapper(); configuration never executes
+     * compute callbacks. Unexpected thenables throw when the returned mapper runs.
+     * @throws MapperConfigurationError for an asynchronous dependency.
+     * @throws Error if the schema pair has not been registered.
+     */
+    public getSyncMapper<
+        TFromSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >,
+        TToSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+    >(
+        fromSchema: TFromSchema,
+        toSchema: TToSchema,
+        ..._args: RegisteredSyncArguments<
+            [TFromSchema, TToSchema],
+            TRegistered,
+            TAsyncRegistered
+        >
+    ): SyncSchemaToSchemaMapperResult<TFromSchema, TToSchema> {
+        return synchronous(this.getMapper(fromSchema, toSchema));
     }
 
     /**
@@ -977,8 +1313,16 @@ export class MappingRegistry<TRegistered = never> {
      * return a promise resolving to a value of the toSchema type
      */
     public getMapper<
-        TFromSchema extends ObjectSchemaBuilder<any, any, any>,
-        TToSchema extends ObjectSchemaBuilder<any, any, any>
+        TFromSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >,
+        TToSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
     >(
         fromSchema: TFromSchema,
         toSchema: TToSchema

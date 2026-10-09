@@ -49,7 +49,7 @@ describe('idempotency middleware', () => {
     });
 
     test('passes through GET requests', async () => {
-        const mw = idempotency({ ttl: 5000 });
+        const mw = idempotency({ scope: () => 'public-test', ttl: 5000 });
         const ctx = makeContext({ 'x-idempotency-key': 'key-1' }, 'GET');
         const next = vi.fn().mockResolvedValue(undefined);
         await mw(ctx, next);
@@ -57,7 +57,7 @@ describe('idempotency middleware', () => {
     });
 
     test('passes through mutations without idempotency key', async () => {
-        const mw = idempotency({ ttl: 5000 });
+        const mw = idempotency({ scope: () => 'public-test', ttl: 5000 });
         const ctx = makeContext({}, 'POST');
         const next = vi.fn().mockResolvedValue(undefined);
         await mw(ctx, next);
@@ -65,7 +65,7 @@ describe('idempotency middleware', () => {
     });
 
     test('passes through on first request with key', async () => {
-        const mw = idempotency({ ttl: 5000 });
+        const mw = idempotency({ scope: () => 'public-test', ttl: 5000 });
         const ctx = makeContext({ 'x-idempotency-key': 'key-1' }, 'POST');
         let handlerCalled = false;
         await mw(ctx, async () => {
@@ -77,7 +77,7 @@ describe('idempotency middleware', () => {
     });
 
     test('returns stored response on duplicate key', async () => {
-        const mw = idempotency({ ttl: 10_000 });
+        const mw = idempotency({ scope: () => 'public-test', ttl: 10_000 });
 
         // First request
         const ctx1 = makeContext({ 'x-idempotency-key': 'key-dup' }, 'POST');
@@ -100,7 +100,7 @@ describe('idempotency middleware', () => {
     });
 
     test('different keys store independently', async () => {
-        const mw = idempotency({ ttl: 10_000 });
+        const mw = idempotency({ scope: () => 'public-test', ttl: 10_000 });
 
         const ctx1 = makeContext({ 'x-idempotency-key': 'key-a' }, 'POST');
         await mw(ctx1, async () => {
@@ -118,7 +118,7 @@ describe('idempotency middleware', () => {
     });
 
     test('expired key calls handler again', async () => {
-        const mw = idempotency({ ttl: 1000 });
+        const mw = idempotency({ scope: () => 'public-test', ttl: 1000 });
 
         const ctx1 = makeContext({ 'x-idempotency-key': 'key-exp' }, 'POST');
         await mw(ctx1, async () => {
@@ -140,6 +140,7 @@ describe('idempotency middleware', () => {
 
     test('handles case-insensitive header name', async () => {
         const mw = idempotency({
+            scope: () => 'public-test',
             ttl: 10_000,
             headerName: 'X-Idempotency-Key'
         });
@@ -160,7 +161,7 @@ describe('idempotency middleware', () => {
     });
 
     test('stores error responses too (non-2xx under 500)', async () => {
-        const mw = idempotency({ ttl: 10_000 });
+        const mw = idempotency({ scope: () => 'public-test', ttl: 10_000 });
 
         const ctx1 = makeContext({ 'x-idempotency-key': 'key-err' }, 'POST');
         await mw(ctx1, async () => {
@@ -179,6 +180,7 @@ describe('idempotency middleware', () => {
 
     test('custom skip predicate', async () => {
         const mw = idempotency({
+            scope: () => 'public-test',
             ttl: 10_000,
             skip: ctx => ctx.method === 'DELETE'
         });

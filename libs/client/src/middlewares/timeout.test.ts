@@ -37,6 +37,20 @@ function hangingFetch(): FetchLike {
 // ---------------------------------------------------------------------------
 
 describe('timeout middleware', () => {
+    test.each([false, true])(
+        'releases caller listeners and timers (throws=%s)',
+        async throws => {
+            const caller = new AbortController();
+            const remove = vi.spyOn(caller.signal, 'removeEventListener');
+            const mw = timeout()(() => {
+                if (throws) throw new Error('sync failure');
+                return Promise.resolve(new Response('ok'));
+            });
+            await mw('/test', { signal: caller.signal }).catch(() => undefined);
+            expect(remove).toHaveBeenCalledWith('abort', expect.any(Function));
+            expect(vi.getTimerCount()).toBe(0);
+        }
+    );
     beforeEach(() => {
         vi.useFakeTimers();
     });

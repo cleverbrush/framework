@@ -14,13 +14,17 @@ import {
     requireRole
 } from '@cleverbrush/auth';
 import { ServiceCollection, type ServiceProvider } from '@cleverbrush/di';
-import { Busboy } from '@fastify/busboy';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
+import { CorsPolicy, type ServerCorsOptions } from './Cors.js';
 import type { EndpointBuilder, Handler, HandlerMapping } from './Endpoint.js';
+import type { EndpointOptions } from './EndpointOptions.js';
+import { validateErrorMap } from './ErrorMap.js';
 import { HttpError } from './HttpError.js';
 import { MiddlewarePipeline } from './MiddlewarePipeline.js';
+import { idempotency } from './middlewares/Idempotency.js';
+import { parseMultipart } from './multipart.js';
 import { needsBody, resolveArgs } from './ParameterResolver.js';
 import {
     createProblemDetails,
@@ -40,8 +44,7 @@ import type {
     RejectedFile,
     ServerBatchingOptions,
     ServerOptions,
-    SubscriptionRegistration,
-    UploadOptions
+    SubscriptionRegistration
 } from './types.js';
 import {
     VirtualIncomingMessage,
@@ -93,107 +96,6 @@ export interface AuthorizationConfig {
     policies?: Record<string, (builder: PolicyBuilder) => void>;
 }
 
-// ---------------------------------------------------------------------------
-// Multipart / file-upload helpers
-// ---------------------------------------------------------------------------
-
-async function parseMultipart(
-    req: http.IncomingMessage,
-    options: UploadOptions
-): Promise<{
-    fields: Record<string, string>;
-    files: Record<string, FilePart>;
-    rejectedFiles: RejectedFile[];
-}> {
-    const maxFileCount = options.maxFileCount ?? 10;
-    const maxFileSize = options.maxFileSize ?? 10 * 1024 * 1024;
-    const allowedMimeTypes = options.allowedMimeTypes;
-
-    return new Promise((resolve, reject) => {
-        const fields: Record<string, string> = {};
-        const files: Record<string, FilePart> = {};
-        const rejectedFiles: RejectedFile[] = [];
-        let fileCount = 0;
-
-        const busboy = Busboy({
-            headers: req.headers as {
-                'content-type': string;
-            } & http.IncomingHttpHeaders,
-            limits: {
-                fileSize: maxFileSize,
-                files: maxFileCount
-            }
-        });
-
-        busboy.on('field', (fieldname: string, value: string) => {
-            fields[fieldname] = value;
-        });
-
-        busboy.on(
-            'file',
-            (
-                fieldname: string,
-                stream: import('@fastify/busboy').BusboyFileStream,
-                filename: string,
-                _transferEncoding: string,
-                mimeType: string
-            ) => {
-                if (fileCount >= maxFileCount) {
-                    rejectedFiles.push({
-                        filename,
-                        mimeType,
-                        reason: `Exceeded max file count (${maxFileCount})`
-                    });
-                    stream.resume();
-                    return;
-                }
-
-                if (allowedMimeTypes) {
-                    const allowed = allowedMimeTypes.some(pattern => {
-                        if (pattern.endsWith('/*')) {
-                            return mimeType.startsWith(pattern.slice(0, -1));
-                        }
-                        return mimeType === pattern;
-                    });
-                    if (!allowed) {
-                        rejectedFiles.push({
-                            filename,
-                            mimeType,
-                            reason: `MIME type "${mimeType}" not allowed (allowed: ${allowedMimeTypes.join(', ')})`
-                        });
-                        stream.resume();
-                        return;
-                    }
-                }
-
-                fileCount++;
-                const chunks: Buffer[] = [];
-
-                stream.on('data', (chunk: Buffer) => {
-                    chunks.push(chunk);
-                });
-
-                stream.on('end', () => {
-                    const buffer = Buffer.concat(chunks);
-                    files[fieldname] = {
-                        filename,
-                        mimeType,
-                        buffer,
-                        size: buffer.length
-                    };
-                });
-
-                stream.on('error', reject);
-            }
-        );
-
-        busboy.on('error', reject);
-        busboy.on('finish', () => resolve({ fields, files, rejectedFiles }));
-
-        req.pipe(busboy);
-    });
-}
-
 /**
  * Fluent builder for constructing and starting an HTTP server.
  *
@@ -222,6 +124,7 @@ export class ServerBuilder {
     #authzConfig: AuthorizationConfig | null = null;
     #healthcheck = false;
     #batchConfig: ServerBatchingOptions | null = null;
+    #corsOptions?: ServerCorsOptions;
 
     constructor(options: ServerOptions = {}) {
         this.#options = options;
@@ -238,11 +141,26 @@ export class ServerBuilder {
     }
 
     /**
-     * Add a global middleware that runs for every request.
-     * Middleware is executed in the order it is added.
+     * Add middleware to the matched-request pipeline after authentication.
+     * Middleware is executed in the order it is added. CORS short-circuits
+     * and unmatched routes do not enter this pipeline.
      */
     use(middleware: Middleware): this {
         this.#globalMiddlewares.push(middleware);
+        return this;
+    }
+
+    /**
+     * Enable server-wide CORS before routing and authentication.
+     * Accepted preflights return 204 without running ordinary middleware.
+     * Requests with disallowed origins return 403 before handlers run.
+     * Configuration is validated and copied when the server starts listening.
+     */
+    useCors(options: ServerCorsOptions): this {
+        if (options === undefined) {
+            throw new TypeError('CORS requires an explicit origin policy');
+        }
+        this.#corsOptions = options;
         return this;
     }
 
@@ -257,8 +175,8 @@ export class ServerBuilder {
 
     /**
      * Enable authentication with one or more schemes.
-     * Registers a global middleware that authenticates every request and
-     * sets `ctx.principal`.
+     * Registers middleware that authenticates protected requests and sets
+     * `ctx.principal`. CORS preflights are handled before this middleware.
      */
     useAuthentication(config: AuthenticationConfig): this {
         this.#authConfig = config;
@@ -280,7 +198,7 @@ export class ServerBuilder {
      * Enable the `GET /health` endpoint that returns `{ ok: true }` (200).
      * Useful for load balancer and container readiness probes.
      *
-     * The path is available as {@link HEALTHCHECK_PATH}.
+     * The path is available as `HEALTHCHECK_PATH`.
      */
     withHealthcheck(): this {
         this.#healthcheck = true;
@@ -322,15 +240,14 @@ export class ServerBuilder {
      */
     handle<
         E extends EndpointBuilder<any, any, any, any, any, any, any, any, any>
-    >(
-        endpointDef: E,
-        handler: Handler<E>,
-        options?: { middlewares?: Middleware[] }
-    ): this {
+    >(endpointDef: E, handler: Handler<E>, options?: EndpointOptions<E>): this {
         this.#registrations.push({
             endpoint: endpointDef.introspect(),
             handler,
-            middlewares: options?.middlewares
+            middlewares: options?.middlewares,
+            prepare: options?.prepare,
+            idempotency: options?.idempotency,
+            errors: options?.errors
         });
         return this;
     }
@@ -347,7 +264,11 @@ export class ServerBuilder {
             this.#registrations.push({
                 endpoint: entry.endpoint.introspect(),
                 handler: entry.handler,
-                middlewares: entry.middlewares
+                middlewares: entry.middlewares,
+                handlerErrorsMapped: entry.handlerErrorsMapped,
+                prepare: entry.prepare,
+                idempotency: entry.idempotency,
+                errors: entry.errors
             });
         }
         for (const entry of mapping._subscriptions) {
@@ -416,6 +337,23 @@ export class ServerBuilder {
         const router = new Router();
 
         for (const reg of this.#registrations) {
+            if (
+                reg.endpoint.idempotent &&
+                typeof reg.idempotency?.scope !== 'function'
+            )
+                throw new TypeError(
+                    'Idempotent endpoints require an explicit scope policy'
+                );
+            if (reg.idempotency && !reg.endpoint.idempotent)
+                throw new TypeError(
+                    'An idempotency policy requires an idempotent contract'
+                );
+            if (reg.errors)
+                validateErrorMap({ introspect: () => reg.endpoint });
+            if (reg.idempotency) {
+                // Validate limits before opening the listening socket.
+                idempotency({ ...reg.idempotency, scope: () => undefined });
+            }
             router.addRoute(reg);
         }
         for (const reg of this.#subscriptionRegistrations) {
@@ -464,7 +402,8 @@ export class ServerBuilder {
             this.#healthcheck,
             this.#subscriptionRegistrations.length > 0,
             this.#batchConfig,
-            this.#options.maxBodySize
+            this.#options.maxBodySize,
+            this.#corsOptions
         );
 
         const listenPort = port ?? this.#options.port ?? 3000;
@@ -485,6 +424,8 @@ const MAX_WS_QUEUE_SIZE = 1024;
 
 export class Server {
     readonly #router: Router;
+    readonly #replay = new Map<EndpointRegistration, Middleware>();
+    readonly #replayScopes = new WeakMap<RequestContext, string>();
     readonly #serviceProvider: ServiceProvider;
     readonly #contentNegotiator: ContentNegotiator;
     readonly #globalMiddlewares: Middleware[];
@@ -492,6 +433,7 @@ export class Server {
     readonly #hasSubscriptions: boolean;
     readonly #batchConfig: ServerBatchingOptions | null;
     readonly #maxBodySize: number;
+    readonly #cors?: CorsPolicy;
     #httpServer: http.Server | https.Server | null = null;
     #wss: WebSocketServer | null = null;
     readonly #activeConnections: Set<WebSocket> = new Set();
@@ -504,7 +446,8 @@ export class Server {
         healthcheck = false,
         hasSubscriptions = false,
         batchConfig: ServerBatchingOptions | null = null,
-        maxBodySize: number = DEFAULT_MAX_BODY_SIZE
+        maxBodySize: number = DEFAULT_MAX_BODY_SIZE,
+        corsOptions?: ServerCorsOptions
     ) {
         this.#router = router;
         this.#serviceProvider = serviceProvider;
@@ -514,6 +457,8 @@ export class Server {
         this.#hasSubscriptions = hasSubscriptions;
         this.#batchConfig = batchConfig;
         this.#maxBodySize = maxBodySize;
+        this.#cors =
+            corsOptions === undefined ? undefined : new CorsPolicy(corsOptions);
     }
 
     /**
@@ -628,8 +573,17 @@ export class Server {
 
     async #handleRequest(
         req: http.IncomingMessage,
-        res: http.ServerResponse
+        res: http.ServerResponse,
+        physicalRequest = true
     ): Promise<void> {
+        if (
+            physicalRequest &&
+            this.#cors &&
+            (await this.#cors.handle(req, res, (method, path) =>
+                this.#matchCorsRoute(method, path)
+            ))
+        )
+            return;
         const scope = this.#serviceProvider.createScope();
 
         try {
@@ -743,9 +697,11 @@ export class Server {
 
                 // Parse body if needed
                 let parsedBody: unknown;
-                let uploadedFiles: Record<string, FilePart> | undefined;
+                let uploadedFiles:
+                    | Record<string, FilePart | FilePart[]>
+                    | undefined;
                 let rejectedFiles: RejectedFile[] | undefined;
-                if (needsBody(meta)) {
+                if (needsBody(meta) || meta.fileUpload) {
                     const contentType = req.headers['content-type'] ?? '';
 
                     // Multipart / file-upload path
@@ -756,12 +712,33 @@ export class Server {
                         try {
                             const result = await parseMultipart(
                                 req,
-                                meta.fileUpload
+                                meta.fileUpload,
+                                this.#maxBodySize
                             );
+                            if (
+                                meta.fileUpload.schema &&
+                                !meta.bodySchema &&
+                                Object.keys(result.fields).length
+                            ) {
+                                throw new HttpError(
+                                    400,
+                                    'Bad Request',
+                                    'This upload endpoint does not declare text fields',
+                                    {
+                                        errors: Object.keys(result.fields).map(
+                                            name => ({
+                                                pointer: `/body/${name.replace(/~/g, '~0').replace(/\//g, '~1')}`,
+                                                detail: 'Unexpected multipart text field'
+                                            })
+                                        )
+                                    }
+                                );
+                            }
                             parsedBody = result.fields;
                             uploadedFiles = result.files;
                             rejectedFiles = result.rejectedFiles;
-                        } catch {
+                        } catch (error) {
+                            if (error instanceof HttpError) throw error;
                             const pd = createProblemDetails(
                                 400,
                                 'Malformed multipart request'
@@ -852,15 +829,79 @@ export class Server {
                     }
                 }
 
-                // Call handler
-                let result = registration.handler(...resolveResult.args);
-                if (result instanceof Promise) {
-                    result = await result;
+                const args = resolveResult.args;
+                const send = async (result: unknown) => {
+                    if (ctx.responded) return;
+                    await this.#sendResult(req, res, result);
+                    ctx.responded = true;
+                };
+                const translate = async (error: unknown) => {
+                    if (!registration.errors) throw error;
+                    return registration.errors.translate(error);
+                };
+                // Framework transport validation precedes application callbacks.
+                const key = ctx.headers['x-idempotency-key'];
+                if (
+                    meta.idempotent &&
+                    key !== undefined &&
+                    (key.length === 0 || key.length > 256)
+                )
+                    throw new HttpError(
+                        400,
+                        'Idempotency key must contain 1 to 256 characters'
+                    );
+                try {
+                    if (registration.prepare)
+                        args[0] = await registration.prepare(...args);
+                    if (registration.idempotency && key !== undefined) {
+                        const scope = await registration.idempotency.scope(
+                            ...args
+                        );
+                        if (
+                            typeof scope !== 'string' &&
+                            !(
+                                Array.isArray(scope) &&
+                                scope.length > 0 &&
+                                scope.every(
+                                    part =>
+                                        typeof part === 'string' ||
+                                        (typeof part === 'number' &&
+                                            Number.isFinite(part))
+                                )
+                            )
+                        )
+                            throw new TypeError(
+                                'Idempotency scope must be a string or identity components'
+                            );
+                        this.#replayScopes.set(ctx, JSON.stringify(scope));
+                    }
+                } catch (error) {
+                    await send(await translate(error));
+                    return;
                 }
-
-                if (ctx.responded) return;
-                await this.#sendResult(req, res, result);
-                ctx.responded = true;
+                const execute = async () => {
+                    let result: unknown;
+                    try {
+                        result = await registration.handler(...args);
+                    } catch (error) {
+                        if (registration.handlerErrorsMapped) throw error;
+                        result = await translate(error);
+                    }
+                    await send(result);
+                };
+                if (registration.idempotency) {
+                    let replay = this.#replay.get(registration);
+                    if (!replay) {
+                        replay = idempotency({
+                            ...registration.idempotency,
+                            scope: request => this.#replayScopes.get(request)
+                        });
+                        this.#replay.set(registration, replay);
+                    }
+                    await replay(ctx, execute);
+                } else {
+                    await execute();
+                }
             });
         } catch (err) {
             if (res.headersSent) return;
@@ -886,6 +927,37 @@ export class Server {
                 // Swallow disposal errors
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // CORS target lookup includes built-in routes without changing normal routing.
+    // -----------------------------------------------------------------------
+
+    #matchCorsRoute(
+        method: string,
+        path: string
+    ): {
+        status: 200 | 400 | 404 | 405;
+        allowedMethods?: string[];
+    } {
+        const builtins: string[] = [];
+        if (this.#healthcheck && path === '/health') builtins.push('GET');
+        if (
+            this.#batchConfig &&
+            path === (this.#batchConfig.path ?? '/__batch')
+        ) {
+            builtins.push('POST');
+        }
+        if (builtins.includes(method)) return { status: 200 };
+        const result = this.#router.match(method, path);
+        if (result.badRequest) return { status: 400 };
+        if (result.match) return { status: 200 };
+        const allowedMethods = [
+            ...new Set([...builtins, ...(result.allowedMethods ?? [])])
+        ];
+        return allowedMethods.length
+            ? { status: 405, allowedMethods }
+            : { status: 404 };
     }
 
     // -----------------------------------------------------------------------
@@ -944,7 +1016,10 @@ export class Server {
             const virtualReq = new VirtualIncomingMessage({
                 method: (item.method ?? 'GET').toUpperCase(),
                 url: item.url,
-                headers: item.headers ?? {},
+                headers: {
+                    host: req.headers.host ?? 'localhost',
+                    ...item.headers
+                },
                 body: item.body
             });
             virtualReq.__cleverbrushBatchSubrequest = {
@@ -956,7 +1031,8 @@ export class Server {
 
             await this.#handleRequest(
                 virtualReq as unknown as http.IncomingMessage,
-                virtualRes as unknown as http.ServerResponse
+                virtualRes as unknown as http.ServerResponse,
+                false
             );
 
             return virtualRes.toResult();
@@ -1049,6 +1125,10 @@ export class Server {
                     scope,
                     abortController
                 );
+            })
+            .then(() => {
+                // Short-circuiting middleware never invokes the terminal handler.
+                if (ctx.responded) ws.close(1008, 'Unauthorized');
             })
             .catch(() => {
                 ws.close(1011, 'Internal Server Error');

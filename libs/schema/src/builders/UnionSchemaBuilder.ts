@@ -118,8 +118,8 @@ type TakeExceptIndex<
  * Which means that you are not limited to primitive types and
  * can construct complex types as well, e.g. object | array.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link union | union()} function instead.
  *
  * @example
@@ -174,6 +174,16 @@ export class UnionSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'union',
+        TOptions,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault
+    ];
+
     #options!: TOptions;
     #discriminatorKey: string | null = null;
     #discriminatorMap: Map<
@@ -324,9 +334,12 @@ export class UnionSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -341,9 +354,12 @@ export class UnionSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #createValidationSetup(
@@ -995,7 +1011,7 @@ export class UnionSchemaBuilder<
                 'schema must be an instance of the SchemaBuilder class'
             );
         }
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             options: [...this.#options, schema]
         } as any) as any;
@@ -1024,7 +1040,7 @@ export class UnionSchemaBuilder<
         ) {
             throw new Error('index must be >= 0 and <= count of the options');
         }
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             options: this.#options.filter((_v, i) => i !== index)
         } as any) as any;
@@ -1071,7 +1087,7 @@ export class UnionSchemaBuilder<
                 'schema must be an instance of the SchemaBuilder class'
             );
         }
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             options: [schema]
         } as any) as any;

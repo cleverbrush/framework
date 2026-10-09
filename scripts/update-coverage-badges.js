@@ -10,7 +10,7 @@
  *
  * Usage: node scripts/update-coverage-badges.js
  */
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, readdirSync } from 'fs';
 import { resolve, join } from 'path';
 
 const ROOT = resolve(import.meta.dirname, '..');
@@ -40,21 +40,17 @@ function getColor(pct) {
 function makeBadge(pct) {
     const label = `${pct}%25`; // %25 is URL-encoded %
     const color = getColor(pct);
-    return `![Coverage](https://img.shields.io/badge/coverage-${label}-${color})`;
+    return `![Unit coverage](https://img.shields.io/badge/unit_coverage-${label}-${color})`;
 }
 
 // --- Per-library coverage aggregation ---
 
-const LIBS = [
-    'async',
-    'deep',
-    'knex-clickhouse',
-    'mapper',
-    'react-form',
-    'scheduler',
-    'schema',
-    'schema-json'
-];
+const LIBS = readdirSync(join(ROOT, 'libs')).filter(lib => {
+    const manifest = JSON.parse(
+        readFileSync(join(ROOT, 'libs', lib, 'package.json'), 'utf8')
+    );
+    return !manifest.private;
+});
 
 function calcLibCoverage(lib) {
     const prefix = join(ROOT, 'libs', lib, 'src') + '/';
@@ -86,11 +82,14 @@ function updateReadme(readmePath, badge) {
 
     // Subsequent runs: replace between existing markers
     if (content.includes(BADGE_START)) {
-        const escaped = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escaped = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(
             `${escaped(BADGE_START)}[\\s\\S]*?${escaped(BADGE_END)}`
         );
-        content = content.replace(regex, `${BADGE_START}\n${badge}\n${BADGE_END}`);
+        content = content.replace(
+            regex,
+            `${BADGE_START}\n${badge}\n${BADGE_END}`
+        );
         writeFileSync(readmePath, content);
         console.log(`  updated: ${readmePath}`);
         return;

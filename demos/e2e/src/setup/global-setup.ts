@@ -86,10 +86,8 @@ async function isReachable(url: string, timeoutMs = 1_500): Promise<boolean> {
 
 /** Run pending DB migrations against the dockerized Postgres. */
 async function runMigrations(): Promise<void> {
-    // cb-orm currently keeps the knex pool open after migrations complete,
-    // so the process lingers ~30s. We implement a portable Node-based timeout
-    // and send SIGTERM after 60s; the migrations themselves are fully applied
-    // by then.
+    // The CLI closes its database pool. A timeout or signal must fail setup,
+    // never be mistaken for successfully applied migrations.
     await new Promise<void>((resolve, reject) => {
         const child = spawn('npm', ['run', 'db:run'], {
             stdio: 'inherit',
@@ -112,9 +110,8 @@ async function runMigrations(): Promise<void> {
         });
         child.on('exit', (code, signal) => {
             clearTimeout(timer);
-            // 0 = clean exit; SIGTERM = killed by our timer (still success)
-            if (code === 0 || signal === 'SIGTERM') resolve();
-            else reject(new Error(`Migrations failed with exit code ${code}`));
+            if (code === 0) resolve();
+            else reject(new Error(`Migrations failed (${signal ?? code})`));
         });
     });
 }

@@ -1,15 +1,17 @@
 # ── Stage 1: builder ──────────────────────────────────────────────────────────
 # Build context must be the monorepo root
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
 # Copy root workspace manifest for npm workspaces resolution
-COPY package.json package-lock.json* turbo.json tsconfig.json tsconfig.build.json ./
+COPY package.json package-lock.json turbo.json tsconfig.json tsconfig.build.json ./
 
-# Copy all workspace package.json files for dependency resolution
+# Copy every workspace manifest so npm ci validates the complete lockfile.
 COPY libs/async/package.json ./libs/async/
 COPY libs/auth/package.json ./libs/auth/
+COPY libs/benchmarks/package.json ./libs/benchmarks/
+COPY libs/client/package.json ./libs/client/
 COPY libs/deep/package.json ./libs/deep/
 COPY libs/di/package.json ./libs/di/
 COPY libs/env/package.json ./libs/env/
@@ -17,21 +19,28 @@ COPY libs/knex-clickhouse/package.json ./libs/knex-clickhouse/
 COPY libs/knex-schema/package.json ./libs/knex-schema/
 COPY libs/log/package.json ./libs/log/
 COPY libs/mapper/package.json ./libs/mapper/
-COPY libs/react-form/package.json ./libs/react-form/
-COPY libs/schema/package.json ./libs/schema/
-COPY libs/schema-json/package.json ./libs/schema-json/
-COPY libs/scheduler/package.json ./libs/scheduler/
-COPY libs/server/package.json ./libs/server/
-COPY libs/server-openapi/package.json ./libs/server-openapi/
-COPY libs/otel/package.json ./libs/otel/
-COPY libs/client/package.json ./libs/client/
-COPY libs/benchmarks/package.json ./libs/benchmarks/
 COPY libs/orm/package.json ./libs/orm/
 COPY libs/orm-cli/package.json ./libs/orm-cli/
+COPY libs/otel/package.json ./libs/otel/
+COPY libs/react-form/package.json ./libs/react-form/
+COPY libs/scheduler/package.json ./libs/scheduler/
+COPY libs/scheduler-postgres/package.json ./libs/scheduler-postgres/
+COPY libs/schema/package.json ./libs/schema/
+COPY libs/schema-json/package.json ./libs/schema-json/
+COPY libs/server/package.json ./libs/server/
+COPY libs/server-integration-tests/package.json ./libs/server-integration-tests/
+COPY libs/server-openapi/package.json ./libs/server-openapi/
+COPY libs/storage/package.json ./libs/storage/
+COPY libs/storage-s3/package.json ./libs/storage-s3/
+COPY demos/e2e/package.json ./demos/e2e/
 COPY demos/todo-backend/package.json ./demos/todo-backend/
+COPY demos/todo-frontend/package.json ./demos/todo-frontend/
+COPY websites/docs/package.json ./websites/docs/
+COPY websites/schema/package.json ./websites/schema/
+COPY websites/shared/package.json ./websites/shared/
 
 # Install all workspace dependencies
-RUN npm install --ignore-scripts
+RUN npm ci --ignore-scripts
 
 # Copy all lib sources (needed for workspace build)
 COPY libs/ ./libs/
@@ -50,7 +59,7 @@ RUN npx turbo run build --filter=@cleverbrush/todo-backend
 RUN cp -rL /app/node_modules /app/runtime_modules && \
     rm -rf /app/runtime_modules/@cleverbrush
 # ── Stage 2: runtime ──────────────────────────────────────────────────────────
-FROM node:22-alpine AS runtime
+FROM node:24-alpine AS runtime
 
 LABEL org.opencontainers.image.title="ToDo Management API"
 LABEL org.opencontainers.image.description="Production-ready ToDo REST API built with @cleverbrush/* framework"

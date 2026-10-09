@@ -152,7 +152,7 @@ async function saveNode(
     // 2. Save self (insert vs update from PK presence).
     // ---------------------------------------------------------------------
     const isUpdate = hasFullPk(schema, ownFields);
-    const sqb = schemaQuery(trx, schema) as unknown as {
+    let sqb = schemaQuery(trx, schema) as unknown as {
         andWhere: (col: string, op: string, val: unknown) => unknown;
         update: (data: unknown) => Promise<unknown>;
         insert: (data: unknown) => Promise<unknown>;
@@ -165,7 +165,7 @@ async function saveNode(
         const updateData: Record<string, unknown> = { ...ownFields };
         for (const k of pk.propertyKeys) delete updateData[k];
         for (const k of pk.propertyKeys) {
-            sqb.andWhere(k, '=', ownFields[k]);
+            sqb = sqb.andWhere(k, '=', ownFields[k]) as typeof sqb;
         }
         // SchemaQueryBuilder.update returns the updated row(s).
         const result = (await sqb.update(updateData)) as unknown;

@@ -4,7 +4,7 @@ import type { OrmCliConfig } from '../types.js';
 
 /**
  * Apply pending migrations via `knex.migrate.latest`.
- * Pass `--to <migrationName>` to migrate up to a specific file.
+ * Pass `--to <migrationName>` to apply that one pending migration file.
  */
 export async function run(
     config: OrmCliConfig,

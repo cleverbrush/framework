@@ -51,6 +51,7 @@ export {
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 export type {
+    IndexedPropertyDescriptor,
     NestedValidationResult,
     PropertyDescriptor,
     PropertyDescriptorInner,
@@ -86,13 +87,21 @@ export type {
     CleanExtended,
     ExtensionConfig,
     ExtensionDescriptor,
+    ExtraProperties,
     ExtraTypeBrandSymbol,
     FixedMethods,
     HiddenExtensionMethods,
+    InferExtensionMetadata,
+    MetadataExtended,
+    MetadataMethod,
+    MetadataMethodBuilder,
+    MetadataMethods,
+    MetadataState,
     MethodLiteralBrandSymbol
 } from './extension.js';
 export {
     defineExtension,
+    defineMetadataMethod,
     EXTRA_TYPE_BRAND,
     METHOD_LITERAL_BRAND,
     withExtensions

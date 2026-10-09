@@ -1,6 +1,66 @@
 # @cleverbrush/client
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-94.6%25-brightgreen)
+<!-- coverage-badge-end -->
 
 Typed HTTP client for `@cleverbrush/server` API contracts — zero codegen, full type safety. Optional React + TanStack Query integration via `@cleverbrush/client/react`.
+
+## Decoding field validation errors
+
+`decodeValidationIssues(error, { source: 'body' })` recognizes `ApiError`
+validation Problem Details with status 400 or 422. It returns plain
+`{ pointer, detail }[]`, structurally compatible with React Form's `FormIssue`,
+or `undefined` for unrelated/malformed errors. No React import is needed.
+
+```ts
+import { decodeValidationIssues } from '@cleverbrush/client';
+try {
+    await client.profiles.save({ body: values });
+} catch (error) {
+    const issues = decodeValidationIssues(error, { source: 'body' });
+    if (issues) return { ok: false, error: 'Check your input.', issues };
+    throw error; // Or translate expected failures into an application-safe message.
+}
+```
+
+The source is required (`body`, `query`, or `headers`). Only that prefix is
+stripped: `/body/addresses/0/city` becomes `/addresses/0/city`. Other sources,
+unknown request roots and root errors become empty-pointer form-level issues,
+not silently dropped fields. JSON Pointer escapes are validated and preserved.
+Malformed entries reject the entire payload; retain a safe general-error fallback.
+The `errors` collection is Framework's extension, not a universal Problem Details
+standard. Business messages and network exceptions are never guessed into fields.
+
+See the [multi-file action/form example](../react-form/README.md#server-validation-issues)
+for serialization boundaries and the form issue lifecycle.
+
+## Typed file uploads
+
+An endpoint's upload schema determines its `files` argument. Single fields accept
+`File`, `Blob`, or `FilePart`; array fields accept arrays of those values.
+
+```ts
+import { createClient } from '@cleverbrush/client';
+import { defineApi, endpoint, file } from '@cleverbrush/server/contract';
+import { array, object } from '@cleverbrush/schema';
+
+const api = defineApi({ assets: {
+    upload: endpoint.post('/assets').upload(object({
+        images: array(file()).minLength(1),
+        cover: file().optional()
+    }))
+} });
+const client = createClient(api);
+await client.assets.upload({ files: {
+    images: [new File(['first'], 'first.txt'), new File(['second'], 'second.txt')]
+} });
+```
+
+File-only calls need no `body` argument. The client serializes arrays as repeated
+multipart fields in order, omits undefined optional fields, and lets `FormData`
+set the content-type boundary. Use `File` or `FilePart` to supply a filename;
+a plain `Blob` uses the platform's default filename. Text fields remain in the
+endpoint's separate `body` argument.
 
 ## Overview
 
@@ -182,6 +242,27 @@ const client = createClient(api, {
 | `beforeError` | `(error: WebError) => WebError` | Transform errors before throwing |
 
 ## Resilience Middlewares
+
+### Contract-declared mutation retries
+
+For endpoints declared with `.idempotent()`, the typed client generates one
+`X-Idempotency-Key` per call before middleware execution. `retry()` recognizes
+the contract and reuses the key/body for every HTTP attempt; other POSTs retain
+their existing retry policy. Ordinary endpoint calls require no extra options:
+
+```ts
+await client.items.create({ body: item });
+```
+
+Explicit middleware or per-call `retry.methods` takes precedence, and
+`retry: { limit: 0 }` disables automatic retries. `batching()` sends these calls
+directly so their individual timeout signals still reach the transport.
+Each new client invocation gets a fresh key, even when its input is identical.
+This does not track form submissions or user-initiated retries across calls.
+
+The server requires an authorization scope and replays responses within a
+bounded, process-local store. This does not provide durable exactly-once
+execution across replicas or restarts.
 
 ### Retry — `@cleverbrush/client/retry`
 
@@ -618,7 +699,7 @@ function LiveFeed() {
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `enabled` | `boolean` | `true` | Toggle the subscription on/off |
-| `maxEvents` | `number` | unlimited | Maximum events to keep in the `events` array |
+| `maxEvents` | `number` | unlimited | Maximum events to keep in the `events` array; `0` retains no history |
 
 ## React Integration (`@cleverbrush/client/react`)
 

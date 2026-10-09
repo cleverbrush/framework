@@ -101,7 +101,7 @@ describe('WebSocketProtocol', () => {
             if (frame!.type === 'message') {
                 const data = frame?.data as any;
                 expect(data?.safe).toBe('ok');
-                expect(data?.__proto__).toBe(Object.prototype);
+                expect(Object.getPrototypeOf(data)).toBe(Object.prototype);
                 expect(({} as any).polluted).toBeUndefined();
             }
         });

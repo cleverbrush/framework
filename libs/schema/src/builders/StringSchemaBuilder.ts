@@ -19,46 +19,52 @@ type StringSchemaBuilderCreateProps<
  * length, restricted to start with a certain value, restricted to end with
  * a certain value, restricted to match a certain regular expression.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link string | string()} function instead.
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string().equals('hello');
  * const result = schema.validate('hello');
  * // result.valid === true
  * // result.object === 'hello'
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string().equals('hello');
  * const result = schema.validate('world');
  * // result.valid === false
  * // result.errors[0].message === "is expected to be equal to 'hello'"
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string().minLength(5);
  * const result = schema.validate('hello');
  * // result.valid === true
  * // result.object === 'hello'
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string().minLength(5);
  * const result = schema.validate('hi');
  * // result.valid === false
  * // result.errors[0].message === 'is expected to have a length of at least 5'
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string().minLength(2).maxLength(5);
  * const result = schema.validate('yes');
  * // result.valid === true
  * // result.object === 'yes'
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = string('no');
  * const result = schema.validate('yes');
  * // result.valid === false
@@ -80,6 +86,15 @@ export class StringSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'string',
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault
+    ];
+
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
@@ -314,9 +329,12 @@ export class StringSchemaBuilder<
         _notUsed?: T
     ): StringSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -330,9 +348,12 @@ export class StringSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #getConstraintViolation(
@@ -584,7 +605,7 @@ export class StringSchemaBuilder<
         >
     ) {
         if (typeof value !== 'string') throw new Error('string expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
@@ -609,7 +630,7 @@ export class StringSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: undefined
         }) as any;
@@ -747,7 +768,7 @@ export class StringSchemaBuilder<
         TExtensions {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             minLength: length,
             minLengthValidationErrorMessageProvider: errorMessage
@@ -767,7 +788,7 @@ export class StringSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.minLength;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }
@@ -794,7 +815,7 @@ export class StringSchemaBuilder<
         TExtensions {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             maxLength: length,
             maxLengthValidationErrorMessageProvider: errorMessage
@@ -814,7 +835,7 @@ export class StringSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.maxLength;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }
@@ -840,7 +861,7 @@ export class StringSchemaBuilder<
         TExtensions {
         if (typeof val !== 'string' || !val)
             throw new Error('non empty string expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             startsWith: val,
             startsWithValidationErrorMessageProvider: errorMessage
@@ -860,7 +881,7 @@ export class StringSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.startsWith;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }
@@ -886,7 +907,7 @@ export class StringSchemaBuilder<
         TExtensions {
         if (typeof val !== 'string' || !val)
             throw new Error('non empty string expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             endsWith: val,
             endsWithValidationErrorMessageProvider: errorMessage
@@ -906,7 +927,7 @@ export class StringSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.endsWith;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }
@@ -932,7 +953,7 @@ export class StringSchemaBuilder<
     > &
         TExtensions {
         if (!(regexp instanceof RegExp)) throw new Error('regexp expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             matches: regexp,
             matchesValidationErrorMessageProvider: errorMessage
@@ -952,7 +973,7 @@ export class StringSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.matches;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }

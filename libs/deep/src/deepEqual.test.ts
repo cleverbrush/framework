@@ -125,18 +125,13 @@ test('deepEqual - objects with different key names return false', () => {
     expect(deepEqual({ a: 1 }, { b: 1 })).toEqual(false);
 });
 
-test.each([
-    null,
-    undefined,
-    true,
-    1,
-    'a',
-    Symbol('a'),
-    () => 1
-])('deepEqual - object versus %s is symmetric and does not throw', value => {
-    expect(deepEqual({}, value)).toBe(false);
-    expect(deepEqual(value, {})).toBe(false);
-});
+test.each([null, undefined, true, 1, 'a', Symbol('a'), () => 1])(
+    'deepEqual - object versus %s is symmetric and does not throw',
+    value => {
+        expect(deepEqual({}, value)).toBe(false);
+        expect(deepEqual(value, {})).toBe(false);
+    }
+);
 
 test('deepEqual - primitives follow Object.is', () => {
     expect(deepEqual(Number.NaN, Number.NaN)).toBe(true);
@@ -191,24 +186,32 @@ test('deepEqual - only enumerable own properties participate', () => {
     ).toBe(false);
 });
 
-test.each([
-    false,
-    true
-])('deepEqual - preserves array length, holes and extra properties (unordered=%s)', disregardArrayOrder => {
-    const options = { disregardArrayOrder };
-    expect(deepEqual(new Array(3), new Array(3), options)).toBe(true);
-    expect(deepEqual(new Array(3), new Array(4), options)).toBe(false);
-    expect(deepEqual(new Array(1), [undefined], options)).toBe(false);
-    const key = Symbol('metadata');
-    const left = Object.assign([1], { label: 'a', [key]: 2 });
-    expect(deepEqual(left, [1], options)).toBe(false);
-    expect(
-        deepEqual(left, Object.assign([1], { label: 'a', [key]: 2 }), options)
-    ).toBe(true);
-    expect(
-        deepEqual(left, Object.assign([1], { label: 'a', [key]: 3 }), options)
-    ).toBe(false);
-});
+test.each([false, true])(
+    'deepEqual - preserves array length, holes and extra properties (unordered=%s)',
+    disregardArrayOrder => {
+        const options = { disregardArrayOrder };
+        expect(deepEqual(new Array(3), new Array(3), options)).toBe(true);
+        expect(deepEqual(new Array(3), new Array(4), options)).toBe(false);
+        expect(deepEqual(new Array(1), [undefined], options)).toBe(false);
+        const key = Symbol('metadata');
+        const left = Object.assign([1], { label: 'a', [key]: 2 });
+        expect(deepEqual(left, [1], options)).toBe(false);
+        expect(
+            deepEqual(
+                left,
+                Object.assign([1], { label: 'a', [key]: 2 }),
+                options
+            )
+        ).toBe(true);
+        expect(
+            deepEqual(
+                left,
+                Object.assign([1], { label: 'a', [key]: 3 }),
+                options
+            )
+        ).toBe(false);
+    }
+);
 
 test('deepEqual - ordered holes retain their positions', () => {
     const left = new Array(2);
@@ -219,26 +222,26 @@ test('deepEqual - ordered holes retain their positions', () => {
     expect(deepEqual(left, right, { disregardArrayOrder: true })).toBe(true);
 });
 
-test.each([
-    false,
-    true
-])('deepEqual - cycles terminate and still detect mismatches (unordered=%s)', disregardArrayOrder => {
-    const options = { disregardArrayOrder };
-    const left: any = { value: 1 };
-    left.self = left;
-    const right: any = { value: 1 };
-    right.self = right;
-    expect(deepEqual(left, right, options)).toBe(true);
-    right.value = 2;
-    expect(deepEqual(left, right, options)).toBe(false);
-    const leftArray: any[] = [];
-    leftArray.push(leftArray, { value: 1 });
-    const rightArray: any[] = [];
-    rightArray.push(rightArray, { value: 1 });
-    expect(deepEqual(leftArray, rightArray, options)).toBe(true);
-    rightArray[1].value = 2;
-    expect(deepEqual(leftArray, rightArray, options)).toBe(false);
-});
+test.each([false, true])(
+    'deepEqual - cycles terminate and still detect mismatches (unordered=%s)',
+    disregardArrayOrder => {
+        const options = { disregardArrayOrder };
+        const left: any = { value: 1 };
+        left.self = left;
+        const right: any = { value: 1 };
+        right.self = right;
+        expect(deepEqual(left, right, options)).toBe(true);
+        right.value = 2;
+        expect(deepEqual(left, right, options)).toBe(false);
+        const leftArray: any[] = [];
+        leftArray.push(leftArray, { value: 1 });
+        const rightArray: any[] = [];
+        rightArray.push(rightArray, { value: 1 });
+        expect(deepEqual(leftArray, rightArray, options)).toBe(true);
+        rightArray[1].value = 2;
+        expect(deepEqual(leftArray, rightArray, options)).toBe(false);
+    }
+);
 
 test('deepEqual - sharing topology is not part of structural equality', () => {
     const shared = { value: 1 };

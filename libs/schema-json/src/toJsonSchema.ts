@@ -242,6 +242,22 @@ function convertNode(
     schema: SchemaBuilder<any, any, any>,
     resolver: Resolver
 ): Out {
+    const info = schema.introspect();
+    if (info.referenceTarget) {
+        const target = info.referenceTarget;
+        const canonical = target.introspect();
+        // Handle aliases before name lookup so use-site modifiers survive.
+        let out: Out = { allOf: [convertNode(target, resolver)] };
+        if (info.isNullable && !canonical.isNullable) {
+            out = { anyOf: [out, { type: 'null' }] };
+        } else if (!info.isNullable && canonical.isNullable) {
+            (out.allOf as Out[]).push({ not: { type: 'null' } });
+        }
+        if (info.description !== undefined) out.description = info.description;
+        if (info.example !== undefined) out.examples = [info.example];
+        if (info.isReadonly) out.readOnly = true;
+        return out;
+    }
     if (resolver) {
         const name = resolver(schema);
         if (typeof name === 'string' && name.length > 0) {
@@ -251,7 +267,6 @@ function convertNode(
         }
     }
     const out = convertNodeInner(schema, resolver);
-    const info = schema.introspect() as any;
     if (typeof info.description === 'string' && info.description !== '')
         out['description'] = info.description;
 

@@ -506,20 +506,23 @@ describe('cache invalidation races', () => {
         });
         return { promise, resolve };
     }
-    test.each([
-        400, 500
-    ])('failed mutation %s preserves cached reads', async status => {
-        const fetch = vi
-            .fn<FetchLike>()
-            .mockResolvedValueOnce(new Response('old'))
-            .mockResolvedValueOnce(new Response('failed', { status }));
-        const mw = cacheTags({ defaultTtl: 5000 })(fetch);
-        const meta = makeTagMeta([tag()]);
-        await mw('/records', makeInit(meta));
-        await mw('/records', makeInit(meta, 'PATCH'));
-        expect(await (await mw('/records', makeInit(meta))).text()).toBe('old');
-        expect(fetch).toHaveBeenCalledTimes(2);
-    });
+    test.each([400, 500])(
+        'failed mutation %s preserves cached reads',
+        async status => {
+            const fetch = vi
+                .fn<FetchLike>()
+                .mockResolvedValueOnce(new Response('old'))
+                .mockResolvedValueOnce(new Response('failed', { status }));
+            const mw = cacheTags({ defaultTtl: 5000 })(fetch);
+            const meta = makeTagMeta([tag()]);
+            await mw('/records', makeInit(meta));
+            await mw('/records', makeInit(meta, 'PATCH'));
+            expect(await (await mw('/records', makeInit(meta))).text()).toBe(
+                'old'
+            );
+            expect(fetch).toHaveBeenCalledTimes(2);
+        }
+    );
     test('transport rejection preserves cached reads', async () => {
         const fetch = vi
             .fn<FetchLike>()
@@ -550,52 +553,52 @@ describe('cache invalidation races', () => {
         await pending;
         expect(await (await mw('/records', makeInit(meta))).text()).toBe('new');
     });
-    test.each([
-        false,
-        true
-    ])('rejects old fills, read during write: %s', async duringWrite => {
-        const oldRead = deferred<Response>();
-        const write = deferred<Response>();
-        const fetch = vi
-            .fn<FetchLike>()
-            .mockImplementation(async (_url, init) => {
-                if (init?.method === 'PATCH') return write.promise;
-                if (
-                    fetch.mock.calls.filter(([, i]) => i?.method === 'GET')
-                        .length === 1
-                ) {
-                    return oldRead.promise;
-                }
-                return new Response('new');
-            });
-        const mw = cacheTags({ defaultTtl: 5000 })(fetch);
-        const meta = makeTagMeta([tag(), tag('other')]);
-        let pendingWrite: Promise<Response>;
-        let pendingRead: Promise<Response>;
-        if (duringWrite) {
-            pendingWrite = mw(
-                '/records',
-                makeInit(makeTagMeta([tag()]), 'PATCH')
-            );
-            pendingRead = mw('/records', makeInit(meta));
-        } else {
-            pendingRead = mw('/records', makeInit(meta));
-            pendingWrite = mw(
-                '/records',
-                makeInit(makeTagMeta([tag()]), 'PATCH')
-            );
+    test.each([false, true])(
+        'rejects old fills, read during write: %s',
+        async duringWrite => {
+            const oldRead = deferred<Response>();
+            const write = deferred<Response>();
+            const fetch = vi
+                .fn<FetchLike>()
+                .mockImplementation(async (_url, init) => {
+                    if (init?.method === 'PATCH') return write.promise;
+                    if (
+                        fetch.mock.calls.filter(([, i]) => i?.method === 'GET')
+                            .length === 1
+                    ) {
+                        return oldRead.promise;
+                    }
+                    return new Response('new');
+                });
+            const mw = cacheTags({ defaultTtl: 5000 })(fetch);
+            const meta = makeTagMeta([tag(), tag('other')]);
+            let pendingWrite: Promise<Response>;
+            let pendingRead: Promise<Response>;
+            if (duringWrite) {
+                pendingWrite = mw(
+                    '/records',
+                    makeInit(makeTagMeta([tag()]), 'PATCH')
+                );
+                pendingRead = mw('/records', makeInit(meta));
+            } else {
+                pendingRead = mw('/records', makeInit(meta));
+                pendingWrite = mw(
+                    '/records',
+                    makeInit(makeTagMeta([tag()]), 'PATCH')
+                );
+            }
+            write.resolve(new Response(null, { status: 204 }));
+            await pendingWrite;
+            oldRead.resolve(new Response('old'));
+            expect(await (await pendingRead).text()).toBe('old');
+            // No stale body may survive under a second tag either.
+            expect(
+                await (
+                    await mw('/records', makeInit(makeTagMeta([tag('other')])))
+                ).text()
+            ).toBe('new');
         }
-        write.resolve(new Response(null, { status: 204 }));
-        await pendingWrite;
-        oldRead.resolve(new Response('old'));
-        expect(await (await pendingRead).text()).toBe('old');
-        // No stale body may survive under a second tag either.
-        expect(
-            await (
-                await mw('/records', makeInit(makeTagMeta([tag('other')])))
-            ).text()
-        ).toBe('new');
-    });
+    );
     test('invalidates every alias of a previously cached response', async () => {
         const fetch = vi
             .fn<FetchLike>()

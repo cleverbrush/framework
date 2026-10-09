@@ -1,4 +1,5 @@
 // biome-ignore-all lint/suspicious/useAdjacentOverloadSignatures: each method in ScopedEndpointFactoryMethods and EndpointFactory has a single signature; they are separate methods, not overloads
+
 import type {
     InferType,
     ObjectSchemaBuilder,
@@ -20,6 +21,10 @@ import type {
 } from './ActionResult.js';
 import type { CacheTagDefinition } from './CacheTag.js';
 import { createCacheTagTree, serializeTag } from './CacheTag.js';
+import type {
+    EndpointOptions,
+    RuntimeEndpointOptions
+} from './EndpointOptions.js';
 import type { RequestContext } from './RequestContext.js';
 import {
     createSubscription,
@@ -33,6 +38,13 @@ import type {
     RejectedFile,
     UploadOptions
 } from './types.js';
+import {
+    type UploadConfiguration,
+    type UploadContract,
+    type UploadFiles,
+    type UploadSchema,
+    validateUploadConfiguration
+} from './upload.js';
 
 // ---------------------------------------------------------------------------
 // Simplify — flattens intersection types for clean IDE tooltips
@@ -52,7 +64,7 @@ type ActionContextParts<
     TQuery,
     THeaders,
     TPrincipal,
-    TUpload extends boolean
+    TUpload extends UploadContract
 > = {
     context: RequestContext;
 } & (HasKeys<TParams> extends true ? { params: TParams } : {}) &
@@ -66,9 +78,11 @@ type ActionContextParts<
     (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
     (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
     (TPrincipal extends undefined ? {} : { principal: TPrincipal }) &
-    (TUpload extends true
-        ? { files: Record<string, FilePart>; rejectedFiles?: RejectedFile[] }
-        : {});
+    (TUpload extends false
+        ? {}
+        : TUpload extends true
+          ? { files: Record<string, FilePart>; rejectedFiles?: RejectedFile[] }
+          : { files: UploadFiles<TUpload> });
 
 /**
  * The fully-typed argument object passed to endpoint handlers.
@@ -261,7 +275,7 @@ type AnySubscriptionBuilder = SubscriptionBuilder<
  */
 export type HandlerEntry<E> =
     | Handler<E>
-    | { handler: Handler<E>; middlewares?: Middleware[] };
+    | ({ handler: Handler<E> } & EndpointOptions<E>);
 
 /**
  * A compile-time complete mapping from an endpoint group structure to
@@ -295,6 +309,10 @@ export interface HandlerMapping {
         endpoint: AnyEndpoint;
         handler: (...args: any[]) => any;
         middlewares?: Middleware[];
+        handlerErrorsMapped?: boolean;
+        prepare?: RuntimeEndpointOptions['prepare'];
+        idempotency?: RuntimeEndpointOptions['idempotency'];
+        errors?: RuntimeEndpointOptions['errors'];
     }>;
     /** @internal */
     readonly _subscriptions: ReadonlyArray<{
@@ -363,7 +381,19 @@ export function mapHandlers<
                 entries.push({
                     endpoint: ep as AnyEndpoint,
                     handler,
-                    middlewares
+                    middlewares,
+                    handlerErrorsMapped:
+                        typeof entry === 'function'
+                            ? false
+                            : entry.handlerErrorsMapped,
+                    prepare:
+                        typeof entry === 'function' ? undefined : entry.prepare,
+                    idempotency:
+                        typeof entry === 'function'
+                            ? undefined
+                            : entry.idempotency,
+                    errors:
+                        typeof entry === 'function' ? undefined : entry.errors
                 });
             }
         }
@@ -582,12 +612,14 @@ export interface EndpointMetadata {
      * The configuration controls max file size, allowed MIME types, etc.
      * @see `EndpointBuilder.upload()`
      */
-    readonly fileUpload: UploadOptions | null;
+    readonly fileUpload: UploadConfiguration | null;
     /**
      * Cache tags declared via `.clearsCacheTag()`, providing tag-based cache
      * key computation for the client middleware.
      */
     readonly cacheTags: readonly CacheTagDefinition[];
+    /** Opt-in to bounded mutation response replay. */
+    readonly idempotent?: boolean;
 }
 
 /**
@@ -685,7 +717,7 @@ export class EndpointBuilder<
     TRoles extends string = string,
     TResponse = any,
     TResponses extends Record<number, any> = {},
-    TUpload extends boolean = false
+    TUpload extends UploadContract = false
 > {
     readonly #method: string;
     readonly #basePath: string;
@@ -749,8 +781,9 @@ export class EndpointBuilder<
     readonly #externalDocs: { url: string; description?: string } | null;
     readonly #links: Record<string, LinkDefinition> | null;
     readonly #callbacks: Record<string, CallbackDefinition> | null;
-    readonly #fileUpload: UploadOptions | null;
+    readonly #fileUpload: UploadConfiguration | null;
     readonly #cacheTags: readonly CacheTagDefinition[];
+    readonly #idempotent: boolean;
 
     constructor(
         method: string,
@@ -815,9 +848,11 @@ export class EndpointBuilder<
         externalDocs: { url: string; description?: string } | null = null,
         links: Record<string, LinkDefinition> | null = null,
         callbacks: Record<string, CallbackDefinition> | null = null,
-        fileUpload: UploadOptions | null = null,
-        cacheTags: readonly CacheTagDefinition[] = []
+        fileUpload: UploadConfiguration | null = null,
+        cacheTags: readonly CacheTagDefinition[] = [],
+        idempotent = false
     ) {
+        validateUploadConfiguration(fileUpload, bodySchema);
         this.#method = method;
         this.#basePath = basePath;
         this.#pathTemplate = pathTemplate;
@@ -843,6 +878,60 @@ export class EndpointBuilder<
         this.#callbacks = callbacks;
         this.#fileUpload = fileUpload;
         this.#cacheTags = cacheTags;
+        this.#idempotent = idempotent;
+    }
+
+    /**
+     * Enable optional X-Idempotency-Key replay for this mutation. The server
+     * registration must provide an explicit authorization scope. Retention is
+     * process-local; reusing a key asserts that the input is unchanged.
+     */
+    idempotent(): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses,
+        TUpload
+    > {
+        if (
+            !['POST', 'PUT', 'PATCH', 'DELETE'].includes(
+                this.#method.toUpperCase()
+            )
+        )
+            throw new TypeError('Idempotency requires a mutation endpoint');
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks,
+            this.#fileUpload,
+            this.#cacheTags,
+            true
+        );
     }
 
     /** Define the request body schema. Validation failures return 422 Problem Details. */
@@ -885,7 +974,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -931,7 +1021,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -977,7 +1068,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1023,7 +1115,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1120,7 +1213,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1168,7 +1262,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1239,7 +1334,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1309,7 +1405,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1353,7 +1450,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1397,7 +1495,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1441,7 +1540,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1485,7 +1585,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1527,7 +1628,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1578,7 +1680,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1632,7 +1735,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1685,7 +1789,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1694,9 +1799,11 @@ export class EndpointBuilder<
      *
      * When set, the server parses the request body with a streaming multipart
      * parser instead of the default JSON deserializer. File fields are made
-     * available to the handler via `arg.files` (a `Record<string, FilePart>`),
-     * while non-file form fields are validated against the body schema and
-     * available via `arg.body`.
+     * available via `arg.files`. A schema of file() / array(file()) fields
+     * infers their names, cardinality and optionality. Without a schema,
+     * files remain a Record<string, FilePart>. Non-file fields use arg.body.
+     * File-only endpoints do not require a body schema. Typed uploads fail
+     * before the handler if their contract is invalid; limits produce 413.
      *
      * @param options - Upload configuration (max file size, allowed MIME types, etc.).
      *
@@ -1714,6 +1821,21 @@ export class EndpointBuilder<
      * };
      * ```
      */
+    upload<S extends UploadSchema>(
+        schema: S,
+        options?: UploadOptions
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses,
+        S
+    >;
     upload(
         options?: UploadOptions
     ): EndpointBuilder<
@@ -1727,7 +1849,29 @@ export class EndpointBuilder<
         TResponse,
         TResponses,
         true
+    >;
+    upload(
+        schemaOrOptions?: UploadSchema | UploadOptions,
+        options?: UploadOptions
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses,
+        any
     > {
+        const schema =
+            schemaOrOptions && 'introspect' in schemaOrOptions
+                ? schemaOrOptions
+                : undefined;
+        const config = schema
+            ? options
+            : (schemaOrOptions as UploadOptions | undefined);
         return new EndpointBuilder(
             this.#method,
             this.#basePath,
@@ -1753,11 +1897,16 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             {
-                maxFileSize: options?.maxFileSize ?? 10 * 1024 * 1024,
-                allowedMimeTypes: options?.allowedMimeTypes,
-                maxFileCount: options?.maxFileCount ?? 10
+                ...config,
+                allowedMimeTypes: config?.allowedMimeTypes
+                    ? [...config.allowedMimeTypes]
+                    : undefined,
+                maxFileSize: config?.maxFileSize ?? 10 * 1024 * 1024,
+                maxFileCount: config?.maxFileCount ?? 10,
+                schema
             },
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1814,7 +1963,8 @@ export class EndpointBuilder<
             links: this.#links,
             callbacks: this.#callbacks,
             fileUpload: this.#fileUpload,
-            cacheTags: this.#cacheTags
+            cacheTags: this.#cacheTags,
+            idempotent: this.#idempotent
         };
     }
 
@@ -1881,7 +2031,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1944,7 +2095,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1996,7 +2148,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -2059,7 +2212,8 @@ export class EndpointBuilder<
             defs as Record<string, LinkDefinition>,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -2124,7 +2278,8 @@ export class EndpointBuilder<
             this.#links,
             defs as Record<string, CallbackDefinition>,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -2132,7 +2287,7 @@ export class EndpointBuilder<
      * Declare a cache group for this endpoint.
      *
      * Use on GET / query endpoints to group responses into a named cache.
-     * The client-side {@code cacheTags} middleware caches responses keyed
+     * The client-side `cacheTags` middleware caches responses keyed
      * by this tag and flushes matching entries when a mutation calls
      * {@link clearsCacheTag}.
      *
@@ -2198,7 +2353,7 @@ export class EndpointBuilder<
      * Declare which cache groups are cleared when this mutation succeeds.
      *
      * Use on POST / PUT / PATCH / DELETE endpoints. When the mutation
-     * completes, the {@code cacheTags} client middleware invalidates all
+     * completes, the `cacheTags` client middleware invalidates all
      * cache entries matching the declared tag names (prefix match).
      *
      * @overload Simple tag (clears all entries prefixed with the name).
@@ -2283,7 +2438,8 @@ export class EndpointBuilder<
                 this.#links,
                 this.#callbacks,
                 this.#fileUpload,
-                [...this.#cacheTags, { name, properties: {} }]
+                [...this.#cacheTags, { name, properties: {} }],
+                this.#idempotent
             );
         }
 
@@ -2332,7 +2488,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            [...this.#cacheTags, definition]
+            [...this.#cacheTags, definition],
+            this.#idempotent
         );
     }
 }

@@ -9,6 +9,7 @@
             "@cleverbrush/deep",
             "@cleverbrush/async",
             "@cleverbrush/scheduler",
+            "@cleverbrush/scheduler-postgres",
             "@cleverbrush/mapper",
             "@cleverbrush/knex-clickhouse",
             "@cleverbrush/react-form",
@@ -22,7 +23,9 @@
             "@cleverbrush/server",
             "@cleverbrush/server-openapi",
             "@cleverbrush/orm",
-            "@cleverbrush/orm-cli"
+            "@cleverbrush/orm-cli",
+            "@cleverbrush/storage",
+            "@cleverbrush/storage-s3"
         ]
     ],
     "linked": [],

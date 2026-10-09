@@ -25,7 +25,7 @@
         "typescript",
         "cleverbrush"
     ],
-    "license": "BSD 3-Clause",
+    "license": "BSD-3-Clause",
     "main": "./dist/index.js",
     "exports": {
         ".": {
@@ -35,6 +35,9 @@
     },
     "sideEffects": false,
     "name": "@cleverbrush/env",
+    "engines": {
+        "node": ">=24"
+    },
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/env#readme",
     "repository": {
         "type": "git",
@@ -47,6 +50,7 @@
     },
     "type": "module",
     "devDependencies": {
+        "@cleverbrush/schema": "*",
         "@types/node": "^25.4.0"
     },
     "types": "./dist/index.d.ts",

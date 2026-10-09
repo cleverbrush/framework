@@ -452,13 +452,13 @@ export const uploadAttachmentHandler: Handler<
     return ActionResult.created({
         id: updated.id,
         title: updated.title,
-        description: updated.description,
+        description: updated.description ?? undefined,
         completed: updated.completed,
         userId: updated.userId,
         createdAt: updated.createdAt,
         updatedAt: updated.updatedAt,
-        attachmentName: updated.attachmentName,
-        attachmentMimeType: updated.attachmentMimeType,
+        attachmentName: updated.attachmentName ?? undefined,
+        attachmentMimeType: updated.attachmentMimeType ?? undefined,
         attachmentSize: file.size
     });
 };

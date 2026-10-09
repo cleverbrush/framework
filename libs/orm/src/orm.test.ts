@@ -324,16 +324,16 @@ describe('EntityQuery proxy', () => {
         expect(typeof chain.toQuery).toBe('function');
     });
 
-    it('.include(selector) forwards the relation name and emits a JOIN', () => {
+    it('.include(selector) emits a correlated nested row', () => {
         const db = createDb(mock.knex, { todos: TodoEntity });
         const sql = db.todos.include(t => t.author).toQuery();
-        expect(sql.toLowerCase()).toContain('join');
+        expect(sql.toLowerCase()).toContain('to_jsonb');
         expect(sql).toContain('users');
     });
 
     it('.include(selector) accepts a customize callback', () => {
         const db = createDb(mock.knex, { todos: TodoEntity });
-        const customize = vi.fn();
+        const customize = vi.fn(q => q);
         db.todos.include(t => t.author, customize);
         expect(customize).toHaveBeenCalledOnce();
     });
@@ -356,7 +356,7 @@ describe('EntityQuery proxy', () => {
         // than swallowing the call.
         const db = createDb(mock.knex, { todos: TodoEntity });
         expect(() => db.todos.includeVariant('foo', 'author')).toThrow(
-            /not polymorphic/i
+            /includeVariant is not a function/i
         );
     });
 });
@@ -377,10 +377,12 @@ describe('DbSet.find / findOrFail / findMany', () => {
     // ---- single-PK happy paths ---------------------------------------------
 
     it('find(scalar) emits WHERE id = ? and returns the first row', async () => {
-        mock.responses.push([{ id: 42, email: 'a@b', name: 'A' }]);
+        mock.responses.push([
+            { id: 42, email: 'a@b', name: 'A', createdAt: null }
+        ]);
         const db = createDb(mock.knex, { users: UserEntity });
         const u = await db.users.find(42);
-        expect(u).toEqual({ id: 42, email: 'a@b', name: 'A' });
+        expect(u).toEqual({ id: 42, email: 'a@b', name: 'A', createdAt: null });
         expect(mock.captured).toHaveLength(1);
         expect(mock.captured[0].sql).toContain('"id" = $1');
         expect(mock.captured[0].bindings).toContain(42);
@@ -394,10 +396,12 @@ describe('DbSet.find / findOrFail / findMany', () => {
     });
 
     it('findOrFail returns the row when present', async () => {
-        mock.responses.push([{ id: 1, email: 'x', name: 'Y' }]);
+        mock.responses.push([
+            { id: 1, email: 'x', name: 'Y', createdAt: null }
+        ]);
         const db = createDb(mock.knex, { users: UserEntity });
         const u = await db.users.findOrFail(1);
-        expect(u).toEqual({ id: 1, email: 'x', name: 'Y' });
+        expect(u).toEqual({ id: 1, email: 'x', name: 'Y', createdAt: null });
     });
 
     it('findOrFail throws EntityNotFoundError when no row matches', async () => {
@@ -427,8 +431,8 @@ describe('DbSet.find / findOrFail / findMany', () => {
 
     it('findMany on single-PK emits WHERE id IN (...)', async () => {
         mock.responses.push([
-            { id: 1, email: 'a', name: 'A' },
-            { id: 2, email: 'b', name: 'B' }
+            { id: 1, email: 'a', name: 'A', createdAt: null },
+            { id: 2, email: 'b', name: 'B', createdAt: null }
         ]);
         const db = createDb(mock.knex, { users: UserEntity });
         const rows = await db.users.findMany([1, 2]);
@@ -440,10 +444,10 @@ describe('DbSet.find / findOrFail / findMany', () => {
     // ---- composite-PK paths -----------------------------------------------
 
     it('find on composite-PK accepts a tuple', async () => {
-        mock.responses.push([{ postId: 1, tagId: 9 }]);
+        mock.responses.push([{ postId: 1, tagId: 9, addedAt: null }]);
         const db = createDb(mock.knex, { postTags: PostTagEntity });
         const r = await db.postTags.find([1, 9]);
-        expect(r).toEqual({ postId: 1, tagId: 9 });
+        expect(r).toEqual({ postId: 1, tagId: 9, addedAt: null });
         expect(mock.captured[0].sql).toContain('"post_id"');
         expect(mock.captured[0].sql).toContain('"tag_id"');
         expect(mock.captured[0].bindings).toEqual(
@@ -468,8 +472,8 @@ describe('DbSet.find / findOrFail / findMany', () => {
 
     it('findMany on composite-PK emits OR-grouped predicates', async () => {
         mock.responses.push([
-            { postId: 1, tagId: 9 },
-            { postId: 2, tagId: 9 }
+            { postId: 1, tagId: 9, addedAt: null },
+            { postId: 2, tagId: 9, addedAt: null }
         ]);
         const db = createDb(mock.knex, { postTags: PostTagEntity });
         const rows = await db.postTags.findMany([
@@ -636,7 +640,9 @@ describe('DbSet.save — graph persistence', () => {
     it('update path: PK present → emits UPDATE, no INSERT for root', async () => {
         stubTransaction();
         // The update returns the updated row.
-        mock.responses.push([{ id: 5, name: 'X', email: 'x@y' }]);
+        mock.responses.push([
+            { id: 5, name: 'X', email: 'x@y', createdAt: null }
+        ]);
         const db = createDb(mock.knex, { users: UserEntity });
         const out = await db.users.save({
             id: 5,
@@ -657,7 +663,7 @@ describe('DbSet.save — graph persistence', () => {
         stubTransaction();
         // Root todo insert.
         mock.responses.push([
-            { id: 21, title: 'T', userId: null, completed: false }
+            { id: 21, title: 'T', userId: 0, completed: false }
         ]);
         // Pivot insert (todo_tags) returns []; we don't read it.
         mock.responses.push([]);
@@ -687,7 +693,9 @@ describe('DbSet.save — graph persistence', () => {
         (mock.knex as any).isTransaction = true;
         const txSpy = vi.spyOn(mock.knex, 'transaction');
 
-        mock.responses.push([{ id: 9, email: 'x', name: 'Y' }]);
+        mock.responses.push([
+            { id: 9, email: 'x', name: 'Y', createdAt: null }
+        ]);
         const db = createDb(mock.knex, { users: UserEntity });
         await db.users
             .withTransaction(mock.knex as unknown as KnexT.Transaction)
@@ -748,7 +756,7 @@ describe('DbSet.save — graph persistence', () => {
         stubTransaction();
         // Root todo insert.
         mock.responses.push([
-            { id: 41, title: 'T', userId: null, completed: false }
+            { id: 41, title: 'T', userId: 0, completed: false }
         ]);
         // Tag insert (because PK was not supplied → create new row).
         mock.responses.push([{ id: 77, name: 'urgent' }]);
@@ -885,8 +893,18 @@ describe('DbSet.ofVariant — insert', () => {
         stubTransaction();
         // Base row insert returns generated PK.
         mock.responses.push([{ id: 5, type: 'assigned', todo_id: 42 }]);
-        // Variant row insert.
+        // Variant row insert, then read-back of the completed branch.
         mock.responses.push([]);
+        mock.responses.push([
+            {
+                __read_poly: {
+                    id: 5,
+                    type: 'assigned',
+                    todoId: 42,
+                    assigneeId: 9
+                }
+            }
+        ]);
 
         const db = createDb(mock.knex, { activities: ActivityEntityCTI });
         const result = await db.activities.ofVariant('assigned').insert({
@@ -914,6 +932,9 @@ describe('DbSet.ofVariant — insert', () => {
         stubTransaction();
         mock.responses.push([{ id: 7, type: 'commented', todo_id: 1 }]);
         mock.responses.push([]);
+        mock.responses.push([
+            { __read_poly: { id: 7, type: 'commented', todoId: 1, body: 'hi' } }
+        ]);
 
         const db = createDb(mock.knex, { activities: ActivityEntityCTI });
         await db.activities.ofVariant('commented').insert({
@@ -939,9 +960,9 @@ describe('DbSet.ofVariant — insert', () => {
     it('throws when the variant key is unknown', async () => {
         stubTransaction();
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
-        await expect(
+        expect(() =>
             db.activities.ofVariant('nonexistent' as any).insert({})
-        ).rejects.toThrow(/unknown/i);
+        ).toThrow(/declared variants/i);
     });
 });
 
@@ -953,6 +974,8 @@ describe('VariantDbSet.update', () => {
     let mock: MockKnex;
     beforeEach(() => {
         mock = makeMockKnex();
+        (mock.knex.client as any).transacting = true;
+        stubTransaction();
     });
     afterEach(async () => {
         await mock.knex.destroy();
@@ -965,11 +988,10 @@ describe('VariantDbSet.update', () => {
     }
 
     it('STI: emits an UPDATE on the base table filtered by discriminator', async () => {
-        // First query: execute() to collect PKs → returns matching rows.
-        mock.responses.push([
-            { id: 3, type: 'assigned', todo_id: 10, user_id: 1, assignee_id: 4 }
-        ]);
-        // Second query: the UPDATE itself.
+        // Lock matching base keys, then recheck the captured predicates.
+        mock.responses.push([{ id: 3 }]);
+        mock.responses.push([{ id: 3 }]);
+        // Execute the UPDATE after target selection.
         mock.responses.push([]);
 
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
@@ -986,8 +1008,10 @@ describe('VariantDbSet.update', () => {
 
     it('CTI: emits an UPDATE on the variant table', async () => {
         stubTransaction();
-        // execute() returns matched base-table rows.
-        mock.responses.push([{ id: 5, type: 'assigned', todo_id: 1 }]);
+        // Lock base and child rows, then confirm matching base keys.
+        mock.responses.push([{ id: 5 }]);
+        mock.responses.push([]);
+        mock.responses.push([{ id: 5 }]);
         // UPDATE on the variant table.
         mock.responses.push([]);
 
@@ -1026,6 +1050,8 @@ describe('VariantDbSet.delete', () => {
     let mock: MockKnex;
     beforeEach(() => {
         mock = makeMockKnex();
+        (mock.knex.client as any).transacting = true;
+        stubTransaction();
     });
     afterEach(async () => {
         await mock.knex.destroy();
@@ -1039,8 +1065,9 @@ describe('VariantDbSet.delete', () => {
 
     it('STI: emits a DELETE on the base table with discriminator filter', async () => {
         stubTransaction();
-        // execute() to collect PKs.
-        mock.responses.push([{ id: 2, type: 'commented', todo_id: 1 }]);
+        // Lock and confirm matching base keys.
+        mock.responses.push([{ id: 2 }]);
+        mock.responses.push([{ id: 2 }]);
         // The DELETE.
         mock.responses.push([]);
 
@@ -1057,8 +1084,10 @@ describe('VariantDbSet.delete', () => {
 
     it('CTI: deletes variant row first then base row', async () => {
         stubTransaction();
-        // execute() → matched base rows.
-        mock.responses.push([{ id: 7, type: 'assigned', todo_id: 3 }]);
+        // Lock base and child rows, then confirm matching base keys.
+        mock.responses.push([{ id: 7 }]);
+        mock.responses.push([]);
+        mock.responses.push([{ id: 7 }]);
         // DELETE from variant table.
         mock.responses.push([]);
         // DELETE from base table.
@@ -1107,7 +1136,15 @@ describe('VariantDbSet.find', () => {
 
     it('returns the matched row', async () => {
         mock.responses.push([
-            { id: 3, type: 'assigned', todo_id: 5, user_id: 1, assignee_id: 2 }
+            {
+                __read_poly: {
+                    id: 3,
+                    type: 'assigned',
+                    todoId: 5,
+                    userId: 1,
+                    assigneeId: 2
+                }
+            }
         ]);
 
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
@@ -1184,8 +1221,12 @@ describe('Tracked DbContext', () => {
     // -------------------------------------------------------------------------
 
     it('querying the same PK twice returns the same object reference', async () => {
-        mock.responses.push([{ id: 1, email: 'a@b', name: 'A' }]);
-        mock.responses.push([{ id: 1, email: 'a@b', name: 'A' }]);
+        mock.responses.push([
+            { id: 1, email: 'a@b', name: 'A', createdAt: null }
+        ]);
+        mock.responses.push([
+            { id: 1, email: 'a@b', name: 'A', createdAt: null }
+        ]);
 
         const db = createDb(
             mock.knex,
@@ -1200,8 +1241,8 @@ describe('Tracked DbContext', () => {
 
     it('rows returned from all() are attached to the tracker', async () => {
         mock.responses.push([
-            { id: 1, email: 'a@b', name: 'A' },
-            { id: 2, email: 'c@d', name: 'B' }
+            { id: 1, email: 'a@b', name: 'A', createdAt: null },
+            { id: 2, email: 'c@d', name: 'B', createdAt: null }
         ]);
 
         const db = createDb(
@@ -1212,7 +1253,9 @@ describe('Tracked DbContext', () => {
         const rows = (await db.users.execute()) as any[];
 
         // Querying one of the same PKs should return the existing object.
-        mock.responses.push([{ id: 1, email: 'a@b', name: 'A' }]);
+        mock.responses.push([
+            { id: 1, email: 'a@b', name: 'A', createdAt: null }
+        ]);
         const reloaded = await db.users.find(1);
         expect(reloaded).toBe(rows[0]);
     });
@@ -1227,7 +1270,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 10, email: 'x@y', name: 'X' };
+        const user = { id: 10, email: 'x@y', name: 'X', createdAt: null };
         db.attach('users', user);
         const e = db.entry(user);
         expect(e.state).toBe('Unchanged');
@@ -1240,8 +1283,8 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const u1 = { id: 5, email: 'a@b', name: 'A' };
-        const u2 = { id: 5, email: 'c@d', name: 'C' }; // same PK, different object
+        const u1 = { id: 5, email: 'a@b', name: 'A', createdAt: null };
+        const u2 = { id: 5, email: 'c@d', name: 'C', createdAt: null }; // same PK, different object
         db.attach('users', u1);
         const returned = db.attach('users', u2);
         expect(returned).toBe(u1); // identity-map: existing wins
@@ -1253,7 +1296,12 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b.com', name: 'Alice' };
+        const user = {
+            id: 1,
+            email: 'a@b.com',
+            name: 'Alice',
+            createdAt: null
+        };
         db.attach('users', user);
 
         const original = db.entry(user).originalValues;
@@ -1267,7 +1315,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         expect(db.entry(user).isModified()).toBe(false);
     });
@@ -1278,7 +1326,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         user.name = 'Changed';
         expect(db.entry(user).isModified()).toBe(true);
@@ -1292,7 +1340,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         user.name = 'Changed';
         db.entry(user).reset();
@@ -1306,7 +1354,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 99, email: 'x', name: 'X' };
+        const user = { id: 99, email: 'x', name: 'X', createdAt: null };
         expect(() => db.entry(user)).toThrow(/not tracked/i);
     });
 
@@ -1316,7 +1364,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         db.detach(user);
         expect(() => db.entry(user)).toThrow(/not tracked/i);
@@ -1357,7 +1405,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         db.remove(user);
         expect(db.entry(user).state).toBe('Deleted');
@@ -1369,7 +1417,9 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        expect(() => db.remove({ id: 1, email: 'x', name: 'X' })).toThrow();
+        expect(() =>
+            db.remove({ id: 1, email: 'x', name: 'X', createdAt: null })
+        ).toThrow();
     });
 
     // -------------------------------------------------------------------------
@@ -1378,14 +1428,16 @@ describe('Tracked DbContext', () => {
 
     it('saveChanges() detects silently mutated Unchanged entries and emits UPDATE', async () => {
         stubTransaction();
-        mock.responses.push([{ id: 1, email_address: 'a@b', name: 'Updated' }]);
+        mock.responses.push([
+            { id: 1, email_address: 'a@b', name: 'Updated', created_at: null }
+        ]);
 
         const db = createDb(
             mock.knex,
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         user.name = 'Updated'; // mutate without calling any set-state method
 
@@ -1406,7 +1458,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
 
         const result = await db.saveChanges();
@@ -1420,7 +1472,9 @@ describe('Tracked DbContext', () => {
 
     it('saveChanges() inserts Added entities', async () => {
         stubTransaction();
-        mock.responses.push([{ id: 42, email_address: 'new@e', name: 'New' }]);
+        mock.responses.push([
+            { id: 42, email_address: 'new@e', name: 'New', created_at: null }
+        ]);
 
         const db = createDb(
             mock.knex,
@@ -1452,7 +1506,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 3, email: 'x@y', name: 'X' };
+        const user = { id: 3, email: 'x@y', name: 'X', createdAt: null };
         db.attach('users', user);
         db.remove(user);
 
@@ -1474,7 +1528,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         user.name = 'B';
 
@@ -1494,7 +1548,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         (user as any).id = 99; // mutate PK
 
@@ -1513,7 +1567,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         user.name = 'Changed';
 
@@ -1528,7 +1582,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         db.remove(user);
         expect(db.entry(user).state).toBe('Deleted');
@@ -1550,7 +1604,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         user.name = 'B';
 
@@ -1569,7 +1623,7 @@ describe('Tracked DbContext', () => {
 
     it('reload() refreshes entity values from DB', async () => {
         mock.responses.push([
-            { id: 1, email_address: 'new@b', name: 'Refreshed' }
+            { id: 1, email: 'new@b', name: 'Refreshed', createdAt: null }
         ]);
 
         const db = createDb(
@@ -1577,7 +1631,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         user.name = 'Dirty'; // simulate dirty state
 
@@ -1616,7 +1670,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         // No mutations → dispose should not throw.
         await expect(db[Symbol.asyncDispose]()).resolves.toBeUndefined();
@@ -1628,7 +1682,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         user.name = 'Dirty';
 
@@ -1643,7 +1697,7 @@ describe('Tracked DbContext', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b', name: 'A' };
+        const user = { id: 1, email: 'a@b', name: 'A', createdAt: null };
         db.attach('users', user);
         user.name = 'Dirty';
 
@@ -2022,7 +2076,9 @@ describe('Tracked DbContext — first() single result onResults (line 481)', () 
     });
 
     it('first() in a tracked context attaches the resolved single object', async () => {
-        mock.responses.push([{ id: 2, email_address: 'b@b', name: 'Bob' }]);
+        mock.responses.push([
+            { id: 2, email: 'b@b', name: 'Bob', createdAt: null }
+        ]);
 
         const db = createDb(
             mock.knex,
@@ -2061,7 +2117,12 @@ describe('Tracked DbContext — reload() early returns', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const untracked = { id: 99, email: 'x@y.com', name: 'X' };
+        const untracked = {
+            id: 99,
+            email: 'x@y.com',
+            name: 'X',
+            createdAt: null
+        };
         // Should not throw and should not emit any SQL.
         await db.reload(untracked);
         expect(mock.captured).toHaveLength(0);
@@ -2100,7 +2161,12 @@ describe('Tracked DbContext — attach() same-object snapshot refresh', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b.com', name: 'Alice' };
+        const user = {
+            id: 1,
+            email: 'a@b.com',
+            name: 'Alice',
+            createdAt: null
+        };
         db.attach('users', user);
 
         // Dirty the entity.
@@ -2231,7 +2297,12 @@ describe('Tracked DbContext — pendingSummary() branch coverage', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 1, email: 'a@b.com', name: 'Alice' };
+        const user = {
+            id: 1,
+            email: 'a@b.com',
+            name: 'Alice',
+            createdAt: null
+        };
         db.attach('users', user);
 
         // Silently mutate (no explicit state change — isDirty triggers Modified count).
@@ -2248,7 +2319,7 @@ describe('Tracked DbContext — pendingSummary() branch coverage', () => {
             { users: UserEntity },
             { tracking: true }
         );
-        const user = { id: 2, email: 'b@c.com', name: 'Bob' };
+        const user = { id: 2, email: 'b@c.com', name: 'Bob', createdAt: null };
         db.attach('users', user);
 
         db.remove(user);

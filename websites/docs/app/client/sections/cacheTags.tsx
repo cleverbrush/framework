@@ -130,7 +130,7 @@ externalCacheTags({ invalidateTag: revalidateTag });
             </div>
 
             <div className="card">
-                <h2>Versioned keys: breaking migration</h2>
+                <h2>Deterministic cache keys</h2>
                 <p>
                     Server and client helpers, response caches and external
                     invalidation share the deterministic <code>ct2:</code>{' '}
@@ -141,11 +141,10 @@ externalCacheTags({ invalidateTag: revalidateTag });
                     values throw <code>TypeError</code>.
                 </p>
                 <p>
-                    Upgrade external cache writers and invalidators together and
-                    flush or expire old entries. There is no legacy fallback.
-                    Base invalidation labels remain literal names; TTLs are
-                    unchanged. External invalidators send both base labels and
-                    computed keys by default, including property-free tags.
+                    External cache writers and invalidators must use the same
+                    key format. Base invalidation labels are literal names.
+                    External invalidators send both base labels and computed
+                    keys by default, including property-free tags.
                 </p>
                 <p>
                     Response shape and auth/tenant isolation remain

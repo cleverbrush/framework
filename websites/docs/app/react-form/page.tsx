@@ -307,8 +307,8 @@ function App() {
                         <code>createFormSystem</code>. Its <code>Field</code>{' '}
                         checks the selected value, variant and custom props.
                         Extend it by spreading <code>system.renderers</code>.
-                        Its optional <code>Provider</code> also configures
-                        legacy fields.
+                        Its optional <code>Provider</code> supplies renderers to
+                        descendant fields.
                     </p>
                     <pre>
                         <code
@@ -343,11 +343,12 @@ function ProfileForm() {
                     <p>
                         The submit callback returns <code>void</code>,{' '}
                         <code>{'{ ok: true, data? }'}</code>, or{' '}
-                        <code>{'{ ok: false, error: string }'}</code>. Duplicate
-                        submissions are locked from validation onward. Errors
-                        propagate unless <code>onError</code> translates them;
-                        exceptions in <code>onSuccess</code> always propagate.
-                        Notifications and navigation remain application-owned.
+                        <code>{'{ ok: false, error: string, issues? }'}</code>.
+                        Duplicate submissions are locked from validation onward.
+                        Errors propagate unless <code>onError</code> translates
+                        them; exceptions in <code>onSuccess</code> always
+                        propagate. Notifications and navigation remain
+                        application-owned.
                     </p>
                     <p>
                         <code>reset(values)</code> updates mounted text, select
@@ -359,6 +360,24 @@ function ProfileForm() {
                         prematurely unlocking it.
                     </p>
                     <h3>Try the lifecycle</h3>
+                    <p>
+                        Return plain <code>{'{ pointer, detail }'}</code> issues
+                        from the submit callback, or use{' '}
+                        <code>form.setIssues(issues)</code>. Pointers are
+                        form-relative JSON Pointers. Indexed selectors such as{' '}
+                        <code>t.addresses[0].city</code> retain field types.
+                        Editing clears related external issues; validation
+                        preserves unrelated ones. Reset/resubmit clears them
+                        all. Unknown and unbound fields remain visible through{' '}
+                        <code>form.error</code>. The optional client{' '}
+                        <code>decodeValidationIssues</code> adapter explicitly
+                        strips the selected request source, so action boundaries
+                        pass plain issues, never exception instances. See the{' '}
+                        <a href="https://github.com/cleverbrush/framework/tree/development/libs/react-form#server-validation-issues">
+                            multi-file server/action/form example
+                        </a>
+                        .
+                    </p>
                     <p>
                         Load sample values, edit or clear them, and try a failed
                         save followed by a retry. A successful save clears the
@@ -878,6 +897,16 @@ function App() {
                                         Hook to access a specific field&apos;s
                                         state. Type-safe via PropertyDescriptor
                                         selector.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>form.setIssues(issues)</code>
+                                    </td>
+                                    <td>
+                                        Replaces external field and form-level
+                                        issues without changing values. Pass an
+                                        empty array to clear them.
                                     </td>
                                 </tr>
                                 <tr>

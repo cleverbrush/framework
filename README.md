@@ -4,7 +4,7 @@
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](./LICENSE)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-86.6%25-green)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-92.2%25-brightgreen)
 <!-- coverage-badge-end -->
 
 Cleverbrush is a schema-first TypeScript framework monorepo. It provides the
@@ -39,16 +39,19 @@ JSON Schema, API contracts, and Standard Schema integrations.
 | [`@cleverbrush/otel`](./libs/otel) | OpenTelemetry setup and instrumentation helpers for apps and clients. |
 | [`@cleverbrush/async`](./libs/async) | Async utilities including collector, debounce, throttle, and retry. |
 | [`@cleverbrush/deep`](./libs/deep) | Deep equality, deep extension, flattening, and object utilities. |
-| [`@cleverbrush/scheduler`](./libs/scheduler) | Cron-like job scheduler with schema-validated job configuration. |
+| [`@cleverbrush/scheduler`](./libs/scheduler) | Typed durable jobs, recurring triggers and ordered progress. |
+| [`@cleverbrush/scheduler-postgres`](./libs/scheduler-postgres) | PostgreSQL job persistence, transactional enqueue and fenced leases. |
+| [`@cleverbrush/storage`](./libs/storage) | Provider-neutral object storage contracts and public URL mapping. |
+| [`@cleverbrush/storage-s3`](./libs/storage-s3) | Streaming S3-compatible storage for self-hosted and hosted providers. |
 
 ## How The Pieces Fit
 
 ```ts
 import { object, string, number, type InferType } from '@cleverbrush/schema';
-import { endpoint } from '@cleverbrush/server/contract';
+import { endpoint, route } from '@cleverbrush/server/contract';
 
 const UserSchema = object({
-    id: number().int().min(1),
+    id: number().isInteger().min(1),
     email: string().email(),
     displayName: string().minLength(2)
 });
@@ -56,8 +59,7 @@ const UserSchema = object({
 type User = InferType<typeof UserSchema>;
 
 const GetUserEndpoint = endpoint
-    .get('/api/users/:id')
-    .params(object({ id: number().int().min(1) }))
+    .get('/api/users', route({ id: number().coerce().isInteger().min(1) })`/${p => p.id}`)
     .responses({ 200: UserSchema });
 ```
 
@@ -87,7 +89,7 @@ ES modules.
 
 ## Development
 
-Use Node.js 20 or newer. Node.js 22 is recommended.
+Use Node.js 24 or newer and npm 11. Install the Node version in `.nvmrc`.
 
 ```bash
 npm ci
@@ -116,6 +118,9 @@ This starts the todo backend, frontend, and local database stack used by the
 demo workflow.
 
 ## Documentation
+
+- [Migrating from v4.x to v5](./docs/MIGRATION-v5.md)
+- [Security guidance](./SECURITY.md)
 
 - Framework docs: https://docs.cleverbrush.com
 - Schema docs and playground: https://schema.cleverbrush.com
@@ -154,4 +159,6 @@ npm run publish:beta
 
 ## License
 
-BSD-3-Clause. See [LICENSE](./LICENSE).
+All Framework libraries are licensed under BSD-3-Clause. See [LICENSE](./LICENSE).
+Each published package includes the same license text; `npm run test:packages`
+verifies license text and metadata in both source packages and installed tarballs.

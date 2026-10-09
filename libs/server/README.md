@@ -2,8 +2,25 @@
 
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-92%25-brightgreen)
+<!-- coverage-badge-end -->
 
 A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema`](../schema) for request validation, [`@cleverbrush/di`](../di) for dependency injection, and [`@cleverbrush/auth`](../auth) for authentication — all wired together through a fluent builder API.
+
+## Structured validation paths for forms
+
+Request validation retains its existing 400 Problem Details envelope and
+`errors: [{ pointer, detail }]` extension. Nested arrays now expose indexed paths
+such as `/body/addresses/0/city` alongside existing aggregate errors. Property
+names use JSON Pointer escaping (`~0` for `~`, `~1` for `/`), including query and
+header names. These paths describe the request, not a particular UI.
+
+The optional client `decodeValidationIssues(error, { source: 'body' })` adapter
+produces serializable form-relative issues; see the
+[multi-file consumer example](../react-form/README.md#server-validation-issues).
+Application-owned business errors need explicit structured paths to appear beside
+fields; the framework never derives a field name from an exception's message.
 
 ## Features
 
@@ -11,6 +28,7 @@ A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema
 - **Action results** — `ActionResult.ok()`, `.created()`, `.noContent()`, `.redirect()`, `.file()`, `.stream()`, `.raw()`, `.status()` — no manual `res.write()` / `res.end()` unless you explicitly opt in.
 - **Content negotiation** — pluggable `ContentTypeHandler` registry; JSON and `application/x-www-form-urlencoded` registered by default; honours the `Accept` request header.
 - **Middleware pipeline** — `server.use(middleware)` for global middleware; per-endpoint middleware via `handle(ep, handler, { middlewares })`.
+- **Opt-in CORS** — `server.useCors()` handles route-aware preflights before authentication, with explicit origins or asynchronous origin predicates.
 - **DI integration** — `endpoint.inject({ db: IDbContext })` resolves services per-request from a `@cleverbrush/di` container.
 - **Authentication & authorization** — `server.useAuthentication()` / `server.useAuthorization()` wired to `@cleverbrush/auth` schemes and policies.
 - **RFC 9457 Problem Details** — validation errors and `HttpError` subclasses are serialized as `application/problem+json`.
@@ -20,6 +38,313 @@ A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema
 - **Health check** — optional `/health` endpoint via `server.withHealthcheck()`.
 - **WebSocket subscriptions** — `endpoint.subscription('/ws/path')` with typed incoming/outgoing schemas, `tracked()` events, and async generator handlers.
 - **Contract composition** — `mergeContracts`, `pickGroups`, and `omitGroups` enable audience-scoped bundles: ship only the endpoints each consumer needs.
+- **Modular implementations** — `implement(api)` derives server-configured scopes, keeps separate handler files strongly typed, and checks full contract coverage at final registration.
+- **Typed error policies** — `errorMap()` and `withErrors()` translate known handler exceptions without repeated catch blocks or widening endpoint responses.
+
+## CORS
+
+Enable CORS with an explicit server-wide policy:
+
+```ts
+import { createServer } from '@cleverbrush/server';
+
+const server = createServer().useCors({
+    origin: ['https://app.example.com', 'http://localhost:5173'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    exposedHeaders: ['WWW-Authenticate', 'X-Request-Id'],
+    credentials: true,
+    maxAgeSeconds: 600
+});
+```
+
+`ServerCorsOptions` is exported from `@cleverbrush/server`. The policy is
+validated and copied before listening. Origins are exact serialized URL origins
+(scheme, host and optional port, without a path or trailing slash). The special
+origin string `null` can be included explicitly for opaque browser origins.
+
+| Option | Behavior / default |
+| --- | --- |
+| `origin` | Required: an exact origin, readonly origin list, `'*'`, or `(origin: string) => boolean \| Promise<boolean>`. Empty lists deny all origins. |
+| `methods` | Optional preflight allowlist, intersected with the registered routes. By default, any method registered for the requested URL may be preflighted. |
+| `allowedHeaders` | Explicit preflight request-header names; case-insensitive, default `[]`. Include `Authorization` or custom auth headers when needed. |
+| `exposedHeaders` | Additional response-header names browsers may read; default `[]`. |
+| `credentials` | Default `false`. With `true`, an exact accepted origin is returned. `origin: '*'` with credentials is rejected at startup. |
+| `maxAgeSeconds` | Non-negative integer browser preflight cache duration, default `0`. |
+
+Method and header lists use explicit names; wildcard entries are not supported.
+`origin: '*'` explicitly permits all valid origins, including opaque `null`
+origins, without credential support. CORS is disabled until `useCors` is called.
+
+For domains determined at request time, use a predicate backed by application
+configuration or a domain registry:
+
+```ts
+server.useCors({
+    origin: async origin => tenantDomains.isAllowed(origin),
+    allowedHeaders: ['Content-Type', 'Authorization']
+});
+```
+
+The predicate is awaited once per physical HTTP request carrying a valid `Origin`,
+including preflights; it is not called for requests without `Origin`. Results are
+not cached by the server. Browser preflight caching follows `maxAgeSeconds`.
+Returning `false` rejects the request with `403` before authentication or handlers.
+Throwing or rejecting returns a generic `500` without exposing the callback error.
+Calling `useCors` again replaces the policy for subsequently started servers.
+
+### Execution order and responses
+
+CORS runs before routing, body parsing, DI scopes and ordinary middleware,
+regardless of where `useCors` appears in the builder chain. An `OPTIONS` request
+with both `Origin` and `Access-Control-Request-Method` is a preflight. Accepted
+preflights return an empty `204` without running authentication or handlers.
+Only registered HTTP routes and enabled health/batch endpoints are eligible.
+Malformed preflights return `400`, unknown routes `404`, unsupported route methods
+`405`, and policy denials `403`. Denied preflights have no CORS permission headers.
+Ordinary `OPTIONS` requests still use registered handlers and normal routing.
+
+Actual requests from accepted origins follow the existing middleware and
+authentication pipeline. CORS headers accompany successful and error responses,
+including authentication challenges, validation failures and routing errors.
+Disallowed or malformed origins receive `403` before handlers run. Requests
+without `Origin` retain normal processing and receive no CORS permission headers.
+Authentication remains responsible for resource access; the method/header lists
+govern browser preflight permission, not ordinary HTTP routing.
+
+When enabled, the CORS stage owns its six standard response headers and finalizes
+them as headers are sent, including raw/streamed responses and cache/idempotency
+replays. Configure CORS through this API rather than writing competing CORS headers
+in middleware. Existing `Vary` values are preserved and merged with `Origin`, plus
+the requested method/header fields on preflights. Cached CORS permissions are not
+reused for another origin. Virtual batch subrequests retain their usual auth
+pipeline; CORS applies to the outer HTTP request. WebSocket upgrades are outside
+this policy. Ordinary middleware, including middleware-based tracing, does not run
+for CORS short-circuits.
+
+## Large APIs and shared error handling
+
+`implement` adds server-only configuration and complete handler registration to
+an existing shared API contract. It does not replace endpoint builders, change
+the wire contract, or require business logic inside one fluent expression.
+`errorMap` and `withErrors` also work independently of this registration API.
+
+### A complete multi-file example
+
+The application functions and service registration below are application-owned.
+The contract in this example has exactly two operations, so its root is complete.
+
+#### Shared contract
+
+```ts
+// contracts.ts — browser-safe; no server configuration or handler imports
+import { defineApi, endpoint, route } from '@cleverbrush/server/contract';
+import { array, number, object, string } from '@cleverbrush/schema';
+
+export const Item = object({ id: number(), title: string() });
+const Message = object({ message: string() });
+export const Principal = object({ userId: string() });
+const resource = endpoint.resource('/items').authorize(Principal);
+
+export const api = defineApi({
+    items: {
+        list: resource.get().responses({ 200: array(Item) }),
+        remove: resource.delete(
+            route({ id: number().coerce() })`/${p => p.id}`
+        ).responses({ 204: null, 404: Message })
+    }
+});
+```
+
+#### Server configuration without handlers
+
+```ts
+// features/items/scope.ts
+import { implement } from '@cleverbrush/server';
+import { api } from '../../contracts.js';
+import { DbToken } from '../../di/tokens.js';
+
+export const items = implement(api).group('items', {
+    inject: { db: DbToken },
+    tags: ['items'],
+    operations: {
+        list: { summary: 'List items', operationId: 'listItems' },
+        remove: { summary: 'Remove an item', operationId: 'removeItem' }
+    }
+});
+```
+
+`items.endpoints` contains immutable, server-configured builders. Export the
+scope constant and reference it with `typeof`; do not annotate it with a broad
+base type that erases operation names or service types.
+
+#### Separate handlers
+
+```ts
+// features/items/handlers/list.ts
+import type { Handler } from '@cleverbrush/server';
+import type { items } from '../scope.js';
+import { listItems } from '../../../application/items.js';
+
+export const list: Handler<typeof items.endpoints.list> = (
+    { principal }, { db }
+) => listItems(db, principal.userId);
+```
+
+```ts
+// features/items/handlers/remove.ts
+import { ActionResult, type Handler } from '@cleverbrush/server';
+import type { items } from '../scope.js';
+import { removeItem } from '../../../application/items.js';
+
+export const remove: Handler<typeof items.endpoints.remove> = async (
+    { params, principal }, { db }
+) => {
+    await removeItem(db, principal.userId, params.id);
+    return ActionResult.noContent();
+};
+```
+
+The application function can throw a domain exception. Handlers do not need a
+repeated catch block. Requests, principals, injected services, and responses are
+derived at the handler's declaration site, not inferred retrospectively from a
+later registration call. Type-only scope imports avoid runtime import cycles.
+
+#### Application-owned policy and feature registration
+
+```ts
+// features/items/errors.ts
+import { ActionResult, errorMap } from '@cleverbrush/server';
+import { MissingItemError } from '../../application/errors.js';
+
+export const itemErrors = errorMap().on(MissingItemError, () =>
+    ActionResult.notFound({ message: 'Item not found' })
+);
+```
+
+```ts
+// features/items/index.ts
+import { items } from './scope.js';
+import { itemErrors } from './errors.js';
+import { list } from './handlers/list.js';
+import { remove } from './handlers/remove.js';
+
+export const itemsModule = items.withHandlers({
+    list,
+    remove: { handler: remove, errors: itemErrors }
+});
+```
+
+Attaching this policy to `list` is a type error: `list` does not declare 404.
+Declaring 204 on `remove` does not permit arbitrary other statuses or bodies.
+
+```ts
+// server.ts — after the application's ordinary server/DI setup
+import { implement } from '@cleverbrush/server';
+import { api } from './contracts.js';
+import { itemsModule } from './features/items/index.js';
+
+server.handleAll(implement(api).use(itemsModule).complete());
+```
+
+`complete()` fails at compile time if an operation is missing, and checks again
+at runtime for JavaScript callers and erased types. The output is the existing
+`HandlerMapping`. Authentication, validation, caching, batching, middleware,
+serialization, logging, and OpenAPI generation use their existing paths.
+
+### Split large features and compose contract slices
+
+```ts
+export const reads = items.pick('list').withHandlers({ list });
+export const writes = items.pick('remove').withHandlers({
+    remove: { handler: remove, errors: itemErrors }
+});
+export const feature = implement(api).use(reads, writes);
+
+// Partial roots can be exported and composed; finalize only at the full root.
+server.handleAll(implement(api).use(feature).complete());
+```
+
+Other groups are separate feature modules added to the same `use(...)` call.
+Pass modules directly or in a literal tuple, not an array widened to a generic
+module type. Duplicate bindings are rejected across modules and calls. Source
+endpoint identity is checked at runtime as well: independently recreated
+endpoints are not interchangeable just because their TypeScript shapes match.
+`pickGroups`, `omitGroups`, and `mergeContracts` preserve endpoint references,
+so intentional contract slices can be implemented and recomposed.
+
+Subscriptions use the same scopes, `SubscriptionHandler<typeof scope.endpoints.x>`,
+and existing subscription handler descriptors. They count toward completeness.
+HTTP error policies are not accepted on subscription handlers and do not change
+the WebSocket error protocol.
+
+### Configuration rules
+
+- `inject` merges contract bindings, then group bindings, then operation bindings.
+  A same-name binding is replaced by the later value in both the type and runtime
+  service map. Other dependencies remain available. Endpoint `.inject()` itself
+  retains its existing replacement behavior.
+- An operation's `authorize` schema takes precedence over a group's schema;
+  existing endpoint roles are retained. Supplying authorization explicitly makes
+  even a previously public operation authenticated. Omit it when authorization
+  already lives entirely in the shared contract. There is no implicit auth default.
+- Operation `tags` replace group tags; group tags replace existing tags. Other
+  metadata changes only when supplied: `summary`, `description`, `operationId`,
+  and `deprecated: true`. Deprecation is additive and cannot be cleared here.
+- Request/response schemas, cache definitions, upload settings, links, examples,
+  and other endpoint metadata remain on the shared endpoint. Scopes do not edit
+  the wire contract or silently add error responses.
+- Handler descriptors support existing per-operation `middlewares`. Configuration
+  scopes do not register anything until explicitly bound and composed.
+
+### Error policy behavior and limits
+
+Policies are immutable. Each `.on(ErrorClass, translator)` returns a new policy.
+Rules match by `instanceof` in declaration order; put subclasses before base
+classes. Both handlers and translators may be synchronous or asynchronous.
+
+Translators return explicit JSON or bodyless `ActionResult` values. Every result
+must fit the target endpoint's `.responses()` status/body map. Policies cannot
+use raw/file/stream results to escape that check, and endpoints without explicit
+responses cannot attach a policy. TypeScript escape hatches (`any`, assertions,
+or deliberately erased annotations) still bypass static guarantees; this is not
+a replacement for runtime response validation.
+
+Only exceptions from the handler invocation are translated. Authentication,
+request validation, DI resolution, middleware, and response serialization are
+outside the wrapper. Unknown thrown values are rethrown unchanged. If a translator
+fails, its failure propagates without recursively applying the policy again.
+Existing centralized handling still logs unexpected failures and sends safe 500
+Problem Details. There is no automatic catch-all or exposure of `Error.message`.
+
+Application authors decide which errors are safe to map and which details can
+be returned. Framework has no knowledge of domain ownership or privacy rules.
+
+### Incremental adoption
+
+The old `handle` and `mapHandlers` APIs remain unchanged. Adopt just error policies
+without migrating registration:
+
+```ts
+import { withErrors } from '@cleverbrush/server';
+
+server.handle(
+    RemoveItemEndpoint,
+    withErrors(RemoveItemEndpoint, itemErrors, removeHandler)
+);
+```
+
+The returned function can also be placed in an existing handler map. To migrate
+registration, move server-only metadata/DI into scopes, type the existing handler
+files against `scope.endpoints`, bind feature modules, and finalize at the root.
+Keep the shared contract in `/contract` imports; implementation facilities and
+policies are server-entry-point exports only.
+
+The repository tests include strict type assertions against emitted package
+declarations and a generated 1,000-operation consumer with one handler per file.
+The generated consumer verifies cross-file inference and records compiler
+diagnostics, memory, and timings for both existing and modular registration
+without using environment-dependent timing thresholds.
 
 ## Installation
 
@@ -227,34 +552,54 @@ validated against the endpoint body schema. Repeated fields become arrays:
 
 ## File Upload
 
-Accept file uploads via `multipart/form-data` by chaining `.upload()` on an endpoint:
+Declare uploaded fields with schema builders. Import contracts through the
+browser-safe entry point when sharing them with a client:
 
 ```ts
-import { endpoint } from '@cleverbrush/server';
-import { object, string } from '@cleverbrush/schema';
+import { endpoint, file } from '@cleverbrush/server/contract';
+import { array, object, string } from '@cleverbrush/schema';
 
-const UploadAvatar = endpoint
-    .post('/api/avatar')
-    .upload({ maxFileSize: 2 * 1024 * 1024, allowedMimeTypes: ['image/*'] })
-    .body(object({ description: string().optional() }))
-    .authorize(UserPrincipal);
-
-const handler: Handler<typeof UploadAvatar> = async ({ body, files }) => {
-    const avatar = files['avatar'];
-    // avatar: FilePart { filename, mimeType, buffer, size }
-    return ActionResult.created({ name: avatar.filename });
-};
+export const UploadAssets = endpoint.post('/api/assets')
+    .upload(object({
+        images: array(file()).minLength(1).maxLength(3),
+        cover: file().optional()
+    }), { allowedMimeTypes: ['image/*'] })
+    .body(object({ description: string().optional() }));
 ```
 
-The `files` object on the handler context contains one `FilePart` entry per uploaded file field. Non-file form fields are validated against the body schema and available via `body`.
+Handlers receive `files.images: FilePart[]` in request order and an optional
+`files.cover: FilePart`. Text fields are validated through `.body()`. Omit
+`.body()` for a file-only endpoint. Text and file field names must be distinct.
+A missing required array becomes `[]`; use `.minLength(1)` to require a file.
+Absent optional file fields are omitted.
+
+Typed upload endpoints reject malformed or invalid requests with `400` Problem
+Details before calling the handler. Resource limits return `413`, including
+oversized files, text fields, field names, request bodies and part counts.
+Truncated content is never passed to handlers. Files are buffered in memory
+within these limits; authorization runs before parsing. MIME allowlists compare
+the declared multipart MIME type; they do not inspect file contents.
+
+The options-only `.upload(options?)` overload accepts one `FilePart` per field.
+It reports MIME exclusions through `rejectedFiles` (including `fieldName`) and
+rejects duplicate file fields and limit violations.
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `maxFileSize` | `number` | 10 MB | Maximum file size per file in bytes |
-| `allowedMimeTypes` | `string[]` | all | MIME type allowlist (supports `image/*` glob) |
-| `maxFileCount` | `number` | 10 | Maximum number of files per request |
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `maxFileSize` | 10 MiB | Bytes per file |
+| `maxFileCount` | 10 | Files per request, including rejected files |
+| `allowedMimeTypes` | All | Declared MIME types; supports patterns such as `image/*` |
+| `maxFieldSize` | 1 MiB | Bytes per text field |
+| `maxFieldCount` | 100 | Text fields per request |
+| `maxFieldNameSize` | 100 | UTF-8 bytes per field name |
+| `maxPartCount` | File-count limit + field-count limit | Total file and text parts |
+
+Limits must be positive safe integers. The server's `maxBodySize` (default 5 MiB)
+also limits the **entire multipart request**, including boundaries and headers.
+Configure it large enough for the permitted file collection. It applies even
+when the request has no `Content-Length`.
 
 ### FilePart type
 
@@ -352,6 +697,9 @@ server.handle(GetUser, ({ params }) => {
 | `HttpError` | any (base class) |
 
 ## WebSocket Subscriptions
+
+Middleware that rejects a subscription closes its WebSocket with code `1008`.
+Closing or disconnecting aborts the handler signal and disposes its DI scope.
 
 Define real-time endpoints using `endpoint.subscription()`:
 
@@ -568,6 +916,79 @@ apps/
   admin-panel/         // imports fullApi    — full set of endpoints
   backend/             // imports fullApi    — handles all routes
 ```
+
+## Response replay and caching
+
+Declare mutation replay in the shared contract with `.idempotent()`. Bind an
+explicit scope on the server; registration fails at startup when it is missing.
+The optional `prepare` callback receives validated request data and injected
+services and returns the request passed to scope resolution and the handler.
+Use it to authorize resource access and resolve request defaults before replay.
+
+```ts
+const createItem = endpoint.post('/items')
+    .idempotent()
+    .body(CreateItemSchema)
+    .authorize(UserPrincipal)
+    .inject({ db: DbToken })
+    .responses({ 201: ItemSchema, 403: MessageSchema });
+
+server.handle(createItem, createItemHandler, {
+    prepare: async (request, { db }) => {
+        const workspace = await requireWorkspaceAccess(db, request.principal,
+            request.body.workspaceId);
+        return { ...request, body: { ...request.body, workspaceId: workspace.id } };
+    },
+    idempotency: {
+        scope: ({ principal, body }) => [principal.userId, body.workspaceId]
+    },
+    errors: itemErrors
+});
+```
+
+The same options work in `mapHandlers` and `implement(api).group(...).withHandlers`.
+Authentication, validation, preparation and scope resolution run before each
+replay, including batch subrequests. Preparation/scope exceptions use the bound
+error policy without reserving a key. Handler exceptions translated by that
+policy become replayable responses. Validation, DI and serialization errors
+retain their normal Framework handling; standalone `withErrors` still wraps
+only its handler.
+
+`X-Idempotency-Key` is optional, case-insensitive, and must contain 1–256
+characters when present. It is transport metadata, so no `.headers()` schema is
+needed. OpenAPI includes this header and the 400/409/503 Problem Details responses.
+When enabling cross-origin browser access, explicitly include this header in
+your CORS `allowedHeaders`. Each server endpoint retains its own bounded store
+with the defaults below; `idempotency` options can override its limits.
+
+### Low-level replay and caching
+
+
+`idempotency({ scope })` coalesces concurrent mutations and replays their completed
+responses within one middleware instance. Install it after authentication and
+authorization. Derive `scope(ctx)` from verified identity/tenant context; returning
+`undefined` bypasses replay. A constant scope is appropriate only for intentionally
+public operations. Keys also include method and full URL. Reusing a key asserts
+identical input; request bodies are not fingerprinted.
+
+Defaults: `ttl: 86400000`, `maxEntries: 1000`, `maxResponseBytes: 65536`.
+Capacity exhaustion returns 503 before execution. Oversized or incomplete responses
+reserve the key; retries return 409 so the caller can verify the outcome. This is
+process-local replay, not durable exactly-once execution: crashes, expiry or thrown
+handler errors can permit a later execution. Use database deduplication for durable
+business guarantees.
+
+`cacheResponse()` retains at most 1000 keys and 65,536-byte complete response bodies
+by default (`maxEntries`, `maxResponseBytes`); oldest keys are evicted at capacity.
+It bypasses `Set-Cookie` and `Cache-Control: private`/`no-store` responses.
+`defaultTtl` and `ttlByTag` are finite, non-negative milliseconds; retention uses
+the longest TTL among an endpoint's tags (all zero disables retention).
+Tags must distinguish endpoint shapes, verified identities,
+tenants and all representation inputs. Both middleware capture `write()`/`end()`
+chunks and restore response hooks on failure.
+
+See [security guidance](../../SECURITY.md) and the
+[v4.x-to-v5 migration guide](../../docs/MIGRATION-v5.md).
 
 ## License
 

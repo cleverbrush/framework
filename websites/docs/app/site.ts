@@ -106,10 +106,16 @@ export const DOCS_ROUTES: RouteMetadata[] = [
             'Schema-driven object mapping with compile-time completeness and type-safe property selectors.'
     },
     {
+        path: '/storage',
+        title: 'Object Storage',
+        description:
+            'Provider-neutral object storage and an S3-compatible adapter for self-hosted services and hosted providers.'
+    },
+    {
         path: '/scheduler',
         title: '@cleverbrush/scheduler',
         description:
-            'Job scheduling documentation for workers, event handling, schedule calculators, and custom persistence.'
+            'Typed durable jobs, PostgreSQL persistence, recurring triggers, worker leases, and replayable progress.'
     },
     {
         path: '/log',

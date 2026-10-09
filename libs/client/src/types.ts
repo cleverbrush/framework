@@ -1,5 +1,5 @@
 /**
- * Type utilities for the `@cleverbrush/web` typed HTTP client.
+ * Type utilities for the `@cleverbrush/client` typed HTTP client.
  *
  * These types extract request argument shapes and response types from
  * `EndpointBuilder` instances defined via `@cleverbrush/server/contract`.
@@ -12,7 +12,9 @@ import type {
     EndpointBuilder,
     FilePart,
     ApiContract as ServerApiContract,
-    SubscriptionBuilder
+    SubscriptionBuilder,
+    UploadContract,
+    UploadFiles
 } from '@cleverbrush/server/contract';
 
 // Re-export types shared between server and client
@@ -52,6 +54,13 @@ type HasKeys<T> = keyof T extends never ? false : true;
 type InferSchema<T> =
     T extends SchemaBuilder<any, any, any, any, any> ? InferType<T> : T;
 
+type ClientFile<T> = T extends FilePart
+    ? FilePart | Blob
+    : T extends readonly (infer E)[]
+      ? ClientFile<E>[]
+      : T;
+type ClientFiles<T> = { [K in keyof T]: ClientFile<T[K]> };
+
 /**
  * Assembles the parts of the request argument object conditionally.
  * Only keys that carry data are included.
@@ -61,12 +70,12 @@ type CallArgsParts<
     TBody,
     TQuery,
     THeaders,
-    TUpload extends boolean
+    TUpload extends UploadContract
 > = (HasKeys<TParams> extends true ? { params: TParams } : {}) &
     (TBody extends undefined ? {} : { body: InferSchema<TBody> }) &
     (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
     (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
-    (TUpload extends true ? { files: Record<string, FilePart | Blob> } : {});
+    (TUpload extends false ? {} : { files: ClientFiles<UploadFiles<TUpload>> });
 
 /**
  * Extracts the typed request argument shape from an `EndpointBuilder`.
@@ -594,8 +603,8 @@ export interface ClientOptions {
      *
      * @example
      * ```ts
-     * import { retry } from '@cleverbrush/web/retry';
-     * import { timeout } from '@cleverbrush/web/timeout';
+     * import { retry } from '@cleverbrush/client/retry';
+     * import { timeout } from '@cleverbrush/client/timeout';
      *
      * const client = createClient(api, {
      *     middlewares: [retry(), timeout({ timeout: 10000 })],

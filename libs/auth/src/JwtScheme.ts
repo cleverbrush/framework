@@ -48,7 +48,7 @@ export interface JwtSchemeOptions<T> {
     secret: string | Buffer;
     /** Map raw JWT claims to the typed principal value. */
     mapClaims: (claims: JwtPayload) => T;
-    /** Allowed algorithms (default: ['HS256']). */
+    /** Allowed algorithms (default: ['HS256']). Do not mix HMAC and RSA. */
     algorithms?: string[];
     /** Expected issuer — if set, `iss` must match. */
     issuer?: string;
@@ -89,6 +89,39 @@ const RSA_ALGOS: Record<string, string> = {
     RS512: 'sha512'
 };
 
+function assertKey(secret: string | Buffer, algorithms: readonly string[]) {
+    const hmac = algorithms.some(alg => Object.hasOwn(HMAC_ALGOS, alg));
+    const rsa = algorithms.some(alg => Object.hasOwn(RSA_ALGOS, alg));
+    if (
+        algorithms.length === 0 ||
+        algorithms.some(
+            alg =>
+                !Object.hasOwn(HMAC_ALGOS, alg) &&
+                !Object.hasOwn(RSA_ALGOS, alg)
+        ) ||
+        (hmac && rsa)
+    )
+        throw new TypeError('Select supported algorithms from one key family');
+    if (hmac) {
+        if (
+            !secret.length ||
+            /-----BEGIN [^-]*KEY-----/.test(secret.toString())
+        ) {
+            throw new TypeError(
+                'HMAC requires a non-empty symmetric secret, not a PEM key'
+            );
+        }
+    } else {
+        const key = crypto.createPublicKey(secret);
+        if (key.asymmetricKeyType !== 'rsa')
+            throw new TypeError('RS algorithms require an RSA key');
+    }
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
 // ---------------------------------------------------------------------------
 // JWT verification
 // ---------------------------------------------------------------------------
@@ -103,7 +136,9 @@ function verifySignature(
     const data = `${headerB64}.${payloadB64}`;
     const signatureBytes = base64urlDecode(signatureB64);
 
-    const hmacHash = HMAC_ALGOS[alg];
+    const hmacHash = Object.hasOwn(HMAC_ALGOS, alg)
+        ? HMAC_ALGOS[alg]
+        : undefined;
     if (hmacHash) {
         const expected = crypto
             .createHmac(hmacHash, secret)
@@ -115,7 +150,7 @@ function verifySignature(
         return crypto.timingSafeEqual(expected, signatureBytes);
     }
 
-    const rsaHash = RSA_ALGOS[alg];
+    const rsaHash = Object.hasOwn(RSA_ALGOS, alg) ? RSA_ALGOS[alg] : undefined;
     if (rsaHash) {
         return crypto
             .createVerify(rsaHash)
@@ -151,19 +186,36 @@ function decodeJwt(
         return { error: 'Malformed JWT header' };
     }
 
+    if (!isObject(header) || typeof header.alg !== 'string') {
+        return { error: 'Malformed JWT header' };
+    }
+    if (
+        header.crit !== undefined ||
+        (header.b64 !== undefined && header.b64 !== true)
+    ) {
+        return { error: 'Unsupported critical JWT extension' };
+    }
+
     if (!allowedAlgorithms.includes(header.alg)) {
         return { error: `Unsupported algorithm: ${header.alg}` };
     }
 
-    if (
-        !verifySignature(
+    if (!parts.every(part => /^[A-Za-z0-9_-]+$/.test(part))) {
+        return { error: 'Malformed JWT encoding' };
+    }
+    let validSignature = false;
+    try {
+        validSignature = verifySignature(
             headerB64,
             payloadB64,
             signatureB64,
             header.alg,
             secret
-        )
-    ) {
+        );
+    } catch {
+        // Malformed signatures fail authentication, not the HTTP request.
+    }
+    if (!validSignature) {
         return { error: 'Invalid signature' };
     }
 
@@ -174,9 +226,38 @@ function decodeJwt(
         return { error: 'Malformed JWT payload' };
     }
 
+    if (!isObject(payload)) return { error: 'Malformed JWT payload' };
+    for (const claim of ['exp', 'nbf', 'iat']) {
+        const value = payload[claim];
+        if (
+            value !== undefined &&
+            (typeof value !== 'number' || !Number.isFinite(value))
+        ) {
+            return { error: `Invalid ${claim} claim` };
+        }
+    }
+    for (const claim of ['iss', 'sub', 'jti']) {
+        if (
+            payload[claim] !== undefined &&
+            typeof payload[claim] !== 'string'
+        ) {
+            return { error: `Invalid ${claim} claim` };
+        }
+    }
+    if (
+        payload.aud !== undefined &&
+        typeof payload.aud !== 'string' &&
+        !(
+            Array.isArray(payload.aud) &&
+            payload.aud.every(value => typeof value === 'string')
+        )
+    ) {
+        return { error: 'Invalid aud claim' };
+    }
+
     const now = Math.floor(Date.now() / 1000);
 
-    if (payload.exp !== undefined && now > payload.exp + clockTolerance) {
+    if (payload.exp !== undefined && now >= payload.exp + clockTolerance) {
         return { error: 'Token expired' };
     }
 
@@ -209,9 +290,23 @@ class JwtAuthenticationScheme<T> implements AuthenticationScheme<T> {
     readonly #algorithms: string[];
 
     constructor(options: JwtSchemeOptions<T>) {
+        if (
+            !Number.isFinite(options.clockTolerance ?? 0) ||
+            (options.clockTolerance ?? 0) < 0
+        ) {
+            throw new TypeError(
+                'clockTolerance must be finite and non-negative'
+            );
+        }
         this.name = options.name ?? 'jwt';
-        this.#options = options;
-        this.#algorithms = options.algorithms ?? ['HS256'];
+        this.#options = {
+            ...options,
+            secret: Buffer.isBuffer(options.secret)
+                ? Buffer.from(options.secret)
+                : options.secret
+        };
+        this.#algorithms = [...(options.algorithms ?? ['HS256'])];
+        assertKey(this.#options.secret, this.#algorithms);
     }
 
     async authenticate(
@@ -225,7 +320,7 @@ class JwtAuthenticationScheme<T> implements AuthenticationScheme<T> {
             };
         }
 
-        if (!authHeader.startsWith('Bearer ')) {
+        if (!/^Bearer /i.test(authHeader)) {
             return {
                 succeeded: false,
                 failure: 'Authorization header must use Bearer scheme'
@@ -278,7 +373,9 @@ class JwtAuthenticationScheme<T> implements AuthenticationScheme<T> {
 }
 
 /**
- * Create a JWT authentication scheme.
+ * Create a JWT authentication scheme. Invalid token structures and claims fail
+ * authentication. Unsupported algorithms, mixed key families and invalid
+ * clock tolerance are rejected at configuration time.
  */
 export function jwtScheme<T>(
     options: JwtSchemeOptions<T>
@@ -307,6 +404,13 @@ export function signJwt(
     secret: string | Buffer,
     algorithm = 'HS256'
 ): string {
+    if (
+        !Object.hasOwn(HMAC_ALGOS, algorithm) &&
+        !Object.hasOwn(RSA_ALGOS, algorithm)
+    ) {
+        throw new TypeError(`Unsupported algorithm: ${algorithm}`);
+    }
+    assertKey(secret, [algorithm]);
     const header: JwtHeader = { alg: algorithm, typ: 'JWT' };
 
     const headerB64 = base64urlEncode(

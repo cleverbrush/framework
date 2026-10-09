@@ -15,23 +15,26 @@ type BooleanSchemaBuilderCreateProps<R extends boolean = true> = Partial<
  * Allows to define a schema for a boolean value. It can be required or optional.
  * It can be restricted to be equal to a certain value.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link boolean | boolean()} function instead.
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = boolean().equals(true);
  * const result = schema.validate(true);
  * // result.valid === true
  * // result.object === true
  * ```
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = boolean().equals(false);
  * const result = schema.validate(true);
  * // result.valid === false
  * // result.errors[0].message === 'is expected to be equal to 'false''
  * ```
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = boolean().equals(true).optional();
  * const result = schema.validate(undefined);
  * // result.valid === true
@@ -55,6 +58,17 @@ export class BooleanSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'boolean',
+        TResult,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TFinalResult
+    ];
+
     #equalsTo?: boolean;
     #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
         BooleanSchemaBuilder<TResult, TRequired>
@@ -122,9 +136,12 @@ export class BooleanSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -139,9 +156,12 @@ export class BooleanSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #getConstraintViolation(
@@ -458,7 +478,7 @@ export class BooleanSchemaBuilder<
         >
     ) {
         if (typeof value !== 'boolean') throw new Error('boolean expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
@@ -485,7 +505,7 @@ export class BooleanSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: undefined
         } as any) as any;
@@ -496,7 +516,8 @@ export class BooleanSchemaBuilder<
      * Accepts `"true"` → `true` and `"false"` → `false`; other values are
      * left unchanged so the boolean schema rejects them.
      *
-     * @example ```ts
+     * @example
+     * ```ts
      * const schema = boolean().coerce();
      * const result = schema.validate('true');
      * // result.valid === true

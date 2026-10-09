@@ -17,20 +17,6 @@ export default function MapperPage() {
                     </p>
                 </div>
 
-                <PerformativeBeforeAfter
-                    brand="@cleverbrush/mapper"
-                    before={[
-                        'Manual DTO assignment repeats property names',
-                        'New target fields can be forgotten at runtime',
-                        'Nested mappings sprawl across helper functions'
-                    ]}
-                    after={[
-                        'Property selectors map source fields type-safely',
-                        'Unmapped target fields become compile-time errors',
-                        'Registered mappings compose through nested schemas'
-                    ]}
-                />
-
                 {/* ── Installation ─────────────────────────────────── */}
                 <InstallBanner
                     command="npm install @cleverbrush/mapper"
@@ -530,6 +516,42 @@ const registry = mapper()
                         </table>
                     </div>
                 </div>
+
+                <div className="card" id="synchronous-mapping">
+                    <h2>Synchronous mapping</h2>
+                    <p>
+                        Use the existing configure() chain, then
+                        getSyncMapper(Source, Target) for pure synchronous
+                        mappings. Completeness and nested-mapping checks remain.
+                        Async computations are rejected, and a disguised
+                        promise/thenable throws when invoked. getMapper() keeps
+                        its async behavior.
+                    </p>
+                    <p>
+                        Opt-in Framework database reads expose projection-aware
+                        rowSchema metadata, so source schemas need not be copied
+                        by hand. Reuse schema instances and configure once;
+                        fetching and domain conversions remain
+                        application-owned.
+                    </p>
+                    <a href="https://docs.cleverbrush.com/mapper#synchronous-mapping">
+                        Query mapping examples and consumer guide
+                    </a>
+                </div>
+
+                <PerformativeBeforeAfter
+                    brand="@cleverbrush/mapper"
+                    before={[
+                        'Manual DTO assignment repeats property names',
+                        'New target fields can be forgotten at runtime',
+                        'Nested mappings sprawl across helper functions'
+                    ]}
+                    after={[
+                        'Property selectors map source fields type-safely',
+                        'Unmapped target fields become compile-time errors',
+                        'Registered mappings compose through nested schemas'
+                    ]}
+                />
 
                 {/* ── API Reference ────────────────────────────────── */}
                 <div className="card">

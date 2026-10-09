@@ -255,23 +255,25 @@ return ActionResult.status(202);`)
                     <h2>File Upload</h2>
                     <p>
                         Accept file uploads via <code>multipart/form-data</code>{' '}
-                        by chaining <code>.upload()</code> on an endpoint. File
-                        fields are received as <code>FilePart</code> objects on
-                        the handler context's <code>files</code> property;
+                        with <code>.upload(object(...))</code>. Declare single
+                        files with <code>file()</code> and repeated files with
+                        <code>array(file())</code>. The handler receives
+                        matching
+                        <code>FilePart</code> or <code>FilePart[]</code> fields;
                         non-file form fields are validated against the body
                         schema and available via <code>body</code>.
                     </p>
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { endpoint, type FilePart } from '@cleverbrush/server';
+                                __html: highlightTS(`import { endpoint, file } from '@cleverbrush/server/contract';
 import { object, string } from '@cleverbrush/schema';
 
 const UserPrincipal = object({ sub: string(), role: string() });
 
 const UploadAvatar = endpoint
     .post('/api/avatar')
-    .upload({
+    .upload(object({ avatar: file() }), {
         maxFileSize: 2 * 1024 * 1024,
         allowedMimeTypes: ['image/*']
     })
@@ -279,7 +281,7 @@ const UploadAvatar = endpoint
     .authorize(UserPrincipal);
 
 server.handle(UploadAvatar, ({ body, files }) => {
-    const avatar: FilePart = files['avatar'];
+    const avatar = files.avatar;
     // avatar.filename, avatar.mimeType, avatar.buffer, avatar.size
     return ActionResult.created({ name: avatar.filename });
 });`)
@@ -339,6 +341,25 @@ server.handle(UploadAvatar, ({ body, files }) => {
                         </table>
                     </div>
 
+                    <p>
+                        Omit <code>.body()</code> for file-only requests. Typed
+                        uploads reject invalid fields before calling the
+                        handler. Limits return 413 Problem Details; truncated
+                        content is never delivered as a successful upload.
+                        Required arrays default to empty, so use{' '}
+                        <code>.minLength(1)</code> to require at least one file.
+                    </p>
+                    <p>
+                        The whole multipart body also respects the server's
+                        <code>maxBodySize</code> (5 MiB by default). Text fields
+                        default to 1 MiB each and 100 fields; names are limited
+                        to 100 UTF-8 bytes. Configure these with
+                        <code>maxFieldSize</code>, <code>maxFieldCount</code>,
+                        <code>maxFieldNameSize</code> and{' '}
+                        <code>maxPartCount</code>. Files are buffered in memory
+                        within these bounds.
+                    </p>
+
                     <h3>FilePart type</h3>
                     <pre>
                         <code
@@ -383,6 +404,68 @@ server.handle(GetUser, ({ params }) => {
                             }}
                         />
                     </pre>
+                </div>
+
+                <div className="card" id="cors">
+                    <h2>CORS and preflight requests</h2>
+                    <p>
+                        Enable a server-wide policy with <code>useCors()</code>.
+                        CORS runs before routing and authentication,
+                        independently of ordinary middleware registration order.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const server = createServer().useCors({
+    origin: ['https://app.example.com', 'http://localhost:5173'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    exposedHeaders: ['WWW-Authenticate', 'X-Request-Id'],
+    credentials: true,
+    maxAgeSeconds: 600
+});
+
+// Alternatively, check application-owned domain configuration at request time:
+server.useCors({
+    origin: async origin => tenantDomains.isAllowed(origin),
+    allowedHeaders: ['Content-Type', 'Authorization']
+});`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Origins are exact URL origins without a path or trailing
+                        slash. An explicit <code>origin: '*'</code> enables
+                        public access and cannot be combined with credentials.
+                        Predicates may be synchronous or asynchronous and run
+                        once per HTTP request carrying Origin; results are not
+                        cached by the server. Disallowed origins return 403
+                        before handlers run; predicate failures return a generic
+                        500. Requests without Origin continue through the normal
+                        pipeline.
+                    </p>
+                    <p>
+                        Accepted preflights return an empty 204 without
+                        authentication. Actual protected requests still require
+                        authentication. Optional <code>methods</code> restricts
+                        preflights to an allowlist of registered route methods.
+                        Allowed and exposed header lists default to empty,
+                        credentials to false, and preflight cache duration to
+                        zero. Header names are case-insensitive; method/header
+                        wildcards are not supported.
+                    </p>
+                    <p>
+                        Successful and error responses share the CORS policy,
+                        including cached, raw and streamed results. Existing
+                        Vary headers are preserved. CORS includes enabled health
+                        and batch routes; virtual batch subrequests retain their
+                        usual authentication. Ordinary OPTIONS requests retain
+                        normal routing. CORS short-circuits do not run ordinary
+                        middleware, and WebSocket upgrades are outside this
+                        policy.
+                    </p>
+                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/server/README.md#cors">
+                        CORS options, defaults and execution order
+                    </a>
                 </div>
 
                 {/* ── Middleware ───────────────────────────────────── */}
@@ -488,6 +571,90 @@ const AdminEp = endpoint
                             }}
                         />
                     </pre>
+                </div>
+
+                <div className="card" id="modular-implementations">
+                    <h2>Modular implementations</h2>
+                    <p>
+                        Build large APIs with separate configuration, handler,
+                        and feature-module files. <code>implement(api)</code>
+                        derives configured scopes from the shared contract;
+                        <code>complete()</code> checks that every operation is
+                        implemented before producing an ordinary handler
+                        mapping.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`// scope.ts — no handler imports
+export const items = implement(api).group('items', {
+    inject: { db: DbToken },
+    tags: ['items'],
+    operations: { remove: { summary: 'Remove an item' } }
+});
+
+// handlers/remove.ts
+import type { items } from '../scope.js';
+export const remove: Handler<typeof items.endpoints.remove> = async (
+    { params }, { db }
+) => {
+    await removeItem(db, params.id);
+    return ActionResult.noContent();
+};
+
+// module.ts — list/remove are this example's complete contract
+export const itemsModule = items.withHandlers({ list, remove });
+
+// server.ts
+server.handleAll(implement(api).use(itemsModule).complete());`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Use <code>pick(...operationNames)</code> to split a
+                        large group. Shared and per-operation services merge
+                        while request, principal, service, and response types
+                        remain available inside each handler file. Subscription
+                        handlers can be composed through the same API. Existing
+                        <code>handle</code> and <code>mapHandlers</code> remain
+                        supported.
+                    </p>
+                    <h3>Shared, typed error policies</h3>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const itemErrors = errorMap().on(MissingItemError, () =>
+    ActionResult.notFound({ message: 'Item not found' })
+);
+
+const itemsModule = items.withHandlers({
+    list,
+    remove: { handler: remove, errors: itemErrors }
+});
+
+// Or adopt the policy without changing existing registration:
+server.handle(RemoveItemEndpoint,
+    withErrors(RemoveItemEndpoint, itemErrors, removeHandler));`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        A policy must fit each endpoint&apos;s explicitly
+                        declared response statuses and bodies. Only known
+                        exceptions from the handler are translated. Unknown
+                        exceptions retain the existing safe 500 handling;
+                        middleware, validation, DI, and serialization failures
+                        are not intercepted. Policies are HTTP-only and do not
+                        change subscription errors.
+                    </p>
+                    <p>
+                        See the{' '}
+                        <a href="https://github.com/cleverbrush/framework/blob/development/libs/server/README.md#large-apis-and-shared-error-handling">
+                            complete multi-file consumer guide
+                        </a>{' '}
+                        for configuration precedence, module composition, and
+                        migration.
+                    </p>
                 </div>
 
                 {/* ── WebSocket Subscriptions ──────────────────────── */}

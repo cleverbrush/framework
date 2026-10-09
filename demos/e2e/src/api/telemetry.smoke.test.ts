@@ -41,8 +41,6 @@ describe('Telemetry smoke — ClickHouse logs & traces correlation', () => {
             TraceId: string;
         }>(
             `SELECT body AS Body, trace_id AS TraceId FROM signoz_logs.distributed_logs_v2 WHERE trace_id = '${traceId}' FORMAT JSON`,
-ace_id = '${traceId}' FORMAT JSON`,
-
             45_000,
             1_000
         );
@@ -55,10 +53,8 @@ ace_id = '${traceId}' FORMAT JSON`,
         const spans = await waitForRows<{
             SpanName: string;
             ServiceName: string;
-        }>(name AS SpanName, resources_string['service.name'] AS ServiceName FROM signoz_traces.distributed_signoz_index_v3 WHERE trace_id = '${traceId}' FORMAT JSON`,
-
+        }>(
             `SELECT name AS SpanName, resources_string['service.name'] AS ServiceName FROM signoz_traces.distributed_signoz_index_v3 WHERE trace_id = '${traceId}' FORMAT JSON`,
-
             45_000,
             1_000
         );
@@ -67,7 +63,7 @@ ace_id = '${traceId}' FORMAT JSON`,
         expect(services.has('todo-backend')).toBe(true);
     });
 
-    it('ClickHouse is reachable and reports recent losignoz_logs.distributed_logs_v2 WHERE toDateTime(intDiv(timestamp, 1000000000))
+    it('ClickHouse is reachable and reports recent logs', async () => {
         const { rows } = await clickhouseQuery<{ recent: string }>(
             `SELECT toString(count()) AS recent FROM signoz_logs.distributed_logs_v2 WHERE toDateTime(intDiv(timestamp, 1000000000)) >= now() - INTERVAL 1 HOUR FORMAT JSON`
         );

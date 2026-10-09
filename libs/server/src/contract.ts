@@ -72,7 +72,7 @@ import type { SubscriptionBuilder as _SB } from './Subscription.js';
  */
 export type ApiGroup = Record<
     string,
-    | _EB<any, any, any, any, any, any, any, any, any>
+    | _EB<any, any, any, any, any, any, any, any, any, any>
     | _SB<any, any, any, any, any, any, any, any>
 >;
 
@@ -159,7 +159,8 @@ export function defineApi<T extends ApiContract>(contract: T): Readonly<T> {
  *   visible on the merged group.
  */
 export type MergedContracts<A extends ApiContract, B extends ApiContract> = {
-    readonly [K in keyof A | keyof B]: K extends keyof A
+    // Keep group origins instead of synthesizing keys from `keyof A | keyof B`.
+    readonly [K in keyof Required<A & B>]: K extends keyof A
         ? K extends keyof B
             ? A[K] & B[K]
             : A[K]
@@ -308,3 +309,11 @@ export function omitGroups<T extends ApiContract, K extends keyof T>(
     }
     return Object.freeze(result);
 }
+
+export {
+    file,
+    type UploadConfiguration,
+    type UploadContract,
+    type UploadFiles,
+    type UploadSchema
+} from './upload.js';

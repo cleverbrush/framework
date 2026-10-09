@@ -18,6 +18,19 @@ import {
     string
 } from './index.js';
 
+import { QuerySource } from './QuerySource.js';
+import type { ReadObject } from './read-schema.js';
+
+// Preserve low-level SQL planner regressions independently of public immutable
+// queries (covered by immutable-query, read-predicates and PostgreSQL suites).
+function privateSource<S extends ReadObject>(
+    connection: KnexType,
+    schema: S,
+    base?: KnexType.QueryBuilder
+) {
+    return new QuerySource(connection, schema, base);
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Test schemas
 // ═══════════════════════════════════════════════════════════════════════════
@@ -104,12 +117,12 @@ describe('schema extension', () => {
 
     it('hasColumnName survives .optional() chaining', () => {
         const schema = string().hasColumnName('col_name').optional();
-        expect(schema.getExtension('columnName')).toBe('col_name');
+        expect(schema.introspect().extensions.columnName).toBe('col_name');
     });
 
     it('hasColumnName survives .required() chaining', () => {
         const schema = number().hasColumnName('col_a').optional().required();
-        expect(schema.getExtension('columnName')).toBe('col_a');
+        expect(schema.introspect().extensions.columnName).toBe('col_a');
     });
 
     it('hasTableName survives .optional()/.required() chaining', () => {
@@ -117,7 +130,7 @@ describe('schema extension', () => {
             .hasTableName('my_table')
             .optional()
             .required();
-        expect(schema.getExtension('tableName')).toBe('my_table');
+        expect(schema.introspect().extensions.tableName).toBe('my_table');
     });
 });
 
@@ -180,43 +193,43 @@ describe('resolveColumnRef', () => {
 // Query builder — SQL snapshot tests
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('SchemaQueryBuilder', () => {
+describe('private QuerySource planner', () => {
     describe('basic SELECT', () => {
         it('produces SELECT * FROM table', () => {
-            const sql = query(knex, User).toQuery();
+            const sql = privateSource(knex, User).toQuery();
             expect(sql).toBe('select * from "users"');
         });
 
         it('produces SELECT with SimpleTag (no column mapping needed)', () => {
-            const sql = query(knex, SimpleTag).toQuery();
+            const sql = privateSource(knex, SimpleTag).toQuery();
             expect(sql).toBe('select * from "tags"');
         });
     });
 
     describe('WHERE', () => {
         it('.where with property descriptor', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .where(t => t.fullName, '=', 'John')
                 .toQuery();
             expect(sql).toContain('"full_name" = \'John\'');
         });
 
         it('.where with string property key', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .where('fullName', '=', 'John')
                 .toQuery();
             expect(sql).toContain('"full_name" = \'John\'');
         });
 
         it('.where with default column name', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .where('email', '=', 'test@test.com')
                 .toQuery();
             expect(sql).toContain('"email" = \'test@test.com\'');
         });
 
         it('.where with record syntax', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .where({ fullName: 'John', role: 'admin' })
                 .toQuery();
             expect(sql).toContain('"full_name" = \'John\'');
@@ -224,7 +237,7 @@ describe('SchemaQueryBuilder', () => {
         });
 
         it('.where with callback (knex sub-builder)', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .where((builder: KnexType.QueryBuilder) => {
                     builder.where('role', 'admin');
                 })
@@ -233,42 +246,42 @@ describe('SchemaQueryBuilder', () => {
         });
 
         it('.whereIn with property descriptor', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .whereIn(t => t.role, ['admin', 'user'])
                 .toQuery();
             expect(sql).toContain("\"role\" in ('admin', 'user')");
         });
 
         it('.whereNotIn', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .whereNotIn('role', ['banned'])
                 .toQuery();
             expect(sql).toContain('"role" not in (\'banned\')');
         });
 
         it('.whereNull with descriptor', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .whereNull(t => t.managerId)
                 .toQuery();
             expect(sql).toContain('"manager_id" is null');
         });
 
         it('.whereNotNull', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .whereNotNull(t => t.managerId)
                 .toQuery();
             expect(sql).toContain('"manager_id" is not null');
         });
 
         it('.whereBetween', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .whereBetween(t => t.departmentId, [1, 10])
                 .toQuery();
             expect(sql).toContain('"department_id" between 1 and 10');
         });
 
         it('.andWhere / .orWhere chaining', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .where('role', '=', 'admin')
                 .andWhere(t => t.departmentId, '>', 5)
                 .orWhere('email', 'like', '%@co.com')
@@ -279,7 +292,7 @@ describe('SchemaQueryBuilder', () => {
         });
 
         it('.whereRaw passthrough', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .whereRaw('full_name ILIKE ?', '%smith%')
                 .toQuery();
             expect(sql).toContain("full_name ILIKE '%smith%'");
@@ -288,21 +301,24 @@ describe('SchemaQueryBuilder', () => {
 
     describe('ORDER BY', () => {
         it('.orderBy with descriptor', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .orderBy(t => t.createdAt, 'desc')
                 .toQuery();
             expect(sql).toContain('order by "created_at" desc');
         });
 
         it('.orderBy with string key', () => {
-            const sql = query(knex, User).orderBy('fullName').toQuery();
+            const sql = privateSource(knex, User).orderBy('fullName').toQuery();
             expect(sql).toContain('order by "full_name"');
         });
     });
 
     describe('LIMIT / OFFSET', () => {
         it('.limit and .offset', () => {
-            const sql = query(knex, User).limit(10).offset(20).toQuery();
+            const sql = privateSource(knex, User)
+                .limit(10)
+                .offset(20)
+                .toQuery();
             expect(sql).toContain('limit 10');
             expect(sql).toContain('offset 20');
         });
@@ -310,14 +326,14 @@ describe('SchemaQueryBuilder', () => {
 
     describe('GROUP BY / HAVING', () => {
         it('.groupBy with descriptor', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .groupBy(t => t.role)
                 .toQuery();
             expect(sql).toContain('group by "role"');
         });
 
         it('.having', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .groupBy('role')
                 .having('role', '!=', 'banned')
                 .toQuery();
@@ -328,7 +344,7 @@ describe('SchemaQueryBuilder', () => {
 
     describe('SELECT / DISTINCT', () => {
         it('.select with descriptors', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .select(
                     t => t.fullName,
                     t => t.email
@@ -339,7 +355,7 @@ describe('SchemaQueryBuilder', () => {
         });
 
         it('.distinct with descriptor', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .distinct(t => t.role)
                 .toQuery();
             expect(sql).toContain('distinct "role"');
@@ -348,7 +364,7 @@ describe('SchemaQueryBuilder', () => {
 
     describe('escape hatch', () => {
         it('.apply passes through to knex builder', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .apply(qb => {
                     qb.where('id', '>', 100);
                 })
@@ -359,7 +375,7 @@ describe('SchemaQueryBuilder', () => {
 
     describe('chained queries', () => {
         it('complex chained query', () => {
-            const sql = query(knex, User)
+            const sql = privateSource(knex, User)
                 .where(t => t.role, '=', 'admin')
                 .andWhere(t => t.departmentId, '>', 5)
                 .whereNotNull(t => t.managerId)
@@ -385,7 +401,7 @@ describe('SchemaQueryBuilder', () => {
 
 describe('eager loading', () => {
     it('joinOne produces CTE with jsonb_agg', () => {
-        const sql = query(knex, User)
+        const sql = privateSource(knex, User)
             .joinOne({
                 localColumn: t => t.departmentId,
                 foreignColumn: t => t.id,
@@ -401,7 +417,7 @@ describe('eager loading', () => {
     });
 
     it('joinMany produces CTE with jsonb_agg and coalesce', () => {
-        const sql = query(knex, User)
+        const sql = privateSource(knex, User)
             .joinMany({
                 localColumn: t => t.id,
                 foreignColumn: t => t.authorId,
@@ -417,7 +433,7 @@ describe('eager loading', () => {
     });
 
     it('joinOne with string column refs', () => {
-        const sql = query(knex, User)
+        const sql = privateSource(knex, User)
             .joinOne({
                 localColumn: 'departmentId',
                 foreignColumn: 'id',
@@ -430,7 +446,7 @@ describe('eager loading', () => {
     });
 
     it('joinMany with limit and orderBy', () => {
-        const sql = query(knex, User)
+        const sql = privateSource(knex, User)
             .joinMany({
                 localColumn: t => t.id,
                 foreignColumn: t => t.authorId,
@@ -446,7 +462,7 @@ describe('eager loading', () => {
     });
 
     it('chained joinOne + joinMany', () => {
-        const sql = query(knex, User)
+        const sql = privateSource(knex, User)
             .joinOne({
                 localColumn: t => t.departmentId,
                 foreignColumn: t => t.id,
@@ -468,7 +484,7 @@ describe('eager loading', () => {
     });
 
     it('joinOne with explicit foreignQuery as raw knex', () => {
-        const sql = query(knex, User)
+        const sql = privateSource(knex, User)
             .joinOne({
                 localColumn: t => t.departmentId,
                 foreignColumn: t => t.id,
@@ -482,13 +498,13 @@ describe('eager loading', () => {
     });
 
     it('joinOne with SchemaQueryBuilder as foreignQuery', () => {
-        const sql = query(knex, User)
+        const sql = privateSource(knex, User)
             .joinOne({
                 localColumn: t => t.departmentId,
                 foreignColumn: t => t.id,
                 as: 'department',
                 foreignSchema: Department,
-                foreignQuery: query(knex, Department).where(
+                foreignQuery: privateSource(knex, Department).where(
                     t => t.budget,
                     '>',
                     1000
@@ -500,7 +516,7 @@ describe('eager loading', () => {
     });
 
     it('SchemaQueryBuilder foreignQuery produces same SQL as raw knex foreignQuery', () => {
-        const rawSql = query(knex, User)
+        const rawSql = privateSource(knex, User)
             .joinOne({
                 localColumn: t => t.departmentId,
                 foreignColumn: t => t.id,
@@ -510,13 +526,13 @@ describe('eager loading', () => {
             })
             .toQuery();
 
-        const schemaSql = query(knex, User)
+        const schemaSql = privateSource(knex, User)
             .joinOne({
                 localColumn: t => t.departmentId,
                 foreignColumn: t => t.id,
                 as: 'department',
                 foreignSchema: Department,
-                foreignQuery: query(knex, Department).where(
+                foreignQuery: privateSource(knex, Department).where(
                     t => t.budget,
                     '>',
                     1000
@@ -528,13 +544,17 @@ describe('eager loading', () => {
     });
 
     it('joinMany with SchemaQueryBuilder as foreignQuery', () => {
-        const sql = query(knex, User)
+        const sql = privateSource(knex, User)
             .joinMany({
                 localColumn: t => t.id,
                 foreignColumn: t => t.authorId,
                 as: 'posts',
                 foreignSchema: Post,
-                foreignQuery: query(knex, Post).where(t => t.categoryId, '=', 5)
+                foreignQuery: privateSource(knex, Post).where(
+                    t => t.categoryId,
+                    '=',
+                    5
+                )
             })
             .toQuery();
 
@@ -542,7 +562,7 @@ describe('eager loading', () => {
     });
 
     it('joinMany SchemaQueryBuilder foreignQuery matches raw knex', () => {
-        const rawSql = query(knex, User)
+        const rawSql = privateSource(knex, User)
             .joinMany({
                 localColumn: t => t.id,
                 foreignColumn: t => t.authorId,
@@ -552,13 +572,17 @@ describe('eager loading', () => {
             })
             .toQuery();
 
-        const schemaSql = query(knex, User)
+        const schemaSql = privateSource(knex, User)
             .joinMany({
                 localColumn: t => t.id,
                 foreignColumn: t => t.authorId,
                 as: 'posts',
                 foreignSchema: Post,
-                foreignQuery: query(knex, Post).where(t => t.categoryId, '=', 5)
+                foreignQuery: privateSource(knex, Post).where(
+                    t => t.categoryId,
+                    '=',
+                    5
+                )
             })
             .toQuery();
 
@@ -567,7 +591,7 @@ describe('eager loading', () => {
 
     it('throws on duplicate field names', () => {
         expect(() => {
-            query(knex, User)
+            privateSource(knex, User)
                 .joinOne({
                     localColumn: t => t.departmentId,
                     foreignColumn: t => t.id,
@@ -586,7 +610,7 @@ describe('eager loading', () => {
     it('joinOne with .select() still includes localColumn in CTE', () => {
         // If the caller uses .select() and omits the join key (departmentId),
         // the generated SQL should still include it in the CTE so the join works.
-        const sql = query(knex, User)
+        const sql = privateSource(knex, User)
             .select(t => t.fullName) // intentionally omit departmentId
             .joinOne({
                 localColumn: t => t.departmentId,
@@ -603,7 +627,7 @@ describe('eager loading', () => {
     });
 
     it('joinMany with .select() still includes localColumn in CTE', () => {
-        const sql = query(knex, User)
+        const sql = privateSource(knex, User)
             .select(t => t.fullName) // intentionally omit id (localColumn for joinMany)
             .joinMany({
                 localColumn: t => t.id,
@@ -683,7 +707,7 @@ describe('mappers', () => {
     describe('validateMappers via joinOne/joinMany', () => {
         it('accepts a function mapper in joinOne spec', () => {
             expect(() =>
-                query(knex, User).joinOne({
+                privateSource(knex, User).joinOne({
                     localColumn: t => t.departmentId,
                     foreignColumn: t => t.id,
                     as: 'department',
@@ -695,7 +719,7 @@ describe('mappers', () => {
 
         it('accepts a built-in string mapper name in joinOne spec', () => {
             expect(() =>
-                query(knex, Post).joinOne({
+                privateSource(knex, Post).joinOne({
                     localColumn: t => t.authorId,
                     foreignColumn: t => t.id,
                     as: 'author',
@@ -707,7 +731,7 @@ describe('mappers', () => {
 
         it('rejects an unknown built-in string mapper name in joinOne spec', () => {
             expect(() =>
-                query(knex, User).joinOne({
+                privateSource(knex, User).joinOne({
                     localColumn: t => t.departmentId,
                     foreignColumn: t => t.id,
                     as: 'department',
@@ -719,7 +743,7 @@ describe('mappers', () => {
 
         it('accepts a built-in string mapper name in joinMany spec', () => {
             expect(() =>
-                query(knex, User).joinMany({
+                privateSource(knex, User).joinMany({
                     localColumn: t => t.id,
                     foreignColumn: t => t.authorId,
                     as: 'posts',
@@ -731,7 +755,7 @@ describe('mappers', () => {
 
         it('rejects a non-function, non-string mapper value', () => {
             expect(() =>
-                query(knex, User).joinOne({
+                privateSource(knex, User).joinOne({
                     localColumn: t => t.departmentId,
                     foreignColumn: t => t.id,
                     as: 'department',
@@ -750,16 +774,18 @@ describe('mappers', () => {
 // keys → column names; all other knex behaviour is preserved unchanged.
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('SQL parity with raw knex', () => {
+describe('private planner SQL parity with raw knex', () => {
     // ── SELECT ────────────────────────────────────────────────────────────
 
     it('SELECT *', () => {
-        expect(query(knex, User).toQuery()).toBe(knex('users').toQuery());
+        expect(privateSource(knex, User).toQuery()).toBe(
+            knex('users').toQuery()
+        );
     });
 
     it('SELECT specific columns (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .select(
                     t => t.fullName,
                     t => t.email,
@@ -772,38 +798,38 @@ describe('SQL parity with raw knex', () => {
     });
 
     it('SELECT specific columns (string key)', () => {
-        expect(query(knex, User).select('fullName', 'email').toQuery()).toBe(
-            knex('users').select('full_name', 'email').toQuery()
-        );
+        expect(
+            privateSource(knex, User).select('fullName', 'email').toQuery()
+        ).toBe(knex('users').select('full_name', 'email').toQuery());
     });
 
     it('SELECT — identity mapping (no hasColumnName)', () => {
-        expect(query(knex, SimpleTag).select('id', 'name').toQuery()).toBe(
-            knex('tags').select('id', 'name').toQuery()
-        );
+        expect(
+            privateSource(knex, SimpleTag).select('id', 'name').toQuery()
+        ).toBe(knex('tags').select('id', 'name').toQuery());
     });
 
     // ── DISTINCT ──────────────────────────────────────────────────────────
 
     it('DISTINCT (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .distinct(t => t.role)
                 .toQuery()
         ).toBe(knex('users').distinct('role').toQuery());
     });
 
     it('DISTINCT (string key)', () => {
-        expect(query(knex, User).distinct('departmentId').toQuery()).toBe(
-            knex('users').distinct('department_id').toQuery()
-        );
+        expect(
+            privateSource(knex, User).distinct('departmentId').toQuery()
+        ).toBe(knex('users').distinct('department_id').toQuery());
     });
 
     // ── WHERE ─────────────────────────────────────────────────────────────
 
     it('.where (operator, descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .where(t => t.fullName, '=', 'Alice')
                 .toQuery()
         ).toBe(knex('users').where('full_name', '=', 'Alice').toQuery());
@@ -811,19 +837,19 @@ describe('SQL parity with raw knex', () => {
 
     it('.where (operator, string key)', () => {
         expect(
-            query(knex, User).where('fullName', '=', 'Alice').toQuery()
+            privateSource(knex, User).where('fullName', '=', 'Alice').toQuery()
         ).toBe(knex('users').where('full_name', '=', 'Alice').toQuery());
     });
 
     it('.where (operator, identity column)', () => {
-        expect(query(knex, User).where('email', '=', 'a@b.com').toQuery()).toBe(
-            knex('users').where('email', '=', 'a@b.com').toQuery()
-        );
+        expect(
+            privateSource(knex, User).where('email', '=', 'a@b.com').toQuery()
+        ).toBe(knex('users').where('email', '=', 'a@b.com').toQuery());
     });
 
     it('.where (record)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .where({ fullName: 'Alice', role: 'admin' })
                 .toQuery()
         ).toBe(
@@ -833,7 +859,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.where (callback)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .where((b: KnexType.QueryBuilder) => {
                     b.where('role', 'admin');
                 })
@@ -849,7 +875,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.andWhere (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .where('role', '=', 'admin')
                 .andWhere(t => t.departmentId, '>', 5)
                 .toQuery()
@@ -863,7 +889,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.orWhere (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .where('role', '=', 'admin')
                 .orWhere(t => t.role, '=', 'editor')
                 .toQuery()
@@ -877,21 +903,21 @@ describe('SQL parity with raw knex', () => {
 
     it('.whereNot (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .whereNot(t => t.role, 'banned')
                 .toQuery()
         ).toBe(knex('users').whereNot('role', 'banned').toQuery());
     });
 
     it('.whereNot (string key)', () => {
-        expect(query(knex, User).whereNot('departmentId', 99).toQuery()).toBe(
-            knex('users').whereNot('department_id', 99).toQuery()
-        );
+        expect(
+            privateSource(knex, User).whereNot('departmentId', 99).toQuery()
+        ).toBe(knex('users').whereNot('department_id', 99).toQuery());
     });
 
     it('.whereIn (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .whereIn(t => t.role, ['admin', 'editor'])
                 .toQuery()
         ).toBe(knex('users').whereIn('role', ['admin', 'editor']).toQuery());
@@ -899,13 +925,15 @@ describe('SQL parity with raw knex', () => {
 
     it('.whereIn (string key, mapped column)', () => {
         expect(
-            query(knex, User).whereIn('departmentId', [1, 2, 3]).toQuery()
+            privateSource(knex, User)
+                .whereIn('departmentId', [1, 2, 3])
+                .toQuery()
         ).toBe(knex('users').whereIn('department_id', [1, 2, 3]).toQuery());
     });
 
     it('.whereNotIn (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .whereNotIn(t => t.role, ['banned'])
                 .toQuery()
         ).toBe(knex('users').whereNotIn('role', ['banned']).toQuery());
@@ -913,7 +941,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.whereNull (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .whereNull(t => t.managerId)
                 .toQuery()
         ).toBe(knex('users').whereNull('manager_id').toQuery());
@@ -921,7 +949,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.whereNotNull (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .whereNotNull(t => t.managerId)
                 .toQuery()
         ).toBe(knex('users').whereNotNull('manager_id').toQuery());
@@ -929,7 +957,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.orWhereNull (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .whereNull(t => t.managerId)
                 .orWhereNull(t => t.departmentId)
                 .toQuery()
@@ -943,7 +971,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.orWhereNotNull (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .whereNull(t => t.managerId)
                 .orWhereNotNull(t => t.departmentId)
                 .toQuery()
@@ -957,7 +985,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.whereBetween (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .whereBetween(t => t.departmentId, [1, 10])
                 .toQuery()
         ).toBe(knex('users').whereBetween('department_id', [1, 10]).toQuery());
@@ -965,7 +993,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.whereNotBetween (string key)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .whereNotBetween('departmentId', [20, 30])
                 .toQuery()
         ).toBe(
@@ -975,7 +1003,9 @@ describe('SQL parity with raw knex', () => {
 
     it('.whereRaw passthrough', () => {
         expect(
-            query(knex, User).whereRaw('full_name ILIKE ?', '%smith%').toQuery()
+            privateSource(knex, User)
+                .whereRaw('full_name ILIKE ?', '%smith%')
+                .toQuery()
         ).toBe(
             knex('users').whereRaw('full_name ILIKE ?', '%smith%').toQuery()
         );
@@ -985,21 +1015,21 @@ describe('SQL parity with raw knex', () => {
 
     it('.orderBy asc (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .orderBy(t => t.fullName, 'asc')
                 .toQuery()
         ).toBe(knex('users').orderBy('full_name', 'asc').toQuery());
     });
 
     it('.orderBy desc (string key)', () => {
-        expect(query(knex, User).orderBy('createdAt', 'desc').toQuery()).toBe(
-            knex('users').orderBy('created_at', 'desc').toQuery()
-        );
+        expect(
+            privateSource(knex, User).orderBy('createdAt', 'desc').toQuery()
+        ).toBe(knex('users').orderBy('created_at', 'desc').toQuery());
     });
 
     it('.orderByRaw passthrough', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .orderByRaw('"created_at" DESC NULLS LAST')
                 .toQuery()
         ).toBe(
@@ -1010,19 +1040,19 @@ describe('SQL parity with raw knex', () => {
     // ── LIMIT / OFFSET ────────────────────────────────────────────────────
 
     it('.limit', () => {
-        expect(query(knex, User).limit(25).toQuery()).toBe(
+        expect(privateSource(knex, User).limit(25).toQuery()).toBe(
             knex('users').limit(25).toQuery()
         );
     });
 
     it('.offset', () => {
-        expect(query(knex, User).offset(50).toQuery()).toBe(
+        expect(privateSource(knex, User).offset(50).toQuery()).toBe(
             knex('users').offset(50).toQuery()
         );
     });
 
     it('.limit + .offset', () => {
-        expect(query(knex, User).limit(10).offset(20).toQuery()).toBe(
+        expect(privateSource(knex, User).limit(10).offset(20).toQuery()).toBe(
             knex('users').limit(10).offset(20).toQuery()
         );
     });
@@ -1031,33 +1061,33 @@ describe('SQL parity with raw knex', () => {
 
     it('.groupBy (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .groupBy(t => t.role)
                 .toQuery()
         ).toBe(knex('users').groupBy('role').toQuery());
     });
 
     it('.groupBy (string key, mapped column)', () => {
-        expect(query(knex, User).groupBy('departmentId').toQuery()).toBe(
-            knex('users').groupBy('department_id').toQuery()
-        );
+        expect(
+            privateSource(knex, User).groupBy('departmentId').toQuery()
+        ).toBe(knex('users').groupBy('department_id').toQuery());
     });
 
     it('.groupBy multiple columns', () => {
         expect(
-            query(knex, User).groupBy('role', 'departmentId').toQuery()
+            privateSource(knex, User).groupBy('role', 'departmentId').toQuery()
         ).toBe(knex('users').groupBy('role', 'department_id').toQuery());
     });
 
     it('.groupByRaw passthrough', () => {
-        expect(query(knex, User).groupByRaw('"role"').toQuery()).toBe(
+        expect(privateSource(knex, User).groupByRaw('"role"').toQuery()).toBe(
             knex('users').groupByRaw('"role"').toQuery()
         );
     });
 
     it('.having (string key)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .groupBy('role')
                 .having('role', '!=', 'banned')
                 .toQuery()
@@ -1071,7 +1101,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.havingRaw passthrough', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .groupBy('role')
                 .havingRaw('count(*) > 5')
                 .toQuery()
@@ -1083,14 +1113,14 @@ describe('SQL parity with raw knex', () => {
     // ── AGGREGATES ────────────────────────────────────────────────────────
 
     it('.count()', () => {
-        expect(query(knex, User).count().toQuery()).toBe(
+        expect(privateSource(knex, User).count().toQuery()).toBe(
             knex('users').count().toQuery()
         );
     });
 
     it('.count(column, descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .count(t => t.id)
                 .toQuery()
         ).toBe(knex('users').count('id').toQuery());
@@ -1098,7 +1128,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.countDistinct(column, descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .countDistinct(t => t.departmentId)
                 .toQuery()
         ).toBe(knex('users').countDistinct('department_id').toQuery());
@@ -1106,7 +1136,7 @@ describe('SQL parity with raw knex', () => {
 
     it('.min (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .min(t => t.createdAt)
                 .toQuery()
         ).toBe(knex('users').min('created_at').toQuery());
@@ -1114,20 +1144,20 @@ describe('SQL parity with raw knex', () => {
 
     it('.max (descriptor)', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .max(t => t.createdAt)
                 .toQuery()
         ).toBe(knex('users').max('created_at').toQuery());
     });
 
     it('.sum (string key)', () => {
-        expect(query(knex, User).sum('departmentId').toQuery()).toBe(
+        expect(privateSource(knex, User).sum('departmentId').toQuery()).toBe(
             knex('users').sum('department_id').toQuery()
         );
     });
 
     it('.avg (string key)', () => {
-        expect(query(knex, User).avg('departmentId').toQuery()).toBe(
+        expect(privateSource(knex, User).avg('departmentId').toQuery()).toBe(
             knex('users').avg('department_id').toQuery()
         );
     });
@@ -1136,7 +1166,7 @@ describe('SQL parity with raw knex', () => {
 
     it('combined: SELECT + WHERE + ORDER BY + LIMIT + OFFSET', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .select(
                     t => t.fullName,
                     t => t.email,
@@ -1162,7 +1192,7 @@ describe('SQL parity with raw knex', () => {
 
     it('combined: WHERE complex + GROUP BY + HAVING', () => {
         expect(
-            query(knex, User)
+            privateSource(knex, User)
                 .select(t => t.role)
                 .whereIn(t => t.role, ['admin', 'editor'])
                 .groupBy(t => t.role)
@@ -1182,7 +1212,7 @@ describe('SQL parity with raw knex', () => {
     describe('knex.raw() as column argument', () => {
         it('.where(knex.raw()) — raw as full WHERE expression', () => {
             expect(
-                query(knex, User)
+                privateSource(knex, User)
                     .where(knex.raw('status = ?', ['active']))
                     .toQuery()
             ).toBe(
@@ -1194,7 +1224,7 @@ describe('SQL parity with raw knex', () => {
 
         it('.where(knex.raw(), operator, value) — raw as LHS column', () => {
             expect(
-                query(knex, User)
+                privateSource(knex, User)
                     .where(knex.raw('"full_name"'), '=', 'Alice')
                     .toQuery()
             ).toBe(
@@ -1206,7 +1236,7 @@ describe('SQL parity with raw knex', () => {
 
         it('.andWhere(knex.raw())', () => {
             expect(
-                query(knex, User)
+                privateSource(knex, User)
                     .where('role', '=', 'admin')
                     .andWhere(knex.raw('deleted_at IS NULL'))
                     .toQuery()
@@ -1220,7 +1250,7 @@ describe('SQL parity with raw knex', () => {
 
         it('.orWhere(knex.raw())', () => {
             expect(
-                query(knex, User)
+                privateSource(knex, User)
                     .where('role', '=', 'admin')
                     .orWhere(knex.raw('role = ?', ['superuser']))
                     .toQuery()
@@ -1234,7 +1264,7 @@ describe('SQL parity with raw knex', () => {
 
         it('.whereNot(knex.raw())', () => {
             expect(
-                query(knex, User)
+                privateSource(knex, User)
                     .whereNot(knex.raw('deleted_at IS NULL'))
                     .toQuery()
             ).toBe(
@@ -1244,7 +1274,7 @@ describe('SQL parity with raw knex', () => {
 
         it('.select(knex.raw()) — computed expression', () => {
             expect(
-                query(knex, User)
+                privateSource(knex, User)
                     .select(knex.raw('count(*) as total'))
                     .toQuery()
             ).toBe(
@@ -1254,7 +1284,7 @@ describe('SQL parity with raw knex', () => {
 
         it('.select() mixing schema column and knex.raw()', () => {
             expect(
-                query(knex, User)
+                privateSource(knex, User)
                     .select(t => t.role, knex.raw('count(*) as total'))
                     .toQuery()
             ).toBe(
@@ -1266,13 +1296,13 @@ describe('SQL parity with raw knex', () => {
 
         it('.distinct(knex.raw())', () => {
             expect(
-                query(knex, User).distinct(knex.raw('"role"')).toQuery()
+                privateSource(knex, User).distinct(knex.raw('"role"')).toQuery()
             ).toBe(knex('users').distinct(knex.raw('"role"')).toQuery());
         });
 
         it('.orderBy(knex.raw())', () => {
             expect(
-                query(knex, User)
+                privateSource(knex, User)
                     .orderBy(knex.raw('"created_at" DESC NULLS LAST'))
                     .toQuery()
             ).toBe(
@@ -1284,7 +1314,7 @@ describe('SQL parity with raw knex', () => {
 
         it('.groupBy(knex.raw())', () => {
             expect(
-                query(knex, User)
+                privateSource(knex, User)
                     .groupBy(knex.raw("date_trunc('day', created_at)"))
                     .toQuery()
             ).toBe(
@@ -1296,7 +1326,7 @@ describe('SQL parity with raw knex', () => {
 
         it('.groupBy() mixing schema column and knex.raw()', () => {
             expect(
-                query(knex, User)
+                privateSource(knex, User)
                     .groupBy(
                         t => t.role,
                         knex.raw("date_trunc('day', created_at)")
@@ -1311,7 +1341,7 @@ describe('SQL parity with raw knex', () => {
 
         it('.having(knex.raw(), operator, value)', () => {
             expect(
-                query(knex, User)
+                privateSource(knex, User)
                     .groupBy(t => t.role)
                     .having(knex.raw('count(*)'), '>', 5)
                     .toQuery()
@@ -1335,7 +1365,15 @@ describe('createQuery factory', () => {
     const q = createQuery(knex);
 
     it('produces same SQL as query(knex, schema) for SELECT *', () => {
-        expect(q(User).toQuery()).toBe(query(knex, User).toQuery());
+        expect(
+            q(User)
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
+        ).toBe(
+            query(knex, User)
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
+        );
     });
 
     it('produces same SQL for WHERE via descriptor', () => {
@@ -1343,10 +1381,12 @@ describe('createQuery factory', () => {
             q(User)
                 .where(t => t.fullName, '=', 'Alice')
                 .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
         ).toBe(
             query(knex, User)
                 .where(t => t.fullName, '=', 'Alice')
                 .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
         );
     });
 
@@ -1357,27 +1397,22 @@ describe('createQuery factory', () => {
                 .orderBy(t => t.createdAt, 'desc')
                 .limit(10)
                 .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
         ).toBe(
             query(knex, User)
                 .where(t => t.role, '=', 'admin')
                 .orderBy(t => t.createdAt, 'desc')
                 .limit(10)
                 .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
         );
     });
 
-    it('the baseQuery overload works', () => {
-        const base1 = knex('users').where('deleted_at', null);
-        const base2 = knex('users').where('deleted_at', null);
-        expect(
-            q(User, base1)
-                .where(t => t.role, '=', 'admin')
-                .toQuery()
-        ).toBe(
-            query(knex, User, base2)
-                .where(t => t.role, '=', 'admin')
-                .toQuery()
-        );
+    it('raw SQL extensions declare their output explicitly', () => {
+        const schema = object({ role: string() });
+        const configured = q(User).selectRaw('role', [], { output: schema });
+        expect(configured.rowSchema).toBe(schema);
+        expect(configured.toQuery()).toContain('select role');
     });
 
     it('works with joinOne', () => {
@@ -1390,6 +1425,7 @@ describe('createQuery factory', () => {
                     foreignSchema: Department
                 })
                 .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
         ).toBe(
             query(knex, User)
                 .joinOne({
@@ -1399,6 +1435,7 @@ describe('createQuery factory', () => {
                     foreignSchema: Department
                 })
                 .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
         );
     });
 
@@ -1412,6 +1449,7 @@ describe('createQuery factory', () => {
                     foreignSchema: Post
                 })
                 .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
         ).toBe(
             query(knex, User)
                 .joinMany({
@@ -1421,6 +1459,7 @@ describe('createQuery factory', () => {
                     foreignSchema: Post
                 })
                 .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
         );
     });
 
@@ -1430,7 +1469,15 @@ describe('createQuery factory', () => {
         // Both produce the same SQL — knex client config doesn't affect SQL
         // generation without a real connection, but they must be independent objects
         expect(q(User)).not.toBe(q2(User));
-        expect(q(User).toQuery()).toBe(q2(User).toQuery());
+        expect(
+            q(User)
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
+        ).toBe(
+            q2(User)
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read')
+        );
         knex2.destroy();
     });
 });
@@ -1462,7 +1509,8 @@ describe('transaction support', () => {
             const sql = query(knex, User)
                 .where(t => t.role, '=', 'admin')
                 .transacting(trx)
-                .toQuery();
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read');
             expect(sql).toContain('"role" = \'admin\'');
         });
 
@@ -1470,8 +1518,9 @@ describe('transaction support', () => {
             const sql = query(knex, User)
                 .orderBy(t => t.createdAt, 'desc')
                 .transacting(trx)
-                .toQuery();
-            expect(sql).toContain('order by "created_at" desc');
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read');
+            expect(sql).toContain('order by "__schema_read"."created_at" desc');
         });
 
         it('preserves LIMIT / OFFSET after transacting()', () => {
@@ -1479,12 +1528,13 @@ describe('transaction support', () => {
                 .limit(10)
                 .offset(5)
                 .transacting(trx)
-                .toQuery();
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read');
             expect(sql).toContain('limit 10');
             expect(sql).toContain('offset 5');
         });
 
-        it('transacting() after joinOne preserves CTE structure', () => {
+        it('transacting() after joinOne preserves correlated relation SQL', () => {
             const sql = query(knex, User)
                 .joinOne({
                     localColumn: t => t.departmentId,
@@ -1493,15 +1543,16 @@ describe('transaction support', () => {
                     foreignSchema: Department
                 })
                 .transacting(trx)
-                .toQuery();
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read');
 
-            expect(sql).toContain('with "originalQuery" as');
+            expect(sql).toContain('to_jsonb');
             expect(sql).toContain('"departments"');
-            expect(sql).toContain('jsonb_agg');
+            expect(sql).toContain('limit 1');
             expect(sql).toContain('"department"');
         });
 
-        it('transacting() after joinMany preserves CTE structure', () => {
+        it('transacting() after joinMany preserves correlated relation SQL', () => {
             const sql = query(knex, User)
                 .joinMany({
                     localColumn: t => t.id,
@@ -1510,9 +1561,10 @@ describe('transaction support', () => {
                     foreignSchema: Post
                 })
                 .transacting(trx)
-                .toQuery();
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read');
 
-            expect(sql).toContain('with "originalQuery" as');
+            expect(sql).toContain('to_jsonb');
             expect(sql).toContain('"posts"');
             expect(sql).toContain('jsonb_agg');
             expect(sql).toContain('coalesce');
@@ -1522,13 +1574,15 @@ describe('transaction support', () => {
             const plain = query(knex, User)
                 .where(t => t.departmentId, '>', 3)
                 .orderBy(t => t.fullName)
-                .toQuery();
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read');
 
             const transacted = query(knex, User)
                 .where(t => t.departmentId, '>', 3)
                 .orderBy(t => t.fullName)
                 .transacting(trx)
-                .toQuery();
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read');
 
             expect(transacted).toBe(plain);
         });
@@ -1538,7 +1592,8 @@ describe('transaction support', () => {
                 .transacting(trx)
                 .where(t => t.role, '=', 'editor')
                 .limit(20)
-                .toQuery();
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read');
 
             expect(sql).toContain('"role" = \'editor\'');
             expect(sql).toContain('limit 20');
@@ -1556,7 +1611,15 @@ describe('transaction support', () => {
 
         it('withTransaction() factory produces same SQL as query(trx, schema)', () => {
             const dbTrx = db.withTransaction(trx);
-            expect(dbTrx(User).toQuery()).toBe(query(knex, User).toQuery());
+            expect(
+                dbTrx(User)
+                    .toQuery()
+                    .replace(/__schema_read_\d+/g, '__schema_read')
+            ).toBe(
+                query(knex, User)
+                    .toQuery()
+                    .replace(/__schema_read_\d+/g, '__schema_read')
+            );
         });
 
         it('withTransaction() factory supports chaining', () => {
@@ -1565,17 +1628,24 @@ describe('transaction support', () => {
                 .where(t => t.role, '=', 'admin')
                 .orderBy(t => t.createdAt, 'desc')
                 .limit(5)
-                .toQuery();
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read');
 
             expect(sql).toContain('"role" = \'admin\'');
-            expect(sql).toContain('order by "created_at" desc');
+            expect(sql).toContain('order by "__schema_read"."created_at" desc');
             expect(sql).toContain('limit 5');
         });
 
         it('withTransaction() does not affect the original bound factory', () => {
-            const plainSql = db(User).toQuery();
+            const plainSql = db(User)
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read');
             db.withTransaction(trx); // should not mutate db
-            expect(db(User).toQuery()).toBe(plainSql);
+            expect(
+                db(User)
+                    .toQuery()
+                    .replace(/__schema_read_\d+/g, '__schema_read')
+            ).toBe(plainSql);
         });
 
         it('withTransaction() supports joinOne', () => {
@@ -1587,7 +1657,8 @@ describe('transaction support', () => {
                     as: 'department',
                     foreignSchema: Department
                 })
-                .toQuery();
+                .toQuery()
+                .replace(/__schema_read_\d+/g, '__schema_read');
 
             expect(sql).toContain('"departments"');
             expect(sql).toContain('"department"');
@@ -1650,7 +1721,8 @@ describe('transaction support', () => {
                 await db.transaction(async dbTrx => {
                     sql = dbTrx(User)
                         .where(t => t.role, '=', 'admin')
-                        .toQuery();
+                        .toQuery()
+                        .replace(/__schema_read_\d+/g, '__schema_read');
                 });
             } finally {
                 spy.mockRestore();
@@ -1672,7 +1744,8 @@ describe('default extensions', () => {
         }).hasTableName('test');
         const sql = db(Schema)
             .where(t => t.id, '=', '1234')
-            .toQuery();
+            .toQuery()
+            .replace(/__schema_read_\d+/g, '__schema_read');
         expect(sql).toContain('"id" = \'1234\'');
     });
 });

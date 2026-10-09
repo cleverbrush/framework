@@ -1,343 +1,364 @@
-// @cleverbrush/orm — Polymorphic write helpers
-//
-// Runtime implementations for `insertVariant`, `updateVariant`,
-// `deleteVariant`, and `findVariant`. These are invoked from `DbSet` /
-// `EntityQuery` and handle the two-table atomicity required for CTI
-// (Class Table Inheritance) variants.
-
+// Polymorphic writes share the ordinary storage codecs and timestamp pipeline.
+// Hooks operate on one logical entity before payloads are split across tables.
 import {
     buildColumnMap,
     getPrimaryKeyColumns,
     getVariants,
+    object,
+    type PolymorphicQueryBuilder,
     query as schemaQuery
 } from '@cleverbrush/knex-schema';
+import type { ObjectSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 
-// ---------------------------------------------------------------------------
-// Internal helpers
-// ---------------------------------------------------------------------------
+type Row = Record<string, any>;
+type Schema = ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+type Mutation = 'update' | 'delete' | 'restore' | 'hardDelete';
 
-/**
- * Resolve the variant config for a schema, throwing if the schema is not
- * polymorphic or if the requested variant key is unknown.
- * @internal
- */
-function requireVariantSpec(schema: any, variantKey: string) {
-    const raw = getVariants(schema);
-    if (!raw) {
-        throw new Error(
-            `insertVariant / deleteVariant / updateVariant / findVariant: ` +
-                `entity schema is not polymorphic (no variants declared).`
-        );
+const lifecycle = new Set([
+    'beforeInsert',
+    'afterInsert',
+    'beforeUpdate',
+    'beforeDelete'
+]);
+
+/** Keep physical-table metadata; lifecycle hooks run once on the logical row. */
+function storageSchema(
+    schema: Schema,
+    properties: Record<
+        string,
+        SchemaBuilder<any, any, any, any, any>
+    > = schema.introspect().properties,
+    relations: readonly { name: string }[] = []
+): Schema {
+    const navigation = new Set(
+        [
+            ...((schema.getExtension('relations') as
+                | { name: string }[]
+                | undefined) ?? []),
+            ...relations
+        ].map(relation => relation.name)
+    );
+    let stored: Schema = object(
+        Object.fromEntries(
+            Object.entries(properties).filter(([name]) => !navigation.has(name))
+        )
+    );
+    for (const [key, value] of Object.entries(
+        schema.introspect().extensions ?? {}
+    )) {
+        if (
+            key !== 'variants' &&
+            key !== 'polymorphicVariants' &&
+            key !== 'defaultScope' &&
+            !lifecycle.has(key)
+        )
+            stored = stored.withExtension(key, value) as Schema;
     }
-    const spec = raw.variants[variantKey];
-    if (!spec) {
-        const known = Object.keys(raw.variants).join(', ');
-        throw new Error(
-            `Variant key "${variantKey}" is unknown. Known variants: ${known}.`
-        );
-    }
-    return { config: raw, spec };
+    return stored;
 }
 
-/**
- * Derive the SQL discriminator column name from the schema's propToCol map.
- * @internal
- */
-function _resolveDiscriminatorColumn(
-    schema: any,
-    discriminatorKey: string
-): string {
-    const { propToCol } = buildColumnMap(schema);
-    return propToCol.get(discriminatorKey) ?? discriminatorKey;
+function layout(schema: Schema, key: string) {
+    const config = getVariants(schema);
+    const spec = config?.variants[key];
+    if (!config || !spec)
+        throw new Error(`Unknown polymorphic variant: ${key}`);
+    const pk = getPrimaryKeyColumns(schema);
+    if (pk.propertyKeys.length !== 1)
+        throw new Error('Variant writes require a single-column primary key');
+    const baseMap = buildColumnMap(storageSchema(schema));
+    const body = storageSchema(spec.schema, undefined, spec.relations);
+    const bodyMap = buildColumnMap(body);
+    const base = storageSchema(
+        schema,
+        spec.storage === 'sti'
+            ? {
+                  ...schema.introspect().properties,
+                  ...spec.schema.introspect().properties
+              }
+            : undefined,
+        spec.storage === 'sti'
+            ? [
+                  ...spec.relations,
+                  ...((spec.schema.getExtension('relations') as
+                      | { name: string }[]
+                      | undefined) ?? [])
+              ]
+            : []
+    );
+    return {
+        config,
+        spec,
+        base,
+        body,
+        baseMap,
+        bodyMap,
+        pk: pk.propertyKeys[0],
+        pkColumn: pk.columnNames[0],
+        foreignKey: bodyMap.colToProp.get(spec.foreignKey ?? ''),
+        table: schema.getExtension('tableName') as string,
+        discriminatorColumn: baseMap.propToCol.get(config.discriminatorKey)!,
+        hooks: (name: string): Function[] =>
+            [schema, spec.schema].flatMap(
+                s => (s.getExtension(name) as Function[] | undefined) ?? []
+            )
+    };
 }
 
-// ---------------------------------------------------------------------------
-// insertVariant
-// ---------------------------------------------------------------------------
+function assertPatch(meta: ReturnType<typeof layout>, patch: Row): void {
+    const protectedKeys = new Set([
+        meta.pk,
+        meta.pkColumn,
+        meta.config.discriminatorKey,
+        meta.discriminatorColumn,
+        ...(meta.spec.storage === 'cti'
+            ? [meta.foreignKey, meta.spec.foreignKey]
+            : [])
+    ]);
+    for (const prop of Object.keys(patch)) {
+        if (protectedKeys.has(prop))
+            throw new Error(
+                `Variant updates cannot change identity property "${prop}"`
+            );
+        if (
+            !meta.baseMap.propToCol.has(prop) &&
+            !meta.bodyMap.propToCol.has(prop)
+        )
+            throw new Error(`Unknown variant property: ${prop}`);
+    }
+}
 
-/**
- * Transactionally insert a polymorphic entity row.
- *
- * For CTI variants:
- *   1. Inserts the base row with `discriminatorColumn = variantKey` and all
- *      base-table payload columns; captures the auto-generated PK.
- *   2. Inserts the variant row with the FK set to the base PK and all
- *      variant-table payload columns.
- *
- * For STI variants:
- *   - Inserts a single row into the base table with the discriminator set.
- *
- * @internal
- */
+async function prepare(hooks: Function[], input: Row): Promise<Row> {
+    let data = { ...input };
+    for (const hook of hooks) data = (await hook(data)) ?? data;
+    return data;
+}
+
+function split(meta: ReturnType<typeof layout>, data: Row): [Row, Row] {
+    const base: Row = {};
+    const body: Row = {};
+    for (const [key, value] of Object.entries(data)) {
+        if (meta.baseMap.propToCol.has(key)) base[key] = value;
+        else if (meta.bodyMap.propToCol.has(key)) body[key] = value;
+    }
+    return [base, body];
+}
+
+// An STI body shares the physical base table, but can name additional timestamp
+// columns. The ordinary writer handles the base schema's timestamps itself.
+function stiTimestamps(
+    meta: ReturnType<typeof layout>,
+    db: Knex,
+    data: Row,
+    insert: boolean
+): Row {
+    const timestamps = meta.body.getExtension('timestamps') as
+        | { createdAt: string; updatedAt: string }
+        | undefined;
+    if (!timestamps) return data;
+    const columns = buildColumnMap(meta.base).colToProp;
+    return {
+        ...data,
+        ...(insert
+            ? {
+                  [columns.get(timestamps.createdAt) ?? timestamps.createdAt]:
+                      db.fn.now()
+              }
+            : {}),
+        [columns.get(timestamps.updatedAt) ?? timestamps.updatedAt]: db.fn.now()
+    };
+}
+
+// RETURNING must not replay default-scope callbacks or hide a row which a
+// successful mutation just moved outside a scope. Decode the stored branch.
+function storedVariantQuery(db: Knex, schema: Schema, key: string) {
+    const config = getVariants(schema)!;
+    const spec = config.variants[key];
+    const stored = schema
+        .withExtension('defaultScope', undefined)
+        .withExtension('variants', {
+            ...config,
+            variants: {
+                [key]: {
+                    ...spec,
+                    schema: spec.schema
+                        .withExtension('defaultScope', undefined)
+                        .withExtension('softDelete', undefined)
+                }
+            }
+        });
+    return (schemaQuery(db, stored) as any).selectVariants([key]).withDeleted();
+}
+
+function readRows(
+    db: Knex,
+    schema: Schema,
+    key: string,
+    ids: readonly unknown[]
+): Promise<Row[]> {
+    const pk = getPrimaryKeyColumns(schema).propertyKeys[0];
+    return storedVariantQuery(db, schema, key).whereIn(pk, ids).execute();
+}
+
+/** @internal Atomic insert, including hooks and both CTI storage rows. */
 export async function insertVariant(
     knex: Knex,
-    schema: any,
+    schema: Schema,
     variantKey: string,
-    payload: Record<string, unknown>,
+    payload: Row,
     trx?: Knex.Transaction
-): Promise<Record<string, unknown>> {
-    // Validate before opening a transaction so errors surface immediately.
-    const { config, spec } = requireVariantSpec(schema, variantKey);
-
-    const run = async (t: Knex): Promise<Record<string, unknown>> => {
-        const discKey = config.discriminatorKey;
-        const baseTableName = schema.getExtension?.('tableName') as string;
-        if (!baseTableName) {
-            throw new Error('insertVariant: base schema has no table name.');
-        }
-
-        if (spec.storage === 'sti') {
-            // Single-table: insert into base table with discriminator column
-            const row = { ...payload, [discKey]: variantKey };
-            const sqb = schemaQuery(t, schema) as unknown as {
-                insert: (data: unknown) => Promise<Record<string, unknown>>;
-            };
-            return (await sqb.insert(row)) ?? row;
-        }
-
-        // CTI: two-table insert
-        const variantSchema = spec.schema;
-        const variantTableName = spec.tableName as string;
-        const fkCol = spec.foreignKey as string;
-
-        // Split payload between base-schema columns and variant-schema columns
-        const baseIntrospected = (schema as any).introspect?.() as {
-            properties?: Record<string, unknown>;
-        };
-        const variantIntrospected = variantSchema.introspect?.() as {
-            properties?: Record<string, unknown>;
-        };
-        const basePropKeys = new Set(
-            Object.keys(baseIntrospected?.properties ?? {})
-        );
-        const variantPropKeys = new Set(
-            Object.keys(variantIntrospected?.properties ?? {})
-        );
-
-        const basePayload: Record<string, unknown> = { [discKey]: variantKey };
-        const variantPayload: Record<string, unknown> = {};
-
-        for (const [key, val] of Object.entries(payload)) {
-            // Discriminator is set automatically; FK is set from base PK
-            if (key === discKey || key === fkCol) continue;
-            if (basePropKeys.has(key)) {
-                basePayload[key] = val;
-            } else if (variantPropKeys.has(key)) {
-                variantPayload[key] = val;
-            }
-            // Keys that match neither schema are silently dropped
-        }
-
-        // 1. Insert base row using raw knex (not SchemaQueryBuilder) to avoid
-        //    polymorphic result-resolution running before the variant row exists.
-        const { propToCol: basePropToCol } = buildColumnMap(schema);
-        const baseRowForInsert: Record<string, unknown> = {};
-        for (const [propKey, val] of Object.entries(basePayload)) {
-            baseRowForInsert[basePropToCol.get(propKey) ?? propKey] = val;
-        }
-        const baseInsertResult = await (t as unknown as Knex)(baseTableName)
-            .insert(baseRowForInsert)
-            .returning('*');
-        const baseRow: Record<string, unknown> =
-            Array.isArray(baseInsertResult) && baseInsertResult.length > 0
-                ? (baseInsertResult[0] as Record<string, unknown>)
-                : baseRowForInsert;
-
-        // Resolve the base PK value from the returned row
-        const pkInfo = getPrimaryKeyColumns(schema);
-        if (pkInfo.propertyKeys.length === 0) {
-            throw new Error(
-                `insertVariant: base schema has no primary key declared.`
+): Promise<Row> {
+    const meta = layout(schema, variantKey);
+    // A transaction on an existing transaction creates a savepoint. A caller
+    // may catch a failed write without retaining a partially inserted entity.
+    return (trx ?? knex).transaction(async t => {
+        const data = await prepare(meta.hooks('beforeInsert'), {
+            ...payload,
+            [meta.config.discriminatorKey]: variantKey
+        });
+        data[meta.config.discriminatorKey] = variantKey;
+        const [baseData, bodyData] = split(meta, data);
+        let result: Row;
+        if (meta.spec.storage === 'sti') {
+            result = await schemaQuery(t, meta.base).insert(
+                stiTimestamps(meta, t, { ...baseData, ...bodyData }, true)
             );
+        } else {
+            const base = await schemaQuery(t, meta.base).insert(baseData);
+            // foreignKey is the schema property name, not its SQL column name.
+            bodyData[meta.foreignKey!] = base[meta.pk];
+            if (meta.bodyMap.propToCol.has(meta.config.discriminatorKey))
+                bodyData[meta.config.discriminatorKey] = variantKey;
+            await schemaQuery(t, meta.body).insert(bodyData);
+            [result] = await readRows(t, schema, variantKey, [base[meta.pk]]);
+            if (!result)
+                throw new Error('Inserted variant could not be read back');
         }
-        if (pkInfo.propertyKeys.length > 1) {
-            throw new Error(
-                `insertVariant: composite primary keys are not yet supported for polymorphic CTI inserts.`
-            );
-        }
-        const pkPropKey = pkInfo.propertyKeys[0];
-        const pkColName = pkInfo.columnNames[0];
-        const pkValue = baseRow[pkPropKey] ?? baseRow[pkColName];
-        if (pkValue === undefined) {
-            throw new Error(
-                `insertVariant: could not resolve PK value from base insert result.`
-            );
-        }
-
-        // 2. Insert variant row using raw knex (not SchemaQueryBuilder) so we
-        //    can set the FK column even if it isn't in the schema's column map.
-        const { propToCol: varPropToCol } = buildColumnMap(variantSchema);
-        const variantRow: Record<string, unknown> = { [fkCol]: pkValue };
-        for (const [propKey, val] of Object.entries(variantPayload)) {
-            const colName = varPropToCol.get(propKey) ?? propKey;
-            variantRow[colName] = val;
-        }
-        const discColInVariant = varPropToCol.get(discKey);
-        if (discColInVariant) {
-            variantRow[discColInVariant] = variantKey;
-        }
-        await (t as unknown as Knex)(variantTableName).insert(variantRow);
-
-        // 3. Merge and return
-        const { colToProp: baseColToProp } = buildColumnMap(schema);
-        const result: Record<string, unknown> = {};
-        for (const [col, val] of Object.entries(baseRow)) {
-            result[baseColToProp.get(col) ?? col] = val;
-        }
-        // Ensure discriminator and variant payload are in the result
-        result[discKey] = variantKey;
-        for (const [propKey, val] of Object.entries(variantPayload)) {
-            result[propKey] = val;
-        }
+        for (const hook of meta.hooks('afterInsert')) await hook(result);
         return result;
-    };
-
-    if (trx) return run(trx as unknown as Knex);
-    return (knex as Knex).transaction(t => run(t as unknown as Knex));
+    });
 }
 
-// ---------------------------------------------------------------------------
-// updateVariant
-// ---------------------------------------------------------------------------
-
-/**
- * Update variant-specific columns for all rows matching the current query
- * whose discriminator equals `variantKey`.
- *
- * For CTI: runs UPDATE on the variant table, joining on the FK = base PK.
- * For STI: runs UPDATE on the base table filtered by discriminator.
- *
- * The `getPks` callback must return the PK values of all rows the caller's
- * WHERE clause matched (resolved before this function is called).
- *
- * @internal
- */
-export async function updateVariant(
-    knex: Knex,
-    schema: any,
-    variantKey: string,
-    set: Record<string, unknown>,
-    pkValues: readonly unknown[],
-    trx?: Knex.Transaction
-): Promise<void> {
-    if (pkValues.length === 0) return;
-
-    const db: Knex = (trx as unknown as Knex) ?? knex;
-    const { config, spec } = requireVariantSpec(schema, variantKey);
-    const discKey = config.discriminatorKey;
-
-    if (spec.storage === 'sti') {
-        // STI: update the base table restricted to the discriminator value
-        const { propToCol } = buildColumnMap(schema);
-        const discCol = propToCol.get(discKey) ?? discKey;
-        const pkInfo = getPrimaryKeyColumns(schema);
-        if (pkInfo.columnNames.length === 0) {
-            throw new Error(
-                `updateVariant: base schema has no primary key declared.`
-            );
-        }
-        if (pkInfo.columnNames.length > 1) {
-            throw new Error(
-                `updateVariant: composite primary keys are not supported for STI updates.`
-            );
-        }
-        const pkColName = pkInfo.columnNames[0];
-        const baseTable = schema.getExtension?.('tableName') as string;
-
-        const updateData: Record<string, unknown> = {};
-        for (const [propKey, val] of Object.entries(set)) {
-            updateData[propToCol.get(propKey) ?? propKey] = val;
-        }
-
-        await db(baseTable)
-            .whereIn(pkColName, pkValues as any[])
-            .andWhere(discCol, variantKey)
-            .update(updateData);
-        return;
-    }
-
-    // CTI: update the variant table
-    const variantSchema = spec.schema;
-    const variantTableName = spec.tableName as string;
-    const fkCol = spec.foreignKey as string;
-    const { propToCol: varPropToCol } = buildColumnMap(variantSchema);
-
-    const updateData: Record<string, unknown> = {};
-    for (const [propKey, val] of Object.entries(set)) {
-        // Don't allow updating the FK (it's the join column)
-        if (propKey === fkCol) continue;
-        updateData[varPropToCol.get(propKey) ?? propKey] = val;
-    }
-
-    if (Object.keys(updateData).length === 0) return;
-
-    await db(variantTableName)
-        .whereIn(fkCol, pkValues as any[])
-        .update(updateData);
+/** @internal Shared result for explicit writes and optimistic tracked saves. */
+export interface VariantMutationResult {
+    rows: Row[];
+    count: number;
 }
 
-// ---------------------------------------------------------------------------
-// deleteVariant
-// ---------------------------------------------------------------------------
-
 /**
- * Delete rows for a specific variant key, given their base-table PK values.
- *
- * For CTI: deletes variant rows first (FK-constraint order), then base rows.
- * For STI: deletes the single base-table row filtered by discriminator.
- *
- * @internal
+ * @internal Apply a single variant mutation within a transaction/savepoint.
+ * Selection is untracked and locks base rows, then CTI rows, in primary-key order.
+ * Recheck predicates after waiting for locks before invoking any lifecycle hook.
  */
-export async function deleteVariant(
+export async function mutateVariant(
     knex: Knex,
-    schema: any,
+    schema: Schema,
     variantKey: string,
-    pkValues: readonly unknown[],
-    trx?: Knex.Transaction
-): Promise<void> {
-    if (pkValues.length === 0) return;
-
-    const run = async (t: Knex): Promise<void> => {
-        const { config, spec } = requireVariantSpec(schema, variantKey);
-        const discKey = config.discriminatorKey;
-        const baseTable = schema.getExtension?.('tableName') as string;
-        const pkInfo = getPrimaryKeyColumns(schema);
-        if (pkInfo.columnNames.length === 0) {
-            throw new Error(
-                `deleteVariant: base schema has no primary key declared.`
-            );
+    query: PolymorphicQueryBuilder<any, any>,
+    operation: Mutation,
+    patch: Row = {},
+    managedValues: Row = {}
+): Promise<VariantMutationResult> {
+    const meta = layout(schema, variantKey);
+    query.mutationTargets(variantKey); // Validate before executing any SQL.
+    if (operation === 'update') assertPatch(meta, patch);
+    if (operation === 'restore' && !meta.base.getExtension('softDelete'))
+        throw new Error(
+            'Schema does not have soft delete enabled. Use .softDelete() on the base schema.'
+        );
+    return knex.transaction(async t => {
+        const selected = query.transacting(t);
+        const targets = () =>
+            t(meta.table)
+                .whereIn(meta.pkColumn, selected.mutationTargets(variantKey))
+                .andWhere(meta.discriminatorColumn, variantKey);
+        // Cast before pg's parsers, which may otherwise round a bigint key.
+        const keyColumn = t.raw('cast(?? as text) as ??', [
+            meta.pkColumn,
+            meta.pk
+        ]);
+        const locked = await targets()
+            .orderBy(meta.pkColumn)
+            .forUpdate()
+            .select(keyColumn);
+        let ids = locked.map(row => row[meta.pk]);
+        if (!ids.length) return { rows: [], count: 0 };
+        if (meta.spec.storage === 'cti') {
+            await t(meta.spec.tableName!)
+                .whereIn(meta.spec.foreignKey!, ids)
+                .orderBy(meta.spec.foreignKey!)
+                .forUpdate()
+                .select(t.raw('1'));
         }
-        if (pkInfo.columnNames.length > 1) {
-            throw new Error(
-                `deleteVariant: composite primary keys are not supported for variant deletes.`
-            );
+        const confirmed = await targets()
+            .whereIn(meta.pkColumn, ids)
+            .select(keyColumn);
+        ids = confirmed.map(row => row[meta.pk]);
+        if (!ids.length) return { rows: [], count: 0 };
+        const baseQuery = () =>
+            schemaQuery(t, meta.base)
+                .unscoped()
+                .withDeleted()
+                .whereIn(meta.pk, ids);
+        const bodyQuery = () =>
+            schemaQuery(t, meta.body)
+                .unscoped()
+                .withDeleted()
+                .whereIn(meta.foreignKey!, ids);
+
+        if (operation === 'update') {
+            const data = await prepare(meta.hooks('beforeUpdate'), patch);
+            assertPatch(meta, data);
+            Object.assign(data, managedValues); // Tracker owns automatic row versions.
+            const [baseData, bodyData] = split(meta, data);
+            if (meta.spec.storage === 'sti') {
+                const combined = stiTimestamps(
+                    meta,
+                    t,
+                    { ...baseData, ...bodyData },
+                    false
+                );
+                if (
+                    Object.keys(combined).length ||
+                    meta.base.getExtension('timestamps')
+                )
+                    await baseQuery().update(combined);
+            } else {
+                if (
+                    Object.keys(baseData).length ||
+                    meta.base.getExtension('timestamps')
+                )
+                    await baseQuery().update(baseData);
+                if (
+                    Object.keys(bodyData).length ||
+                    meta.body.getExtension('timestamps')
+                )
+                    await bodyQuery().update(bodyData);
+            }
+            return {
+                rows: await readRows(t, schema, variantKey, ids),
+                count: ids.length
+            };
         }
-        const pkColName = pkInfo.columnNames[0];
-
-        if (spec.storage === 'sti') {
-            const { propToCol } = buildColumnMap(schema);
-            const discCol = propToCol.get(discKey) ?? discKey;
-            await (t as unknown as Knex)(baseTable)
-                .whereIn(pkColName, pkValues as any[])
-                .andWhere(discCol, variantKey)
-                .delete();
-            return;
+        if (operation === 'restore') {
+            await baseQuery().restore();
+            return {
+                rows: await readRows(t, schema, variantKey, ids),
+                count: ids.length
+            };
         }
-
-        // CTI: variant rows first, then base rows
-        const variantTableName = spec.tableName as string;
-        const fkCol = spec.foreignKey as string;
-
-        await (t as unknown as Knex)(variantTableName)
-            .whereIn(fkCol, pkValues as any[])
-            .delete();
-
-        await (t as unknown as Knex)(baseTable)
-            .whereIn(pkColName, pkValues as any[])
-            .delete();
-    };
-
-    if (trx) return run(trx as unknown as Knex);
-    return (knex as Knex).transaction(t => run(t as unknown as Knex));
+        // IDs already include scopes and pagination; do not apply an offset twice.
+        const hookQuery = storedVariantQuery(t, schema, variantKey).whereIn(
+            meta.pk,
+            ids
+        );
+        for (const hook of meta.hooks('beforeDelete')) await hook(hookQuery);
+        if (operation === 'delete' && meta.base.getExtension('softDelete')) {
+            await baseQuery().delete();
+        } else {
+            if (meta.spec.storage === 'cti') await bodyQuery().hardDelete();
+            await baseQuery().hardDelete();
+        }
+        return { rows: [], count: ids.length };
+    });
 }

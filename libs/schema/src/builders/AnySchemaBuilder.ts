@@ -15,8 +15,8 @@ type AnySchemaBuilderCreateProps<R extends boolean = true> = Partial<
  * in TypeScript. Allows to define a schema for `any` value.
  * Use it when you don't know the type of the value.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use `any()` function instead.
  *
  * @example
@@ -41,6 +41,16 @@ export class AnySchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'any',
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResult
+    ];
+
     /**
      * @hidden
      */
@@ -62,9 +72,12 @@ export class AnySchemaBuilder<
         _notUsed?: T
     ): AnySchemaBuilder<true, TNullable, T, THasDefault, TExtensions> &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -78,9 +91,12 @@ export class AnySchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #buildResult(

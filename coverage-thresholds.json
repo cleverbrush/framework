@@ -1,0 +1,134 @@
+{
+    "async": {
+        "statements": 96,
+        "branches": 91,
+        "functions": 100,
+        "lines": 98
+    },
+    "auth": {
+        "statements": 92,
+        "branches": 89,
+        "functions": 100,
+        "lines": 92
+    },
+    "client": {
+        "statements": 93,
+        "branches": 88,
+        "functions": 96,
+        "lines": 95
+    },
+    "deep": {
+        "statements": 98,
+        "branches": 95,
+        "functions": 100,
+        "lines": 98
+    },
+    "di": {
+        "statements": 94,
+        "branches": 80,
+        "functions": 100,
+        "lines": 94
+    },
+    "env": {
+        "statements": 97,
+        "branches": 82,
+        "functions": 100,
+        "lines": 98
+    },
+    "knex-clickhouse": {
+        "statements": 100,
+        "branches": 95,
+        "functions": 100,
+        "lines": 100
+    },
+    "knex-schema": {
+        "statements": 80,
+        "branches": 75,
+        "functions": 80,
+        "lines": 83
+    },
+    "log": {
+        "statements": 98,
+        "branches": 92,
+        "functions": 94,
+        "lines": 98
+    },
+    "mapper": {
+        "statements": 97,
+        "branches": 90,
+        "functions": 100,
+        "lines": 98
+    },
+    "orm": {
+        "statements": 90,
+        "branches": 80,
+        "functions": 97,
+        "lines": 94
+    },
+    "orm-cli": {
+        "statements": 90,
+        "branches": 85,
+        "functions": 100,
+        "lines": 98
+    },
+    "otel": {
+        "statements": 88,
+        "branches": 75,
+        "functions": 94,
+        "lines": 90
+    },
+    "react-form": {
+        "statements": 99,
+        "branches": 95,
+        "functions": 100,
+        "lines": 99
+    },
+    "scheduler": {
+        "statements": 95,
+        "branches": 90,
+        "functions": 97,
+        "lines": 97
+    },
+    "scheduler-postgres": {
+        "statements": 90,
+        "branches": 85,
+        "functions": 100,
+        "lines": 100
+    },
+    "schema": {
+        "statements": 97,
+        "branches": 93,
+        "functions": 97,
+        "lines": 97
+    },
+    "schema-json": {
+        "statements": 96,
+        "branches": 93,
+        "functions": 100,
+        "lines": 97
+    },
+    "server": {
+        "statements": 90,
+        "branches": 85,
+        "functions": 94,
+        "lines": 92
+    },
+    "server-openapi": {
+        "statements": 96,
+        "branches": 86,
+        "functions": 100,
+        "lines": 97
+    },
+    "storage": {
+        "statements": 100,
+        "branches": 95,
+        "functions": 100,
+        "lines": 100
+    },
+    "storage-s3": {
+        "statements": 90,
+        "branches": 88,
+        "functions": 92,
+        "lines": 92
+    }
+}

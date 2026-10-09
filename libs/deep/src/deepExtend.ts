@@ -16,9 +16,17 @@ type DeepSafeMergeProps<T> = {
     [K in keyof SafeMergeProps<T>]: DeepSafeMergeValue<SafeProp<T, K>>;
 };
 
+type CommonSource<T1, T2> = Pick<
+    SafeMergeProps<T2>,
+    keyof SafeMergeProps<T1> & keyof SafeMergeProps<T2>
+>;
+
 /** Properties that exist in both `T1` and `T2`, typed as `T2`'s version. */
 export type CommonProps<T1, T2> = {
-    [k in keyof SafeMergeProps<T1> & keyof SafeMergeProps<T2>]: SafeProp<
+    // Shared values come from T2; retain that property's declaration and JSDoc.
+    // Required makes the slots required without removing undefined from T2's
+    // optional values when they are read through SafeProp below.
+    -readonly [k in keyof Required<CommonSource<T1, T2>>]: SafeProp<
         T1,
         k
     > extends never

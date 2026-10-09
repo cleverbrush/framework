@@ -138,20 +138,22 @@ function buildContext<TMap extends EntityMap>(
 ): DbContext<TMap> {
     const sets = {} as { [K in keyof TMap]: DbSet<TMap[K]> };
     for (const key of Object.keys(entities) as Array<keyof TMap>) {
-        sets[key] = makeDbSet(knex, entities[key]) as DbSet<TMap[keyof TMap]>;
+        sets[key] = makeDbSet<TMap[typeof key]>(knex, entities[key]);
     }
 
     const ctx = {
         ...sets,
         knex,
         withTransaction(trx: Knex.Transaction): DbContext<TMap> {
-            return buildContext(trx as unknown as Knex, entities);
+            return buildContext<TMap>(trx as unknown as Knex, entities);
         },
         async transaction<T>(
             callback: (db: DbContext<TMap>) => Promise<T>
         ): Promise<T> {
             return knex.transaction(async (trx: Knex.Transaction) => {
-                return callback(buildContext(trx as unknown as Knex, entities));
+                return callback(
+                    buildContext<TMap>(trx as unknown as Knex, entities)
+                );
             });
         }
     } satisfies DbContext<TMap>;
@@ -180,11 +182,7 @@ function buildTrackedContext<TMap extends EntityMap>(
                 return item;
             });
         };
-        sets[key as keyof TMap] = makeDbSet(
-            knex,
-            entities[key],
-            onResults
-        ) as DbSet<TMap[keyof TMap]>;
+        sets[key] = makeDbSet<TMap[typeof key]>(knex, entities[key], onResults);
     }
 
     const ctx: TrackedDbContext<TMap> = {
@@ -192,7 +190,7 @@ function buildTrackedContext<TMap extends EntityMap>(
         knex,
 
         withTransaction(trx: Knex.Transaction): DbContext<TMap> {
-            return buildTrackedContext(
+            return buildTrackedContext<TMap>(
                 trx as unknown as Knex,
                 entities,
                 tracker
@@ -204,7 +202,7 @@ function buildTrackedContext<TMap extends EntityMap>(
         ): Promise<T> {
             return knex.transaction(async (trx: Knex.Transaction) => {
                 return callback(
-                    buildTrackedContext(
+                    buildTrackedContext<TMap>(
                         trx as unknown as Knex,
                         entities,
                         tracker
@@ -297,11 +295,19 @@ export function createDb<TMap extends EntityMap>(
     entities: TMap,
     opts: { tracking: true }
 ): TrackedDbContext<TMap>;
+/**
+ * Create a database context with a fresh typed query starter for each entity.
+ * @param knex - Database connection or transaction.
+ * @param entities - Named entity definitions exposed as context properties.
+ * @param opts - Enable tracking to add identity-map and explicit saveChanges() behavior.
+ * @returns A non-tracking context by default; the tracking overload adds unit-of-work APIs.
+ */
 export function createDb<TMap extends EntityMap>(
     knex: Knex,
     entities: TMap,
     opts?: { tracking?: false | undefined }
 ): DbContext<TMap>;
+/** Create the tracking or non-tracking context selected by opts.tracking. */
 export function createDb<TMap extends EntityMap>(
     knex: Knex,
     entities: TMap,
@@ -317,7 +323,7 @@ export function createDb<TMap extends EntityMap>(
             };
             tracker.registerEntitySet(cfg);
         }
-        return buildTrackedContext(knex, entities, tracker);
+        return buildTrackedContext<TMap>(knex, entities, tracker);
     }
-    return buildContext(knex, entities);
+    return buildContext<TMap>(knex, entities);
 }

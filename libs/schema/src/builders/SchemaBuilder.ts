@@ -63,7 +63,7 @@ export type InferType<T> = T extends {
  *
  * When returned from an object-level validator (via {@link SchemaBuilder.addValidator | addValidator}),
  * the optional `property` selector can route the error to a specific property
- * so that {@link ObjectSchemaValidationResult.getErrorsFor | getErrorsFor()} reports it
+ * so that `ObjectSchemaValidationResult.getErrorsFor()` reports it
  * on that property rather than only on the root object.
  *
  * ```ts
@@ -245,6 +245,8 @@ export type SchemaBuilderProps<T> = {
     hasCatch?: boolean;
     description?: string;
     schemaName?: string;
+    /** @internal Canonical named definition for a use-site-only derivative. */
+    referenceTarget?: SchemaBuilder<any, any, any, any, any>;
     example?: unknown;
 };
 
@@ -599,7 +601,7 @@ export type PropertyDescriptorTree<
                             any,
                             any
                         >
-                          ? PropertyDescriptor<
+                          ? IndexedPropertyDescriptor<
                                 TRootSchema,
                                 TProperties[K],
                                 PropertyDescriptor<
@@ -610,7 +612,7 @@ export type PropertyDescriptorTree<
                                 K & string
                             >
                           : InferType<TProperties[K]> extends TAssignableTo
-                            ? PropertyDescriptor<
+                            ? IndexedPropertyDescriptor<
                                   TRootSchema,
                                   TProperties[K],
                                   PropertyDescriptor<
@@ -635,6 +637,31 @@ export type PropertyDescriptorTree<
                         : never;
           }
         : never);
+
+/**
+ * A descriptor that preserves its array binding and exposes lazy indexed child
+ * descriptors. Indices are non-negative integers; they are positions, not item
+ * identities. Object and nested-array elements retain their schema types.
+ *
+ * @example `object.getPropertiesFor(schema).addresses[0].city`
+ */
+export type IndexedPropertyDescriptor<
+    TRoot extends ObjectSchemaBuilder<any, any, any, any, any>,
+    TSchema,
+    TParent,
+    TKey extends string = string
+> = PropertyDescriptor<TRoot, TSchema, TParent, TKey> &
+    (TSchema extends ObjectSchemaBuilder<any, any, any>
+        ? PropertyDescriptorTree<TSchema, TRoot, any, TParent>
+        : TSchema extends ArraySchemaBuilder<infer TElement, any, any>
+          ? {
+                readonly [index: number]: IndexedPropertyDescriptor<
+                    TRoot,
+                    TElement,
+                    PropertyDescriptor<TRoot, TSchema, TParent, TKey>
+                >;
+            }
+          : {});
 
 /**
  * Recursively maps the keys of an extern schema's output type into
@@ -740,8 +767,8 @@ type ResolvedSchemaType<
  * Base class for all schema builders. Provides basic functionality for schema building.
  *
  * **Note:** this class is not intended to be used directly, use one of the subclasses instead.
- * @typeparam TResult Type of the object that will be returned by `validate()` method.
- * @typeparam TRequired If `true`, object will be required. If `false`, object will be optional.
+ * @typeParam TResult Type of the object that will be returned by `validate()` method.
+ * @typeParam TRequired If `true`, object will be required. If `false`, object will be optional.
  */
 export abstract class SchemaBuilder<
     TResult = any,
@@ -756,6 +783,7 @@ export abstract class SchemaBuilder<
     #isReadonly = false;
     #description: string | undefined;
     #schemaName: string | undefined;
+    #referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
     #preprocessors: PreprocessorEntry<TResult>[] = [];
     #validators: ValidatorEntry<TResult>[] = [];
     #hasMutating = false;
@@ -807,13 +835,13 @@ export abstract class SchemaBuilder<
      * consumes the spec — including tRPC, TanStack Form, React Hook Form, T3 Env,
      * Hono, Elysia, next-safe-action, and 50+ other tools.
      *
-     * Every `SchemaBuilder` subclass (all 13 builders) inherits this property
+     * Every `SchemaBuilder` subclass inherits this property
      * automatically — no additional setup required.
      *
      * **Shape of the returned object:**
      * - `version` — always `1` (Standard Schema spec version)
      * - `vendor` — `'@cleverbrush/schema'`
-     * - `validate(value)` — synchronous; wraps this builder's own `.validate()`
+     * - `validate(value)` — asynchronous; wraps this builder's `.validateAsync()`
      *   and converts its result to the Standard Schema `Result<Output>` format:
      *   - Success: `{ value: <validated output> }`
      *   - Failure: `{ issues: [{ message: string }, …] }`
@@ -909,6 +937,27 @@ export abstract class SchemaBuilder<
      * @param props arbitrary props object
      */
     protected abstract createFromProps(props: any): this;
+
+    /**
+     * Constructs an immutable derivative through the existing subclass hook.
+     * Shape, rule and extension changes detach from inherited component names
+     * by default. Only presence, nullability, annotations and type-only changes
+     * may preserve the canonical definition. Preserve chains collapse to their
+     * original target; an unnamed derivative never reconnects automatically.
+     * @param props - Complete introspection properties for the new builder.
+     * @param preserveReference - Whether only use-site metadata changed.
+     * @internal
+     */
+    protected derive(props: any, preserveReference = false): this {
+        return this.createFromProps({
+            ...props,
+            schemaName: preserveReference ? this.#schemaName : undefined,
+            referenceTarget:
+                preserveReference && this.#schemaName
+                    ? (this.#referenceTarget ?? this)
+                    : undefined
+        });
+    }
 
     /**
      * The string identifier of the schema type (e.g. `'string'`, `'number'`, `'object'`).
@@ -1461,6 +1510,14 @@ export abstract class SchemaBuilder<
              */
             schemaName: this.#schemaName,
             /**
+             * Canonical named definition retained by use-site modifiers.
+             * Exporters must compose local annotations/nullability around this
+             * target before resolving the derivative's inherited name.
+             * Structural and validation-rule derivatives have no target.
+             * @internal
+             */
+            referenceTarget: this.#referenceTarget,
+            /**
              * Whether a catch/fallback value has been set on this schema via `.catch()`.
              */
 
@@ -1481,10 +1538,13 @@ export abstract class SchemaBuilder<
      * Makes schema optional (consider `null` and `undefined` as valid objects for this schema)
      */
     public optional() {
-        return this.createFromProps({
-            ...this.introspect(),
-            isRequired: false
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect(),
+                isRequired: false
+            },
+            true
+        ) as any;
     }
 
     /**
@@ -1495,10 +1555,13 @@ export abstract class SchemaBuilder<
      * `.optional()` to accept both `null` and `undefined`.
      */
     public nullable() {
-        return this.createFromProps({
-            ...this.introspect(),
-            isNullable: true
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect(),
+                isNullable: true
+            },
+            true
+        ) as any;
     }
 
     /**
@@ -1506,10 +1569,13 @@ export abstract class SchemaBuilder<
      * value. This is the counterpart of `.nullable()`.
      */
     public notNullable() {
-        return this.createFromProps({
-            ...this.introspect(),
-            isNullable: false
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect(),
+                isNullable: false
+            },
+            true
+        ) as any;
     }
 
     /**
@@ -1534,7 +1600,7 @@ export abstract class SchemaBuilder<
      * ```
      */
     public default(value: TResult | (() => TResult)) {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             defaultValue: value
         }) as any;
@@ -1555,7 +1621,10 @@ export abstract class SchemaBuilder<
      *
      * When `.catch()` is set, {@link parse} and {@link parseAsync} will **never throw**.
      *
-     * @param value - the fallback value, or a factory function producing the fallback
+     * @param value - A value (or factory) compatible with the resolved output:
+     * optional schemas allow undefined; nullable schemas allow null.
+     * @remarks Legacy optional schemas also accept null at runtime, so
+     * catch(undefined) does not normalize null. Use an explicit preprocessor.
      *
      * @example
      * ```ts
@@ -1584,8 +1653,12 @@ export abstract class SchemaBuilder<
      * c.validate(42);        // { valid: true, object: 'anon' }  ← also fires
      * ```
      */
-    public catch(value: TResult | (() => TResult)): this {
-        return this.createFromProps({
+    public catch(
+        value:
+            | ResolvedSchemaType<TResult, TRequired, TNullable>
+            | (() => ResolvedSchemaType<TResult, TRequired, TNullable>)
+    ): this {
+        return this.derive({
             ...this.introspect(),
             catchValue: value,
             hasCatch: true
@@ -1596,7 +1669,7 @@ export abstract class SchemaBuilder<
      * Removes the default value set by a previous call to `.default()`.
      */
     public clearDefault() {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             defaultValue: undefined
         }) as any;
@@ -1622,10 +1695,13 @@ export abstract class SchemaBuilder<
      * ```
      */
     public describe(text: string): this {
-        return this.createFromProps({
-            ...this.introspect(),
-            description: text
-        }) as unknown as this;
+        return this.derive(
+            {
+                ...this.introspect(),
+                description: text
+            },
+            true
+        ) as unknown as this;
     }
 
     /**
@@ -1645,10 +1721,13 @@ export abstract class SchemaBuilder<
      * ```
      */
     public example(value: TResult): this {
-        return this.createFromProps({
-            ...this.introspect(),
-            example: value
-        }) as unknown as this;
+        return this.derive(
+            {
+                ...this.introspect(),
+                example: value
+            },
+            true
+        ) as unknown as this;
     }
 
     /**
@@ -1663,6 +1742,15 @@ export abstract class SchemaBuilder<
      * same constant (same object reference) to multiple consumers is always
      * safe; how conflicts between different instances with the same name are
      * handled depends on the tool.
+     *
+     * Ordinary presence, nullability, annotation and type-only modifiers retain
+     * this canonical definition for document exporters. Shape, validation-rule,
+     * default, fallback and extension changes discard the inherited name. Apply
+     * `schemaName` after those edits to give the derivative its own component.
+     * Calling this method always establishes a fresh definition, even on an alias.
+     *
+     * @param name - Component name for this independent schema definition.
+     * @returns A new named builder without an inherited canonical target.
      *
      * @example
      * ```ts
@@ -1679,7 +1767,8 @@ export abstract class SchemaBuilder<
     public schemaName(name: string): this {
         return this.createFromProps({
             ...this.introspect(),
-            schemaName: name
+            schemaName: name,
+            referenceTarget: undefined
         }) as unknown as this;
     }
 
@@ -1700,9 +1789,12 @@ export abstract class SchemaBuilder<
      * ```
      */
     public brand<TBrand extends string | symbol>(_name?: TBrand) {
-        return this.createFromProps({
-            ...this.introspect()
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            },
+            true
+        ) as any;
     }
 
     /**
@@ -1723,10 +1815,13 @@ export abstract class SchemaBuilder<
      * ```
      */
     public readonly() {
-        return this.createFromProps({
-            ...this.introspect(),
-            isReadonly: true
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect(),
+                isReadonly: true
+            },
+            true
+        ) as any;
     }
 
     /**
@@ -1734,32 +1829,45 @@ export abstract class SchemaBuilder<
      * @param errorMessage - optional custom error message or provider for the 'is required' validation error
      */
     public required(errorMessage?: ValidationErrorMessageProvider) {
-        return this.createFromProps({
-            ...this.introspect(),
-            isRequired: true,
-            ...(errorMessage !== undefined
-                ? {
-                      requiredValidationErrorMessageProvider:
-                          this.assureValidationErrorMessageProvider(
-                              errorMessage,
-                              this.#defaultRequiredErrorMessageProvider
-                          )
-                  }
-                : {})
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect(),
+                isRequired: true,
+                ...(errorMessage !== undefined
+                    ? {
+                          requiredValidationErrorMessageProvider:
+                              this.assureValidationErrorMessageProvider(
+                                  errorMessage,
+                                  this.#defaultRequiredErrorMessageProvider
+                              )
+                      }
+                    : {})
+            },
+            true
+        ) as any;
     }
 
     /**
-     * Adds a `preprocessor` to a preprocessors list
+     * Adds an immutable preprocessing step. It may return the resolved value,
+     * including undefined for optional schemas and null for nullable schemas.
+     * @param preprocessor - Existing value-to-value conversion, optionally async.
+     * @param options - Whether the callback can mutate its argument.
+     * @returns A new builder preserving the original schema.
+     * @remarks Legacy callback parameter typing is preserved for compatibility.
+     * Unknown external data still needs runtime validation.
      */
     public addPreprocessor(
-        preprocessor: Preprocessor<TResult>,
+        preprocessor: (
+            object: TResult
+        ) =>
+            | ResolvedSchemaType<TResult, TRequired, TNullable>
+            | Promise<ResolvedSchemaType<TResult, TRequired, TNullable>>,
         options?: { mutates?: boolean }
     ): this {
         if (typeof preprocessor !== 'function') {
             throw new Error('preprocessor must be a function');
         }
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             preprocessors: [
                 ...this.preprocessors,
@@ -1772,7 +1880,7 @@ export abstract class SchemaBuilder<
      * Remove all preprocessors for this schema.
      */
     public clearPreprocessors(): this {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             preprocessors: []
         });
@@ -1788,7 +1896,7 @@ export abstract class SchemaBuilder<
         if (typeof validator !== 'function') {
             throw new Error('validator must be a function');
         }
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             validators: [
                 ...this.validators,
@@ -1801,7 +1909,7 @@ export abstract class SchemaBuilder<
      * Remove all validators for this schema.
      */
     public clearValidators(): this {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             validators: []
         });
@@ -1997,7 +2105,7 @@ export abstract class SchemaBuilder<
      * @internal Used by extension authors inside `defineExtension()` callbacks.
      */
     public withExtension(key: string, value: unknown): this {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             extensions: {
                 ...this.#extensions,
@@ -2121,6 +2229,7 @@ export abstract class SchemaBuilder<
         if (typeof props.schemaName === 'string') {
             this.#schemaName = props.schemaName;
         }
+        this.#referenceTarget = props.referenceTarget;
 
         if (props.example !== undefined) {
             this.#example = props.example;

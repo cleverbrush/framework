@@ -23,6 +23,11 @@ import {
     getColumnName,
     type VariantInputForResolver
 } from './extension.js';
+import type {
+    EntityReadSchema,
+    ReadVariants,
+    WithReadVariant
+} from './read-entity.js';
 import type { ResolvedVariantRelationSpec } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -48,7 +53,13 @@ export interface RelationInfo<
         any
     > = ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > {
+    /**
+     * Relation cardinality used to infer nested object or collection results.
+     */
     readonly kind: TKind;
+    /**
+     * Foreign schema retained at the type level for relation callback completion.
+     */
     readonly foreign: TForeign;
 }
 
@@ -161,11 +172,22 @@ export type WithRelation<
     TKey extends string,
     TKind extends 'belongsTo' | 'hasOne' | 'hasMany' | 'belongsToMany',
     TForeign extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
-    TVariantUnion = never
+    TVariantUnion = never,
+    TReadVariants extends ReadVariants = {}
 > = Entity<
     TSchema,
-    TRels & Record<TKey, RelationInfo<TKind, TForeign>>,
-    TVariantUnion
+    // Derive metadata from schema properties so includes retain their origins.
+    TRels & {
+        -readonly [P in keyof Pick<
+            SchemaProps<TSchema>,
+            Extract<TKey, keyof SchemaProps<TSchema>>
+        >]-?: RelationInfo<TKind, TForeign>;
+    } & Record<
+            Exclude<TKey, keyof SchemaProps<TSchema>>,
+            RelationInfo<TKind, TForeign>
+        >,
+    TVariantUnion,
+    TReadVariants
 >;
 
 // ---------------------------------------------------------------------------
@@ -186,19 +208,29 @@ export type WithRelation<
 export class Entity<
     TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TRels extends Record<string, RelationInfo> = {},
-    TVariantUnion = never
+    TVariantUnion = never,
+    TReadVariants extends ReadVariants = {}
 > {
     /** The underlying schema (relations registered via `withExtension('relations', ...)`). */
-    readonly schema: TSchema;
+    readonly schema: EntityReadSchema<TSchema, TRels, TReadVariants>;
 
     /** @internal Phantom slot to retain `TRels` in inferred types. */
-    private declare readonly __relations__: TRels;
+    declare private readonly __relations__: TRels;
 
     /** @internal Phantom slot to retain `TVariantUnion` in inferred types. */
-    private declare readonly __variantUnion__: TVariantUnion;
+    declare private readonly __variantUnion__: TVariantUnion;
 
+    /**
+     * Wrap a schema as an entity definition with typed relation metadata.
+     * Prefer defineEntity(schema) for inference. Relation/variant methods return new
+     * definitions; constructing an Entity does not query or create database tables.
+     */
     constructor(schema: TSchema) {
-        this.schema = schema;
+        this.schema = schema as unknown as EntityReadSchema<
+            TSchema,
+            TRels,
+            TReadVariants
+        >;
     }
 
     private _addRelation(spec: {
@@ -206,6 +238,8 @@ export class Entity<
         name: string;
         schema: any;
         foreignKey?: any;
+        localKey?: string;
+        remoteKey?: string;
         through?: { table: string; localKey: string; foreignKey: string };
         optional?: boolean;
     }): Entity<TSchema, any> {
@@ -226,7 +260,7 @@ export class Entity<
      * via `opts.foreign` only when peeling fails.
      *
      * @param navSel    Selector of nav property: `t => t.author`
-     * @param localSel  Selector of local-side join key: `l => l.id`
+     * @param _localSel Selector of local-side join key: `l => l.id`
      * @param remoteSel Selector of remote-side FK on foreign schema: `r => r.userId`
      * @param opts      Optional `{ optional?: boolean }` (default false).
      */
@@ -246,7 +280,15 @@ export class Entity<
         _localSel: EntityPropSelector<TSchema>,
         remoteSel: EntityPropSelector<TForeign>,
         opts?: { optional?: boolean }
-    ): WithRelation<TSchema, TRels, TKey, 'hasOne', TForeign, TVariantUnion> {
+    ): WithRelation<
+        TSchema,
+        TRels,
+        TKey,
+        'hasOne',
+        TForeign,
+        TVariantUnion,
+        TReadVariants
+    > {
         const navName = this._resolvePropName(
             navSel as EntityPropSelector<TSchema>,
             this.schema
@@ -262,6 +304,8 @@ export class Entity<
             name: navName,
             schema: foreignSchema,
             foreignKey: remoteKey,
+            localKey: this._resolvePropName(_localSel, this.schema),
+            remoteKey,
             optional: opts?.optional
         }) as any;
     }
@@ -270,7 +314,7 @@ export class Entity<
      * Declare a one-to-many relation where the FK lives on the FOREIGN table.
      *
      * @param navSel    Selector of nav array property: `t => t.posts`
-     * @param localSel  Selector of local-side join key: `l => l.id`
+     * @param _localSel Selector of local-side join key: `l => l.id`
      * @param remoteSel Selector of remote-side FK on foreign schema: `r => r.userId`
      */
     hasMany<
@@ -288,7 +332,15 @@ export class Entity<
         navSel: EntityPropSelector<TSchema, TKey>,
         _localSel: EntityPropSelector<TSchema>,
         remoteSel: EntityPropSelector<TForeign>
-    ): WithRelation<TSchema, TRels, TKey, 'hasMany', TForeign, TVariantUnion> {
+    ): WithRelation<
+        TSchema,
+        TRels,
+        TKey,
+        'hasMany',
+        TForeign,
+        TVariantUnion,
+        TReadVariants
+    > {
         const navName = this._resolvePropName(
             navSel as EntityPropSelector<TSchema>,
             this.schema
@@ -302,7 +354,9 @@ export class Entity<
             type: 'hasMany',
             name: navName,
             schema: foreignSchema,
-            foreignKey: remoteKey
+            foreignKey: remoteKey,
+            localKey: this._resolvePropName(_localSel, this.schema),
+            remoteKey
         }) as any;
     }
 
@@ -311,7 +365,7 @@ export class Entity<
      *
      * @param navSel    Selector of nav property (foreign schema, usually `.optional()`).
      * @param localSel  Selector of local-side FK property: `l => l.userId`
-     * @param remoteSel Selector of foreign-side PK property: `r => r.id`
+     * @param _remoteSel Selector of foreign-side PK property: `r => r.id`
      */
     belongsTo<
         TKey extends keyof SchemaProps<TSchema> & string,
@@ -323,19 +377,25 @@ export class Entity<
             any,
             any,
             any
-        > = UnwrapNavSchema<SchemaProps<TSchema>[TKey]>
+        > = UnwrapNavSchema<SchemaProps<TSchema>[TKey]>,
+        TOptional extends boolean = false
     >(
         navSel: EntityPropSelector<TSchema, TKey>,
         localSel: EntityPropSelector<TSchema>,
         _remoteSel: EntityPropSelector<TForeign>,
-        opts?: { optional?: boolean }
-    ): WithRelation<
+        opts?: { optional?: TOptional }
+    ): Entity<
         TSchema,
-        TRels,
-        TKey,
-        'belongsTo',
-        TForeign,
-        TVariantUnion
+        TRels & {
+            -readonly [P in keyof Pick<
+                SchemaProps<TSchema>,
+                TKey
+            >]-?: RelationInfo<'belongsTo', TForeign> & {
+                optional: TOptional;
+            };
+        },
+        TVariantUnion,
+        TReadVariants
     > {
         const navName = this._resolvePropName(
             navSel as EntityPropSelector<TSchema>,
@@ -349,6 +409,11 @@ export class Entity<
             name: navName,
             schema: foreignSchema,
             foreignKey: localKey,
+            localKey,
+            remoteKey: this._resolvePropName(
+                _remoteSel as EntityPropSelector<any>,
+                foreignSchema
+            ),
             optional: opts?.optional
         }) as any;
     }
@@ -379,7 +444,8 @@ export class Entity<
         TKey,
         'belongsToMany',
         TForeign,
-        TVariantUnion
+        TVariantUnion,
+        TReadVariants
     > {
         const navName = this._resolvePropName(
             navSel as EntityPropSelector<TSchema>,
@@ -415,7 +481,7 @@ export class Entity<
      */
     discriminator<TKey extends keyof SchemaProps<TSchema> & string>(
         sel: TKey | EntityPropSelector<TSchema, TKey>
-    ): Entity<TSchema, TRels, never> {
+    ): Entity<TSchema, TRels, never, { discriminator: TKey; variants: {} }> {
         const discKey =
             typeof sel === 'string'
                 ? (sel as string)
@@ -423,7 +489,10 @@ export class Entity<
                       sel as EntityPropSelector<TSchema>,
                       this.schema
                   );
-        const next = new Entity(this.schema) as Entity<TSchema, TRels>;
+        const next = new Entity(this.schema) as unknown as Entity<
+            TSchema,
+            TRels
+        >;
         // Carry the variant-builder state on the new Entity so subsequent
         // `.ctiVariant()`/`.stiVariant()` calls can extend it. Stored on
         // the instance (not in the schema) so the original schema is
@@ -432,7 +501,7 @@ export class Entity<
             discKey,
             variants: {} as Record<string, VariantInputForResolver>
         };
-        return next;
+        return next as any;
     }
 
     /**
@@ -455,19 +524,33 @@ export class Entity<
             any,
             any,
             any
-        >
+        >,
+        const TKey extends string,
+        TForeignKey extends keyof SchemaProps<TVarSchema> & string,
+        TVarRelations extends Record<string, RelationInfo>,
+        TAllowOrphan extends boolean = false
     >(
-        key: string,
-        variant: Entity<TVarSchema, any>,
-        fkSel: (t: EntityTree<TVarSchema>) => any,
+        key: TKey,
+        variant: Entity<TVarSchema, TVarRelations>,
+        fkSel: EntityPropSelector<TVarSchema, TForeignKey>,
         opts?: {
-            allowOrphan?: boolean;
+            allowOrphan?: TAllowOrphan;
             relations?: Record<string, VariantRelationInput<TVarSchema>>;
         }
     ): Entity<
         TSchema,
         TRels,
-        TVariantUnion | VariantBranch<TSchema, TVarSchema>
+        TVariantUnion | VariantBranch<TSchema, TVarSchema>,
+        WithReadVariant<
+            TReadVariants,
+            TKey,
+            {
+                schema: EntityReadSchema<TVarSchema, TVarRelations>;
+                storage: 'cti';
+                foreignKey: TForeignKey;
+                allowOrphan: TAllowOrphan;
+            }
+        >
     > {
         const builder = (this as any)._variantBuilder as
             | VariantBuilderState
@@ -499,7 +582,7 @@ export class Entity<
         };
         return this._withVariantBuilder<
             TVariantUnion | VariantBranch<TSchema, TVarSchema>
-        >(builder.discKey, nextVariants);
+        >(builder.discKey, nextVariants) as any;
     }
 
     /**
@@ -516,10 +599,12 @@ export class Entity<
             any,
             any,
             any
-        >
+        >,
+        const TKey extends string,
+        TVarRelations extends Record<string, RelationInfo> = {}
     >(
-        key: string,
-        body: Entity<TVarSchema, any> | TVarSchema,
+        key: TKey,
+        body: Entity<TVarSchema, TVarRelations> | TVarSchema,
         opts?: {
             enforceCheck?: boolean;
             relations?: Record<string, VariantRelationInput<TVarSchema>>;
@@ -527,7 +612,15 @@ export class Entity<
     ): Entity<
         TSchema,
         TRels,
-        TVariantUnion | VariantBranch<TSchema, TVarSchema>
+        TVariantUnion | VariantBranch<TSchema, TVarSchema>,
+        WithReadVariant<
+            TReadVariants,
+            TKey,
+            {
+                schema: EntityReadSchema<TVarSchema, TVarRelations>;
+                storage: 'sti';
+            }
+        >
     > {
         const builder = (this as any)._variantBuilder as
             | VariantBuilderState
@@ -559,7 +652,7 @@ export class Entity<
         };
         return this._withVariantBuilder<
             TVariantUnion | VariantBranch<TSchema, TVarSchema>
-        >(builder.discKey, nextVariants);
+        >(builder.discKey, nextVariants) as any;
     }
 
     /** @internal Apply the variant extension to the schema and return a new Entity. */
@@ -817,7 +910,7 @@ export type EntityRelations<E> =
  * Type-level helper: extract the underlying schema type from any `Entity`.
  * @public
  */
-export type EntitySchema<E> = E extends Entity<infer S, any, any> ? S : never;
+export type EntitySchema<E> = E extends { schema: infer S } ? S : never;
 
 /**
  * Type-level helper: extract the accumulated variant union from any `Entity`.
@@ -829,7 +922,7 @@ export type EntityVariantUnion<E> =
 
 /**
  * Type-level helper: union of relation key names declared on an entity.
- * Used by `SchemaQueryBuilder.insert()/update()/upsert()` to omit relation
+ * Used by `QuerySource.insert()/update()/upsert()` to omit relation
  * navigation properties from accepted input.
  * @public
  */

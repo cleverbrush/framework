@@ -18,6 +18,7 @@ import { Field, useSchemaForm } from '@cleverbrush/react-form';
 import { UpdateTodoBodySchema } from '@cleverbrush/todo-backend/contract';
 import { ApiError, isTimeoutError, isNetworkError } from '@cleverbrush/client';
 import { client } from '../../api/client';
+import { useAuth } from '../../lib/auth-context';
 
 type TodoEvent = Parameters<typeof client.todos.sendEvent>[0]['body'];
 import { ConfirmDialog } from '../../components/ConfirmDialog';
@@ -25,6 +26,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 type TodoWithAuthor = Awaited<ReturnType<typeof client.todos.getWithAuthor>>;
 
 export function TodoDetailPage() {
+    const { isAdmin } = useAuth();
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
 
@@ -79,11 +81,13 @@ export function TodoDetailPage() {
 
     // Load user list once for the "assigned" picker
     useEffect(() => {
+        // The user directory is admin-only. Regular users retain the ID input.
+        if (!isAdmin) return;
         client.users
             .list({ query: { page: 1, limit: 100 } })
             .then(rows => setUsers(rows.map(u => ({ id: u.id, email: u.email }))))
             .catch(() => {/* ignore — picker will fall back to text input */});
-    }, []);
+    }, [isAdmin]);
 
     useEffect(() => { load(); }, [load]);
 

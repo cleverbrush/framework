@@ -3,7 +3,7 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-96.8%25-brightgreen)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-98.8%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A type-safe, declarative object mapper for converting objects between different `@cleverbrush/schema` representations. Uses PropertyDescriptors as pointers to properties (similar to expressions in C# .NET) and enforces **compile-time completeness** — TypeScript will produce an error if any target property is not mapped, auto-mapped, or explicitly ignored.
@@ -86,7 +86,7 @@ const dto = await mapFn({
 1. **Define schemas** — use `@cleverbrush/schema` to define source and target shapes
 2. **Configure mappings** — use `.for()` to select a target property, then `.from()`, `.compute()`, or `.ignore()` to define how it's populated
 3. **Auto-mapping fills the gaps** — properties with the same name and compatible type are mapped automatically
-4. **Get a mapper function** — `registry.getMapper(from, to)` returns an async function that transforms objects
+4. **Get a mapper function** — use `getMapper(from, to)` for an async function or `getSyncMapper(from, to)` when all steps are synchronous
 5. **TypeScript enforces completeness** — if any target property is unmapped, you get a compile-time error
 
 ## Compile-Time Safety
@@ -225,6 +225,32 @@ Every non-auto-mappable target property must be either mapped or explicitly igno
 - A **compile-time TypeScript type error** — a type-assignability mismatch that includes the unmapped property names in the type parameters
 - A **runtime `MapperConfigurationError`** if type checks are bypassed
 
+## Synchronous mapping
+
+Use the same `configure()` API and retrieve a synchronous mapper when every final
+step and nested mapping is synchronous:
+
+```ts
+const registry = mapper().configure(Source, Target, m => m
+    .for(t => t.label).compute(s => s.name.toUpperCase()));
+const toTarget = registry.getSyncMapper(Source, Target);
+const results = rows.map(toTarget); // ordinary values, not promises
+```
+
+Completeness checking, `.from()`, ignores, nested objects/arrays and compatible
+auto-mapping still apply. Async computations or nested async mappings reject
+`getSyncMapper()` at compile time; runtime guards cover JavaScript and unsafe
+casts too. Callbacks are never probed during configuration. A function falsely
+typed as synchronous that returns a promise/thenable throws when invoked.
+`getMapper()` still always returns an async function. There is no separate
+`configureSync()` API.
+
+Configure once and reuse the same source/target schema instances. Queries can
+provide their projection schema through `.rowSchema`; see the
+[projection-aware read guide](../knex-schema/README.md#projection-aware-reads), including separate
+definition/mapping/service files and explicit polymorphic dispatch. The mapper
+performs no database calls or application enrichment.
+
 ## API
 
 ### `mapper()`
@@ -251,6 +277,13 @@ Retrieves a previously registered mapper function. Throws if no mapper has been 
 const mapFn = registry.getMapper(ApiUser, DomainUser);
 const result = await mapFn(sourceObject);
 ```
+
+### `registry.getSyncMapper(fromSchema, toSchema)`
+
+Retrieves an ordinary function for a complete, synchronous mapping. It returns
+the target value directly and can be passed to `rows.map(...)`. Async final steps
+or nested async mappings are rejected. See [Synchronous mapping](#synchronous-mapping)
+for runtime guards and schema identity requirements.
 
 ### `Mapper`
 

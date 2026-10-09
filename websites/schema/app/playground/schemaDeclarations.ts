@@ -25,6 +25,15 @@ type AnySchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<
  */
 export declare class AnySchemaBuilder<TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? any : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'any',
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResult
+    ];
     /**
      * @hidden
      */
@@ -167,6 +176,16 @@ type ArraySchemaBuilderCreateProps<TElementSchema extends SchemaBuilder<any, any
  */
 export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any, any, any, any, any>, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? TElementSchema extends undefined ? Array<any> : TElementSchema extends SchemaBuilder<infer T1, infer T2> ? Array<InferType<SchemaBuilder<T1, T2>>> : never : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'array',
+        TElementSchema,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResult
+    ];
     /**
      * @hidden
      */
@@ -271,6 +290,7 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -372,6 +392,16 @@ type BooleanSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnT
  */
 export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TFinalResult = TExplicitType extends undefined ? TResult : TExplicitType> extends SchemaBuilder<TFinalResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'boolean',
+        TResult,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TFinalResult
+    ];
     /**
      * @hidden
      */
@@ -401,6 +431,7 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
         defaultValue: TFinalResult | (() => TFinalResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TFinalResult | (() => TFinalResult) | undefined;
         example: unknown;
@@ -544,6 +575,14 @@ type DateSchemaBuilderCreateProps<T = Date, R extends boolean = true> = Partial<
  */
 export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean = true, TNullable extends boolean = false, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'date',
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault
+    ];
     /**
      * @hidden
      */
@@ -625,6 +664,7 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -908,6 +948,7 @@ export declare class ExternSchemaBuilder<TStandardSchema extends StandardSchemaV
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -1053,6 +1094,17 @@ type InferParameters<TParams extends SchemaBuilder<any, any, any, any, any>[]> =
  */
 export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TParameters extends SchemaBuilder<any, any, any, any, any>[] = [], TReturnTypeSchema extends SchemaBuilder<any, any, any, any, any> | undefined = undefined, TResult = TExplicitType extends undefined ? (...args: TParameters extends [] ? any[] : InferParameters<TParameters>) => TReturnTypeSchema extends SchemaBuilder<any, any, any, any, any> ? InferType<TReturnTypeSchema> : any : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'func',
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TParameters,
+        TReturnTypeSchema,
+        TResult
+    ];
     /**
      * @hidden
      */
@@ -1109,6 +1161,7 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNu
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -1339,6 +1392,16 @@ type GenericSchemaBuilderCreateProps<TRequired extends boolean = true> = Partial
  */
 export declare class GenericSchemaBuilder<TFn extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? ReturnType<TFn> extends SchemaBuilder<infer R, any, any, any, any> ? R : any : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'generic',
+        TFn,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResult
+    ];
     /**
      * Applies the template function with concrete schema arguments, returning
      * a fully typed concrete schema builder. TypeScript infers the result type
@@ -1404,6 +1467,7 @@ export declare class GenericSchemaBuilder<TFn extends (...args: any[]) => Schema
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -1573,6 +1637,7 @@ export declare class IntersectionSchemaBuilder<TLeft extends SchemaBuilder<any, 
         defaultValue: (TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: (TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | undefined;
         example: unknown;
@@ -1741,6 +1806,7 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -2044,6 +2110,14 @@ type NumberSchemaBuilderCreateProps<T = number, R extends boolean = true> = Part
  */
 export declare class NumberSchemaBuilder<TResult = number, TRequired extends boolean = true, TNullable extends boolean = false, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'number',
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault
+    ];
     /**
      * @hidden
      */
@@ -2123,6 +2197,7 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -2420,7 +2495,7 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
      * This is the **recommended** way to inspect validation errors — it provides type-safe,
      * per-property error details including \`isValid\`, \`errors\`, and \`seenValue\`.
      *
-     * Prefer this over the deprecated \`errors\` array.
+     * Inspect root or property-specific validation errors with a selector.
      *
      * @param selector a callback function to select property from the schema.
      */
@@ -2490,7 +2565,7 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
  * });
  *
  * // result.valid === false
- * // result.errors is deprecated — use result.getErrorsFor() instead
+ * // Inspect property errors using result.getErrorsFor().
  * // result.getErrorsFor((p) => p.age).errors // ["is expected to have property 'age'"]
  * \`\`\`
  *
@@ -2523,6 +2598,16 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
  */
 export declare class ObjectSchemaBuilder<TProperties extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TConstructorSchemas extends SchemaBuilder<any, any, any, any, any>[] = []> extends SchemaBuilder<undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'object',
+        TProperties,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TConstructorSchemas
+    ];
     /** Marks this builder as having sub-properties for descriptor tree recursion. */
     readonly [SYMBOL_HAS_PROPERTIES] = true;
     /**
@@ -2564,6 +2649,7 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
         defaultValue: (undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | (() => undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: (undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | (() => undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | undefined;
         example: unknown;
@@ -3120,6 +3206,7 @@ export declare class ParseStringSchemaBuilder<TResult = any, TRequired extends b
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -3290,6 +3377,16 @@ type PromiseSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnT
  */
 export declare class PromiseSchemaBuilder<TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResolvedTypeSchema extends SchemaBuilder<any, any, any, any, any> | undefined = undefined, TResult = TExplicitType extends undefined ? TResolvedTypeSchema extends SchemaBuilder<any, any, any, any, any> ? Promise<InferType<TResolvedTypeSchema>> : Promise<any> : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'promise',
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResolvedTypeSchema,
+        TResult
+    ];
     /**
      * @hidden
      */
@@ -3337,6 +3434,7 @@ export declare class PromiseSchemaBuilder<TRequired extends boolean = true, TNul
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -3716,6 +3814,17 @@ type RecordSchemaBuilderCreateProps<TKeySchema extends StringSchemaBuilder<any, 
  */
 export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? Record<InferType<TKeySchema>, InferType<TValueSchema>> : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'record',
+        TKeySchema,
+        TValueSchema,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResult
+    ];
     /**
      * @hidden
      */
@@ -3781,6 +3890,7 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -4066,6 +4176,8 @@ export type SchemaBuilderProps<T> = {
     hasCatch?: boolean;
     description?: string;
     schemaName?: string;
+    /** @internal Canonical named definition for a use-site-only derivative. */
+    referenceTarget?: SchemaBuilder<any, any, any, any, any>;
     example?: unknown;
 };
 export type ValidationContext<TSchema extends SchemaBuilder<any, any, any, any> = SchemaBuilder<any, any, any, any>> = {
@@ -4278,8 +4390,18 @@ export type PropertyDescriptor<TRootSchema extends ObjectSchemaBuilder<any, any,
  * Has a possibility to filter properties by the type (\`TAssignableTo\` type parameter).
  */
 export type PropertyDescriptorTree<TSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any> = TSchema, TAssignableTo = any, TParentPropertyDescriptor = undefined> = PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor> & (TSchema extends ObjectSchemaBuilder<infer TProperties, any, any> ? {
-    [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<any, any, any> ? PropertyDescriptorTree<TProperties[K], TRootSchema, any, PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : TProperties[K] extends ExternSchemaBuilder<any, any, any, any, any, any, infer TExternResult> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> & ExternOutputPropertyDescriptors<TExternResult, TRootSchema, PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string>> : TProperties[K] extends ArraySchemaBuilder<infer TArrayElement, any, any> ? TArrayElement extends ObjectSchemaBuilder<any, any, any, any, any> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> : never : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> : never;
+    [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<any, any, any> ? PropertyDescriptorTree<TProperties[K], TRootSchema, any, PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : TProperties[K] extends ExternSchemaBuilder<any, any, any, any, any, any, infer TExternResult> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> & ExternOutputPropertyDescriptors<TExternResult, TRootSchema, PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string>> : TProperties[K] extends ArraySchemaBuilder<infer TArrayElement, any, any> ? TArrayElement extends ObjectSchemaBuilder<any, any, any, any, any> ? IndexedPropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> : InferType<TProperties[K]> extends TAssignableTo ? IndexedPropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> : never : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> : never;
 } : never);
+/**
+ * A descriptor that preserves its array binding and exposes lazy indexed child
+ * descriptors. Indices are non-negative integers; they are positions, not item
+ * identities. Object and nested-array elements retain their schema types.
+ *
+ * @example \`object.getPropertiesFor(schema).addresses[0].city\`
+ */
+export type IndexedPropertyDescriptor<TRoot extends ObjectSchemaBuilder<any, any, any, any, any>, TSchema, TParent, TKey extends string = string> = PropertyDescriptor<TRoot, TSchema, TParent, TKey> & (TSchema extends ObjectSchemaBuilder<any, any, any> ? PropertyDescriptorTree<TSchema, TRoot, any, TParent> : TSchema extends ArraySchemaBuilder<infer TElement, any, any> ? {
+    readonly [index: number]: IndexedPropertyDescriptor<TRoot, TElement, PropertyDescriptor<TRoot, TSchema, TParent, TKey>>;
+} : {});
 /**
  * Recursively maps the keys of an extern schema's output type into
  * property descriptors.  When a value is a plain-object type its keys
@@ -4340,13 +4462,13 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * consumes the spec — including tRPC, TanStack Form, React Hook Form, T3 Env,
      * Hono, Elysia, next-safe-action, and 50+ other tools.
      *
-     * Every \`SchemaBuilder\` subclass (all 13 builders) inherits this property
+     * Every \`SchemaBuilder\` subclass inherits this property
      * automatically — no additional setup required.
      *
      * **Shape of the returned object:**
      * - \`version\` — always \`1\` (Standard Schema spec version)
      * - \`vendor\` — \`'@cleverbrush/schema'\`
-     * - \`validate(value)\` — synchronous; wraps this builder's own \`.validate()\`
+     * - \`validate(value)\` — asynchronous; wraps this builder's \`.validateAsync()\`
      *   and converts its result to the Standard Schema \`Result<Output>\` format:
      *   - Success: \`{ value: <validated output> }\`
      *   - Failure: \`{ issues: [{ message: string }, …] }\`
@@ -4400,6 +4522,17 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * @param props arbitrary props object
      */
     protected abstract createFromProps(props: any): this;
+    /**
+     * Constructs an immutable derivative through the existing subclass hook.
+     * Shape, rule and extension changes detach from inherited component names
+     * by default. Only presence, nullability, annotations and type-only changes
+     * may preserve the canonical definition. Preserve chains collapse to their
+     * original target; an unnamed derivative never reconnects automatically.
+     * @param props - Complete introspection properties for the new builder.
+     * @param preserveReference - Whether only use-site metadata changed.
+     * @internal
+     */
+    protected derive(props: any, preserveReference?: boolean): this;
     /**
      * The string identifier of the schema type (e.g. \`'string'\`, \`'number'\`, \`'object'\`).
      */
@@ -4568,6 +4701,14 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
          */
         schemaName: string | undefined;
         /**
+         * Canonical named definition retained by use-site modifiers.
+         * Exporters must compose local annotations/nullability around this
+         * target before resolving the derivative's inherited name.
+         * Structural and validation-rule derivatives have no target.
+         * @internal
+         */
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
+        /**
          * Whether a catch/fallback value has been set on this schema via \`.catch()\`.
          */
         hasCatch: boolean;
@@ -4635,7 +4776,10 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      *
      * When \`.catch()\` is set, {@link parse} and {@link parseAsync} will **never throw**.
      *
-     * @param value - the fallback value, or a factory function producing the fallback
+     * @param value - A value (or factory) compatible with the resolved output:
+     * optional schemas allow undefined; nullable schemas allow null.
+     * @remarks Legacy optional schemas also accept null at runtime, so
+     * catch(undefined) does not normalize null. Use an explicit preprocessor.
      *
      * @example
      * \`\`\`ts
@@ -4664,7 +4808,7 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * c.validate(42);        // { valid: true, object: 'anon' }  ← also fires
      * \`\`\`
      */
-    catch(value: TResult | (() => TResult)): this;
+    catch(value: ResolvedSchemaType<TResult, TRequired, TNullable> | (() => ResolvedSchemaType<TResult, TRequired, TNullable>)): this;
     /**
      * Removes the default value set by a previous call to \`.default()\`.
      */
@@ -4718,6 +4862,15 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * same constant (same object reference) to multiple consumers is always
      * safe; how conflicts between different instances with the same name are
      * handled depends on the tool.
+     *
+     * Ordinary presence, nullability, annotation and type-only modifiers retain
+     * this canonical definition for document exporters. Shape, validation-rule,
+     * default, fallback and extension changes discard the inherited name. Apply
+     * \`schemaName\` after those edits to give the derivative its own component.
+     * Calling this method always establishes a fresh definition, even on an alias.
+     *
+     * @param name - Component name for this independent schema definition.
+     * @returns A new named builder without an inherited canonical target.
      *
      * @example
      * \`\`\`ts
@@ -4773,9 +4926,15 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      */
     required(errorMessage?: ValidationErrorMessageProvider): any;
     /**
-     * Adds a \`preprocessor\` to a preprocessors list
+     * Adds an immutable preprocessing step. It may return the resolved value,
+     * including undefined for optional schemas and null for nullable schemas.
+     * @param preprocessor - Existing value-to-value conversion, optionally async.
+     * @param options - Whether the callback can mutate its argument.
+     * @returns A new builder preserving the original schema.
+     * @remarks Legacy callback parameter typing is preserved for compatibility.
+     * Unknown external data still needs runtime validation.
      */
-    addPreprocessor(preprocessor: Preprocessor<TResult>, options?: {
+    addPreprocessor(preprocessor: (object: TResult) => ResolvedSchemaType<TResult, TRequired, TNullable> | Promise<ResolvedSchemaType<TResult, TRequired, TNullable>>, options?: {
         mutates?: boolean;
     }): this;
     /**
@@ -4973,6 +5132,14 @@ type StringSchemaBuilderCreateProps<T = string, R extends boolean = true> = Part
  */
 export declare class StringSchemaBuilder<TResult = string, TRequired extends boolean = true, TNullable extends boolean = false, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'string',
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault
+    ];
     /**
      * @hidden
      */
@@ -5053,6 +5220,7 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -5297,6 +5465,17 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
     [K in keyof TElements]: InferType<TElements[K]>;
 } : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'tuple',
+        TElements,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TRestSchema,
+        TResult
+    ];
     /**
      * @hidden
      */
@@ -5381,6 +5560,7 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
         defaultValue: TResult | (() => TResult) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: TResult | (() => TResult) | undefined;
         example: unknown;
@@ -5553,6 +5733,15 @@ type TakeExceptIndex<TArr extends readonly SchemaBuilder<any, any, any, any, any
  */
 export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<any, any, any, any, any>[], TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    readonly __cleverbrush_builder_type__: readonly [
+        'union',
+        TOptions,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault
+    ];
     /**
      * @hidden
      */
@@ -5583,6 +5772,7 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
         defaultValue: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
         description: string | undefined;
         schemaName: string | undefined;
+        referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
         hasCatch: boolean;
         catchValue: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
         example: unknown;
@@ -5717,15 +5907,15 @@ export { ParseStringSchemaBuilder, parseString } from './builders/ParseStringSch
 export { PromiseSchemaBuilder, promise } from './builders/PromiseSchemaBuilder.js';
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
-export type { NestedValidationResult, PropertyDescriptor, PropertyDescriptorInner, PropertyDescriptorTree, PropertySetterOptions, ValidationErrorMessageProvider } from './builders/SchemaBuilder.js';
+export type { IndexedPropertyDescriptor, NestedValidationResult, PropertyDescriptor, PropertyDescriptorInner, PropertyDescriptorTree, PropertySetterOptions, ValidationErrorMessageProvider } from './builders/SchemaBuilder.js';
 export { BRAND, Brand, InferType, MakeOptional, SchemaBuilder, SchemaTypeBrand, SchemaValidationError, SYMBOL_HAS_PROPERTIES, SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR, ValidationError, ValidationResult } from './builders/SchemaBuilder.js';
 export { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
 export type { TupleElementValidationResults, TupleSchemaValidationResult } from './builders/TupleSchemaBuilder.js';
 export { TupleSchemaBuilder, tuple } from './builders/TupleSchemaBuilder.js';
 export type { OptionValidationResults, UnionSchemaValidationResult } from './builders/UnionSchemaBuilder.js';
 export { UnionSchemaBuilder, union } from './builders/UnionSchemaBuilder.js';
-export type { CleanExtended, ExtensionConfig, ExtensionDescriptor, ExtraTypeBrandSymbol, FixedMethods, HiddenExtensionMethods, MethodLiteralBrandSymbol } from './extension.js';
-export { defineExtension, EXTRA_TYPE_BRAND, METHOD_LITERAL_BRAND, withExtensions } from './extension.js';
+export type { CleanExtended, ExtensionConfig, ExtensionDescriptor, ExtraProperties, ExtraTypeBrandSymbol, FixedMethods, HiddenExtensionMethods, InferExtensionMetadata, MetadataExtended, MetadataMethod, MetadataMethodBuilder, MetadataMethods, MetadataState, MethodLiteralBrandSymbol } from './extension.js';
+export { defineExtension, defineMetadataMethod, EXTRA_TYPE_BRAND, METHOD_LITERAL_BRAND, withExtensions } from './extension.js';
 `,
     "file:///node_modules/@cleverbrush/schema/extension.d.ts": `/**
  * @module extension
@@ -5805,6 +5995,9 @@ import type { PropertyDescriptorTree, SchemaBuilder } from './builders/SchemaBui
 import { StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
 import { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 import { UnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';
+import type { MetadataExtended } from './metadata-extension.js';
+export type { ExtraProperties, InferExtensionMetadata, MetadataExtended, MetadataMethod, MetadataMethodBuilder, MetadataMethods, MetadataState } from './metadata-extension.js';
+export { defineMetadataMethod } from './metadata-extension.js';
 /**
  * Maps each builder type name to the corresponding generic builder class.
  *
@@ -6008,7 +6201,7 @@ export type FixedMethods<TRawMethods, TBase, TAccum extends string = never, TExt
  * \`withExtension\` / \`getExtension\` overridden to \`never\` so they
  * don't appear as callable in consumer code.
  */
-export type CleanExtended<TBuilder, TExt> = TBuilder & FixedMethods<TExt, TBuilder> & HiddenExtensionMethods;
+export type CleanExtended<TBuilder, TExt> = MetadataExtended<TBuilder, TExt>;
 type ExtendedStringFactory<TExt> = {
     (): CleanExtended<StringSchemaBuilder<string, true, false, false, TExt>, TExt>;
     <T extends string>(equals: T): CleanExtended<StringSchemaBuilder<T, true, false, false, TExt>, TExt>;
@@ -7283,6 +7476,203 @@ export type { TupleElementValidationResults, TupleSchemaValidationResult } from 
 export { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 export * from './core.js';
 export { type ArrayBuiltinExtensions, any, array, arrayExtensions, boolean, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedPromise, type ExtendedRecord, type ExtendedString, type ExtendedTuple, type ExtendedUnion, enumOf, func, type NumberBuiltinExtensions, type NumberOneOfExtension, number, numberExtensions, object, promise, record, type StringBuiltinExtensions, type StringOneOfExtension, string, stringExtensions, tuple, union } from './extensions/index.js';
+`,
+    "file:///node_modules/@cleverbrush/schema/metadata-extension.d.ts": `import type { AnySchemaBuilder } from './builders/AnySchemaBuilder.js';
+import type { ArraySchemaBuilder } from './builders/ArraySchemaBuilder.js';
+import type { BooleanSchemaBuilder } from './builders/BooleanSchemaBuilder.js';
+import type { DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
+import type { FunctionSchemaBuilder } from './builders/FunctionSchemaBuilder.js';
+import type { GenericSchemaBuilder } from './builders/GenericSchemaBuilder.js';
+import type { NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
+import type { ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
+import type { PromiseSchemaBuilder } from './builders/PromiseSchemaBuilder.js';
+import type { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';
+import type { PropertyDescriptorTree, SchemaBuilder } from './builders/SchemaBuilder.js';
+import type { StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
+import type { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
+import type { UnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';
+import type { EXTRA_TYPE_BRAND, HiddenExtensionMethods, METHOD_LITERAL_BRAND } from './extension.js';
+/** @internal Metadata helpers own their key, including explicitly undefined values. */
+export declare function isMetadataMethod(method: Function): boolean;
+/** Metadata recorded by typed extension methods; unannotated builders yield \`{}\`. */
+export type InferExtensionMetadata<S> = S extends {
+    readonly __cleverbrush_extension_metadata__: infer M;
+} ? M : {};
+/** @internal Description carried on a metadata method's type, not on schemas. */
+export type MetadataMethod<K extends string, A extends any[], V, Mode> = ((this: SchemaBuilder<any, any, any, any, any>, ...args: A) => SchemaBuilder<any, any, any, any, any>) & {
+    readonly __cleverbrush_metadata_method__: {
+        key: K;
+        value: V;
+        mode: Mode;
+    };
+};
+/** Defines the source of a typed metadata value for an extension method. */
+export interface MetadataMethodBuilder<K extends string> {
+    /** Store the caller's argument, retaining its literal type. */
+    argument<TValue = unknown>(): MetadataMethod<K, [
+        value: TValue
+    ], TValue, 'argument'>;
+    /** Create a zero-argument method that stores a fixed value. */
+    value<const TValue>(value: TValue): MetadataMethod<K, [], TValue, 'value'>;
+    /** Compute metadata from typed arguments; inference uses the callback's return type. */
+    compute<TArgs extends any[], TValue>(compute: (...args: TArgs) => TValue): MetadataMethod<K, TArgs, TValue, 'computed'>;
+}
+/**
+ * Define an immutable metadata-only method for use inside \`defineExtension()\`.
+ *
+ * Unlike ordinary extension methods, its stored value is also available through
+ * \`InferExtensionMetadata<S>\`. Repeated writes replace the value for that key.
+ * The method does not validate input or change the schema's inferred value type.
+ * Methods are installed only on factories returned by \`withExtensions()\`.
+ *
+ * @param key - Runtime introspection key, independent of the fluent method name.
+ * @example
+ * \`\`\`ts
+ * const labels = defineExtension({
+ *     string: {
+ *         label: defineMetadataMethod('label').argument<string>(),
+ *         internal: defineMetadataMethod('visibility').value('internal')
+ *     }
+ * });
+ * const s = withExtensions(labels).string().label('Title').optional();
+ * type Label = InferExtensionMetadata<typeof s>['label']; // 'Title'
+ * \`\`\`
+ */
+export declare function defineMetadataMethod<const K extends string>(key: K): MetadataMethodBuilder<K>;
+/** @internal Rebuild a native builder with new extension state, preserving its value flags. */
+type WithExtensions<S, E> = S extends {
+    readonly __cleverbrush_builder_type__: infer P;
+} ? P extends readonly [
+    'number',
+    infer T,
+    infer R extends boolean,
+    infer N extends boolean,
+    infer D extends boolean
+] ? NumberSchemaBuilder<T, R, N, D, E> : P extends readonly [
+    'string',
+    infer T,
+    infer R extends boolean,
+    infer N extends boolean,
+    infer D extends boolean
+] ? StringSchemaBuilder<T, R, N, D, E> : P extends readonly [
+    'date',
+    infer T,
+    infer R extends boolean,
+    infer N extends boolean,
+    infer D extends boolean
+] ? DateSchemaBuilder<T, R, N, D, E> : P extends readonly [
+    'object',
+    infer P extends Record<string, SchemaBuilder<any, any, any, any, any>>,
+    infer R extends boolean,
+    infer N extends boolean,
+    infer T,
+    infer D extends boolean,
+    infer C extends SchemaBuilder<any, any, any, any, any>[]
+] ? ObjectSchemaBuilder<P, R, N, T, D, E, C> : P extends readonly [
+    'array',
+    infer P extends SchemaBuilder<any, any, any, any, any>,
+    infer R extends boolean,
+    infer N extends boolean,
+    infer T,
+    infer D extends boolean,
+    infer V
+] ? ArraySchemaBuilder<P, R, N, T, D, E, V> : P extends readonly [
+    'boolean',
+    infer T,
+    infer R extends boolean,
+    infer N extends boolean,
+    infer X,
+    infer D extends boolean,
+    infer V
+] ? BooleanSchemaBuilder<T, R, N, X, D, E, V> : P extends readonly [
+    'tuple',
+    infer P extends readonly SchemaBuilder<any, any, any, any, any>[],
+    infer R extends boolean,
+    infer N extends boolean,
+    infer T,
+    infer D extends boolean,
+    infer Rest extends SchemaBuilder<any, any, any, any, any> | undefined,
+    infer V
+] ? TupleSchemaBuilder<P, R, N, T, D, E, Rest, V> : P extends readonly [
+    'record',
+    infer K extends StringSchemaBuilder<any, any, any, any>,
+    infer P extends SchemaBuilder<any, any, any, any, any>,
+    infer R extends boolean,
+    infer N extends boolean,
+    infer T,
+    infer D extends boolean,
+    infer V
+] ? RecordSchemaBuilder<K, P, R, N, T, D, E, V> : P extends readonly [
+    'union',
+    infer P extends readonly SchemaBuilder<any, any, any, any, any>[],
+    infer R extends boolean,
+    infer N extends boolean,
+    infer T,
+    infer D extends boolean
+] ? UnionSchemaBuilder<P, R, N, T, D, E> : P extends readonly [
+    'func',
+    infer R extends boolean,
+    infer N extends boolean,
+    infer T,
+    infer D extends boolean,
+    infer P extends SchemaBuilder<any, any, any, any, any>[],
+    infer Return extends SchemaBuilder<any, any, any, any, any> | undefined,
+    infer V
+] ? FunctionSchemaBuilder<R, N, T, D, E, P, Return, V> : P extends readonly [
+    'promise',
+    infer R extends boolean,
+    infer N extends boolean,
+    infer T,
+    infer D extends boolean,
+    infer P extends SchemaBuilder<any, any, any, any, any> | undefined,
+    infer V
+] ? PromiseSchemaBuilder<R, N, T, D, E, P, V> : P extends readonly [
+    'generic',
+    infer F extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>,
+    infer R extends boolean,
+    infer N extends boolean,
+    infer T,
+    infer D extends boolean,
+    infer V
+] ? GenericSchemaBuilder<F, R, N, T, D, E, V> : P extends readonly [
+    'any',
+    infer R extends boolean,
+    infer N extends boolean,
+    infer T,
+    infer D extends boolean,
+    infer V
+] ? AnySchemaBuilder<R, N, T, D, E, V> : never : never;
+/** @internal Named declaration support for metadata-aware fluent builders. */
+export type MetadataState<Methods, Metadata, Extras> = MetadataMethods<Methods> & HiddenExtensionMethods & Extras & {
+    readonly __cleverbrush_extension_metadata__: Metadata;
+};
+/** @internal A metadata-aware factory result; state survives native builder modifiers. */
+export type MetadataExtended<S, Methods, Metadata = {}, Extras = ExtraProperties<S, Methods>> = WithExtensions<S, MetadataState<Methods, Metadata, Extras>> & MetadataState<Methods, Metadata, Extras>;
+/** @internal Preserve author-defined type brands without intersecting stale metadata or methods. */
+export type ExtraProperties<S, Methods> = Pick<S, Exclude<keyof S, keyof WithExtensions<S, {}> | keyof Methods | '__cleverbrush_extension_metadata__'>>;
+type ExtraTypes<S> = S extends {
+    readonly [EXTRA_TYPE_BRAND]?: infer T;
+} ? T : {};
+type LiteralNames<S> = S extends {
+    readonly [METHOD_LITERAL_BRAND]?: infer T;
+} ? T : never;
+type WithBrand<S, Methods, K extends PropertyKey, V> = MetadataExtended<S, Methods, InferExtensionMetadata<S>, Omit<ExtraProperties<S, Methods>, K> & {
+    readonly [P in K]?: V;
+}>;
+type SetMetadata<S, Methods, K extends string, V> = MetadataExtended<S, Methods, Omit<InferExtensionMetadata<S>, K> & Record<K, V>>;
+/** Describe fields without recursively inspecting the receiver's fluent methods. */
+type MetadataPropertyTree<S> = S extends {
+    readonly __cleverbrush_builder_type__: readonly [
+        'object',
+        infer P extends Record<string, SchemaBuilder<any, any, any, any, any>>,
+        ...unknown[]
+    ];
+} ? PropertyDescriptorTree<ObjectSchemaBuilder<P>, ObjectSchemaBuilder<P>> : never;
+/** @internal Named declaration support for extension method signatures. */
+export type MetadataMethods<Methods> = {
+    [M in keyof Methods]: Methods[M] extends MetadataMethod<infer K, infer A, infer V, infer Mode> ? Mode extends 'argument' ? <S, const Value extends A[0]>(this: S, value: Value) => SetMetadata<S, Methods, K, Value> : <S>(this: S, ...args: A) => SetMetadata<S, Methods, K, V> : Methods[M] extends (this: any, ...args: infer A) => infer R ? typeof EXTRA_TYPE_BRAND extends keyof R ? <S, const Name extends string & A[0], const Key extends string>(this: S, name: Name, ...columns: ReadonlyArray<Key | ((t: MetadataPropertyTree<S>) => any)>) => WithBrand<S, Methods, typeof EXTRA_TYPE_BRAND, ExtraTypes<S> & Record<Name, readonly Key[]>> : typeof METHOD_LITERAL_BRAND extends keyof R ? <S, const Name extends string & A[0]>(this: S, name: Name, ...rest: A extends [any, ...infer Rest] ? Rest : []) => WithBrand<S, Methods, typeof METHOD_LITERAL_BRAND, LiteralNames<S> | Name> : <S>(this: S, ...args: A) => S : Methods[M];
+};
+export {};
 `,
     "file:///node_modules/@cleverbrush/schema/utils/transaction.d.ts": `/**
  * Options for customizing transaction behavior.

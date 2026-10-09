@@ -139,6 +139,16 @@ export type UseSchemaFormOptions = {
     validationDebounceMs?: number;
 };
 
+/**
+ * Plain external validation issue. `pointer` is a form-relative JSON Pointer
+ * (RFC 6901), or '' for a form-level issue. Safe to serialize through actions.
+ * The form does not decode HTTP responses or infer paths from message text.
+ */
+export type FormIssue = {
+    readonly pointer: string;
+    readonly detail: string;
+};
+
 /** Reactive state for handleSubmit; independent of any UI kit. */
 export type FormSubmissionState = {
     readonly submitting: boolean;
@@ -148,7 +158,9 @@ export type FormSubmissionState = {
 /** Void denotes success without data; explicit failures preserve user input. */
 export type FormSubmitResult<TData = void> =
     // biome-ignore lint/suspicious/noConfusingVoidType: callbacks returning void are valid successful submissions
-    void | { ok: true; data?: TData } | { ok: false; error: string };
+    | void
+    | { ok: true; data?: TData }
+    | { ok: false; error: string; issues?: readonly FormIssue[] };
 
 /** Application-owned success UI and exception translation. Rethrows propagate. */
 export type FormSubmitOptions<TValues, TData = void> = {

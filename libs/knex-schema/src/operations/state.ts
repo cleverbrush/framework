@@ -1,8 +1,8 @@
-// @cleverbrush/knex-schema — Shared mutable state store for SchemaQueryBuilder
+// @cleverbrush/knex-schema — Shared mutable state store for QuerySource
 
 import type { ObjectSchemaBuilder } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
-import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
+import type { QuerySource } from '../QuerySource.js';
 import type {
     ResolvedVariantConfig,
     ValidatedSpec,
@@ -10,6 +10,10 @@ import type {
 } from '../types.js';
 
 export interface QueryBuilderState {
+    /** Decode write-returning property rows before lifecycle hooks observe them. */
+    decodeRow?: (row: Record<string, any>) => Record<string, any>;
+    /** Raw callbacks have no statically declared result shape for opt-in reads. */
+    opaqueReadShape?: boolean;
     knex: Knex;
     baseQuery: Knex.QueryBuilder;
     localSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
@@ -24,6 +28,13 @@ export interface QueryBuilderState {
 
     /** Name of the projection currently applied, for error messages. */
     appliedProjection: string | null;
+    /** Output aliases and decoders for typed object projections. */
+    projectionColumns: Record<string, string | Knex.Raw> | null;
+    projectionDecoders: Record<string, (value: unknown) => unknown>;
+    hiddenColumns: Set<string>;
+
+    /** Immutable public query snapshot supplied to observational delete hooks. */
+    hookQuery?: unknown;
 
     /** When true, soft-delete filter is NOT applied. */
     includeDeleted: boolean;
@@ -47,29 +58,27 @@ export interface QueryBuilderState {
     variantRelationIncludes: Array<{
         variantKey: string;
         relationName: string;
-        customize?: (q: SchemaQueryBuilder<any, any>) => void;
+        customize?: (q: QuerySource<any, any>) => void;
     }>;
 
     /** Memoized result of buildQuery(). null = needs rebuild. */
     cachedBuiltQuery: Knex.QueryBuilder | null;
 }
 
-const STATE = new WeakMap<SchemaQueryBuilder<any, any>, QueryBuilderState>();
+const STATE = new WeakMap<QuerySource<any, any>, QueryBuilderState>();
 
-export function getState(
-    builder: SchemaQueryBuilder<any, any>
-): QueryBuilderState {
+export function getState(builder: QuerySource<any, any>): QueryBuilderState {
     const s = STATE.get(builder);
     if (!s) {
         throw new Error(
-            'SchemaQueryBuilder state not found — builder was not properly initialized'
+            'QuerySource state not found — builder was not properly initialized'
         );
     }
     return s;
 }
 
 export function setState(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     state: QueryBuilderState
 ): void {
     STATE.set(builder, state);
