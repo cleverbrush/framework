@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, it } from 'vitest';
+import { typescriptCli } from '../../../scripts/typescript-cli.mjs';
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
@@ -136,7 +137,7 @@ export const registration = mapHandlers({ ${groups.map(g => `${g}: ${g}.endpoint
             const result = spawnSync(
                 process.execPath,
                 [
-                    join(repository, 'node_modules/typescript/lib/tsc.js'),
+                    typescriptCli(),
                     '-p',
                     join(temporary, style, 'tsconfig.json'),
                     '--extendedDiagnostics'

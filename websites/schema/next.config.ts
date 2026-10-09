@@ -50,6 +50,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+    experimental: { useTypeScriptCli: true },
     output: 'standalone',
     transpilePackages: [
         '@t3-oss/env-nextjs',

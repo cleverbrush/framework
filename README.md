@@ -91,6 +91,14 @@ ES modules.
 
 Use Node.js 24 or newer and npm 11. Install the Node version in `.nvmrc`.
 
+Builds and typechecks use the pinned native compiler,
+`typescript@7.1.0-dev.20261007.1`. The `tsc` command also powers declaration
+generation, Vitest type tests, website builds, and consumer fixtures.
+TypeDoc alone uses TypeScript 6.0.3 in the private `scripts/api-docs` workspace
+until [TypeDoc supports TypeScript 7](https://github.com/TypeStrong/typedoc/issues/3098).
+Use `npm run docs:generate -- --out <directory>` to generate API references
+through that isolated toolchain, or `npm run docs` for the website output.
+
 ```bash
 npm ci
 npm run lint
@@ -107,6 +115,19 @@ npm run typecheck:docs-site
 npm run build:schema-site
 npm run build:docs-site
 ```
+
+To compare two disposable checkouts after running `npm ci` in each:
+
+```bash
+node scripts/benchmark-build.mjs --baseline /tmp/framework-baseline \
+    --candidate /tmp/framework-candidate --runs 5 --output /tmp/build-results.json
+```
+
+The benchmark removes generated package outputs, bypasses Turbo cache reads,
+and alternates the checkouts after a warm-up. It records clean full builds,
+compiler-only declaration generation, and warm incremental schema checks.
+Run it without other builds or tests competing for CPU. Results and command
+logs are written beside the requested JSON file.
 
 The demo app can be started with:
 

@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { typescriptCli } from './typescript-cli.mjs';
 import { assertPackageLicense } from './package-license.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
@@ -134,7 +135,7 @@ try {
         declarations + '\n' + readmeExample
     );
     execute(process.execPath, [
-        join(root, 'node_modules/typescript/bin/tsc'),
+        typescriptCli(),
         '--noEmit',
         '--strict',
         '--skipLibCheck',

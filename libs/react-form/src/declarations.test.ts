@@ -1,39 +1,50 @@
 // @vitest-environment node
 
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
 import { expect, test } from 'vitest';
+import { typescriptCli } from '../../../scripts/typescript-cli.mjs';
 
 test('consumers can emit declarations for exported inferred form systems', () => {
     const fixture = fileURLToPath(
         new URL('../test-fixtures/exported-system.tsx', import.meta.url)
     );
-    const options: ts.CompilerOptions = {
-        declaration: true,
-        emitDeclarationOnly: true,
-        strict: true,
-        skipLibCheck: true,
-        target: ts.ScriptTarget.ES2022,
-        module: ts.ModuleKind.ESNext,
-        moduleResolution: ts.ModuleResolutionKind.Bundler,
-        jsx: ts.JsxEmit.ReactJSX
-    };
-    const host = ts.createCompilerHost(options);
-    const output: string[] = [];
-    host.writeFile = (_fileName, content) => {
-        output.push(content);
-    };
-    const program = ts.createProgram([fixture], options, host);
-    const diagnostics = [
-        ...ts.getPreEmitDiagnostics(program),
-        ...program.emit().diagnostics
-    ];
-    expect(
-        diagnostics.map(diagnostic =>
-            ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
-        )
-    ).toEqual([]);
-    expect(output.join('\n')).toContain('TypedFormSystem');
-    // In-process TypeScript declaration emit is substantially slower with V8
-    // coverage on shared CI runners than ordinary form behavior tests.
+    const output = mkdtempSync(join(tmpdir(), 'framework-form-declarations-'));
+    try {
+        const result = spawnSync(
+            process.execPath,
+            [
+                typescriptCli(),
+                '--ignoreConfig',
+                '--declaration',
+                '--emitDeclarationOnly',
+                '--strict',
+                '--skipLibCheck',
+                '--target',
+                'ES2022',
+                '--module',
+                'ESNext',
+                '--moduleResolution',
+                'bundler',
+                '--jsx',
+                'react-jsx',
+                '--outDir',
+                output,
+                '--rootDir',
+                dirname(fixture),
+                fixture
+            ],
+            { encoding: 'utf8', timeout: 60_000 }
+        );
+        expect(result.error).toBeUndefined();
+        expect(result.status, result.stdout + result.stderr).toBe(0);
+        expect(
+            readFileSync(join(output, 'exported-system.d.ts'), 'utf8')
+        ).toContain('TypedFormSystem');
+    } finally {
+        rmSync(output, { recursive: true, force: true });
+    }
 }, 60_000);
