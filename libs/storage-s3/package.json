@@ -1,6 +1,6 @@
 {
     "name": "@cleverbrush/storage-s3",
-    "version": "4.4.3",
+    "version": "5.0.0",
     "description": "S3-compatible object storage for self-hosted and hosted providers",
     "type": "module",
     "sideEffects": false,
@@ -27,7 +27,7 @@
         "clean": "rm -rf dist tsconfig.tsbuildinfo"
     },
     "dependencies": {
-        "@cleverbrush/storage": "^4.4.3",
+        "@cleverbrush/storage": "^5.0.0",
         "@aws-sdk/client-s3": "^3.1145.0",
         "@aws-sdk/lib-storage": "^3.1145.0"
     }

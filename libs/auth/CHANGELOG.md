@@ -1,5 +1,35 @@
 # @cleverbrush/auth
 
+## 5.0.0
+
+### Major Changes
+
+- d916566: Make Framework query builders immutable and infer row schemas automatically.
+  
+  Retain returned query builders, return synchronous builders from scopes and grouped predicates, and supply an explicit Framework object output schema for opaque raw SELECTs. Ordinary, aliased, polymorphic and ORM queries expose their row schemas directly. Projections replace scalar selections, and projected/aggregate/raw queries cannot perform entity writes. Reads and write-returning rows consistently preserve exact decimal/bigint strings, Date objects and SQL nulls.
+  
+  All published Framework packages advance together to the next major version. Tracked entity objects remain mutable.
+  
+  ### Migrating from v4.x to v5
+  
+  Remove `withRowSchema()` calls and retain each configured query instead of relying on mutation. Replace raw base-query overloads with explicit output contracts. See `libs/knex-schema/MIGRATION-v5.md` for the complete migration guide.
+- c5b4dbc: Require Node.js 24+ consistently across all published packages. Correct the root and all published-package license files to BSD-3-Clause, matching package metadata and documentation, and verify license consistency in source and npm tarballs. See docs/MIGRATION-v5.md for migration guidance.
+  
+  Harden JWT key/algorithm and claim validation, cookie parsing/serialization, and request-body lifecycle handling. Require explicit authorization scope for bounded server idempotency; coalesce concurrent retries and capture full response bodies. Bound response caching and bypass private, no-store and cookie-setting responses.
+  
+  Preserve DI scope validation through factories and propagate registered optional-service failures. Fix batch response status/header capture, timeout abort-listener cleanup, concurrent deduplication response cloning, CLI database cleanup on validation/production-guard failures, and the missing client idempotency JavaScript export. Update security-sensitive dependencies and ensure OpenTelemetry disable flags override SDK defaults.
+  
+  Add regression tests, package-consumer smoke checks, package-level unit coverage floors, migration/security documentation and release validation gates.
+
+### Patch Changes
+
+- Updated dependencies [d916566]
+- Updated dependencies [a90a491]
+- Updated dependencies [f9b1f56]
+- Updated dependencies [c5b4dbc]
+- Updated dependencies [47133eb]
+  - @cleverbrush/schema@5.0.0
+
 ## 4.5.0
 
 ### Patch Changes

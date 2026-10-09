@@ -5,8 +5,8 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/deep": "^4.5.0",
-        "@cleverbrush/schema": "^4.5.0"
+        "@cleverbrush/deep": "^5.0.0",
+        "@cleverbrush/schema": "^5.0.0"
     },
     "devDependencies": {
         "@types/react": "^19.0.0",
@@ -51,5 +51,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "4.5.0"
+    "version": "5.0.0"
 }

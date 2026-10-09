@@ -5,8 +5,8 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/schema": "^4.5.0",
-        "@cleverbrush/knex-schema": "^4.5.0"
+        "@cleverbrush/schema": "^5.0.0",
+        "@cleverbrush/knex-schema": "^5.0.0"
     },
     "peerDependencies": {
         "knex": ">=3.1.0"
@@ -56,5 +56,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "4.5.0"
+    "version": "5.0.0"
 }

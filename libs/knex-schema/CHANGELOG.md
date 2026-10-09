@@ -1,5 +1,113 @@
 # @cleverbrush/knex-schema
 
+## 5.0.0
+
+### Major Changes
+
+- d916566: Make Framework query builders immutable and infer row schemas automatically.
+  
+  Retain returned query builders, return synchronous builders from scopes and grouped predicates, and supply an explicit Framework object output schema for opaque raw SELECTs. Ordinary, aliased, polymorphic and ORM queries expose their row schemas directly. Projections replace scalar selections, and projected/aggregate/raw queries cannot perform entity writes. Reads and write-returning rows consistently preserve exact decimal/bigint strings, Date objects and SQL nulls.
+  
+  All published Framework packages advance together to the next major version. Tracked entity objects remain mutable.
+  
+  ### Migrating from v4.x to v5
+  
+  Remove `withRowSchema()` calls and retain each configured query instead of relying on mutation. Replace raw base-query overloads with explicit output contracts. See `libs/knex-schema/MIGRATION-v5.md` for the complete migration guide.
+- c5b4dbc: Require Node.js 24+ consistently across all published packages. Correct the root and all published-package license files to BSD-3-Clause, matching package metadata and documentation, and verify license consistency in source and npm tarballs. See docs/MIGRATION-v5.md for migration guidance.
+  
+  Harden JWT key/algorithm and claim validation, cookie parsing/serialization, and request-body lifecycle handling. Require explicit authorization scope for bounded server idempotency; coalesce concurrent retries and capture full response bodies. Bound response caching and bypass private, no-store and cookie-setting responses.
+  
+  Preserve DI scope validation through factories and propagate registered optional-service failures. Fix batch response status/header capture, timeout abort-listener cleanup, concurrent deduplication response cloning, CLI database cleanup on validation/production-guard failures, and the missing client idempotency JavaScript export. Update security-sensitive dependencies and ensure OpenTelemetry disable flags override SDK defaults.
+  
+  Add regression tests, package-consumer smoke checks, package-level unit coverage floors, migration/security documentation and release validation gates.
+
+### Minor Changes
+
+- e43b72f: Add `parameter('name')` for callable PostgreSQL SELECT templates with schema-inferred positional arguments. Compile SQL, binding slots and decoding once on first invocation or `.toSQL(...)`; reuse them with independent values on later calls. `.query(...)` returns an ordinary composable bound reader.
+  
+  Support repeated names, grouped filters, fixed membership/range slots, alias joins, relation and STI/CTI customizers, and caller-owned transactions. Preserve storage types, null comparison semantics, result schemas, property navigation, and ORM identity tracking. Reject unsupported placeholder positions and unbound terminals or writes before execution.
+- 6d3aecf: Add typed flat joined projections, aggregate expressions and scalar helpers
+  with optional output schemas, and composite keyset pagination. Preserve parent
+  ordering during eager loading and infer related-query customization types.
+  Existing aggregate and single-column cursor APIs remain available unchanged.
+  Export reusable SQL identifier validation, preserve schema inference throughout
+  bound query factories, and document the public query/ORM APIs for IDE tooltips.
+- cb5d622: Add immutable connection-independent query definitions with `query(Schema)`.
+  Define typed reads once and supply a Knex connection or transaction through
+  `definition(knex, ...values)`, `.query(knex, ...values)` or `.toSQL(knex, ...values)`.
+  
+  Preserve inferred parameters, projections, relation/variant schemas and existing
+  connection-first APIs. Capture selectors/scopes/customizers once, compile SELECTs
+  lazily per definition and actual Knex instance, and bind ordinary readers before
+  native SQL composition, pagination or supported writes. Include runtime,
+  declaration and PostgreSQL integration coverage and multi-file usage guidance.
+- a90a491: Add opt-in immutable, detached PostgreSQL reads with projection-aware runtime
+  schemas, precise decimal/bigint decoding, nested relation graphs and explicit
+  STI/CTI branch schemas. Reuse result schemas directly in separately defined
+  application mappings without duplicating projection schemas.
+  
+  Add `getSyncMapper()` with synchronous eligibility inferred through the existing
+  `configure()` API, completeness checks, nested mapping propagation and runtime
+  thenable guards. Existing queries and asynchronous mapping behavior are unchanged.
+  
+  Add application-agnostic typed metadata extension methods that retain metadata
+  through immutable chains. Use these in database extensions without modifying
+  global schema prototypes.
+  
+  Preserve typed function-schema compatibility in dependency injection when a
+  function declares its return schema.
+- 81c2de4: Add shape-preserving grouped AND/OR predicates, captured IN/EXISTS subqueries,
+  bound raw predicates and ordering, and typed SQL column references to ordinary
+  and aliased schema-aware readers. These capabilities also work in ordinary ORM
+  reads and nested relation customizers while retaining immutable query plans and
+  stable row-schema identity. Group callbacks are synchronous and predicate-only;
+  unrestricted raw query mutation remains unavailable.
+- e788a0d: Add schema-based single and multiple file upload contracts, typed multipart client
+  serialization, and matching OpenAPI schemas. Enforce multipart body, file, field,
+  and part limits, reject truncated or duplicate singleton uploads, and support
+  file-only endpoints. Existing options-only uploads retain their single-file
+  shape and explicit MIME rejection reporting.
+  
+  Add lossless JSONB object reads and writes using native object schemas with
+  `.acceptUnknownProps().jsonb()`. Preserve nested extension data through returning
+  rows and projections, validate JSON extensions in the database layer, align
+  nullable object column DDL with reads, and track nested edits independently in
+  the ORM. Fix the PostgreSQL
+  upsert returning path exercised by document round trips.
+
+### Patch Changes
+
+- d31323a: Honor hooks, timestamps and base-schema soft deletion in explicit variant writes
+  and tracked polymorphic saves, for single-table and class-table inheritance.
+  Add `ofVariant(key).restore()` and `hardDelete()`; CTI soft deletion retains the
+  child row, while permanent deletion removes both rows atomically.
+  
+  **Migration:** Variant `delete()` now respects the base schema's `.softDelete()`.
+  Use `hardDelete()` for physical removal, and `withDeleted()` to include hidden
+  rows. Review lifecycle hooks that now run, and remove identity/discriminator/join
+  keys from update patches. This change is part of the coordinated v5 major release.
+  
+  Capture mutation targets inside the write transaction, preserve query restrictions
+  and transaction bindings, and use savepoints for caller-owned transactions. Fix
+  base/variant column mapping and visibility of extension-managed deletion columns;
+  retain exact numeric keys and tracked optimistic-concurrency/rollback semantics.
+- 6d7e982: Apply and generate column default changes without dropping, retyping or changing
+  the nullability of the existing column. Removing a default executes DROP DEFAULT;
+  setting one executes SET DEFAULT with safely quoted values (including question
+  marks and backslashes) and support for explicit SQL expressions. Generated down
+  migrations restore the original default instead of assuming a timestamp column.
+- efe2f2f: Preserve original property declarations and JSDoc through derived types so
+  editors can navigate to definitions and show property documentation. This covers
+  query selectors, rows, projections and write payloads; declared relation includes;
+  mapper targets; JSON Schema inferred values; composed API groups and injected
+  services; and merged object properties. Runtime behavior is unchanged.
+- Updated dependencies [d916566]
+- Updated dependencies [a90a491]
+- Updated dependencies [f9b1f56]
+- Updated dependencies [c5b4dbc]
+- Updated dependencies [47133eb]
+  - @cleverbrush/schema@5.0.0
+
 ## 4.5.0
 
 ### Patch Changes

@@ -1,5 +1,71 @@
 # @cleverbrush/server-openapi
 
+## 5.0.0
+
+### Major Changes
+
+- d916566: Make Framework query builders immutable and infer row schemas automatically.
+  
+  Retain returned query builders, return synchronous builders from scopes and grouped predicates, and supply an explicit Framework object output schema for opaque raw SELECTs. Ordinary, aliased, polymorphic and ORM queries expose their row schemas directly. Projections replace scalar selections, and projected/aggregate/raw queries cannot perform entity writes. Reads and write-returning rows consistently preserve exact decimal/bigint strings, Date objects and SQL nulls.
+  
+  All published Framework packages advance together to the next major version. Tracked entity objects remain mutable.
+  
+  ### Migrating from v4.x to v5
+  
+  Remove `withRowSchema()` calls and retain each configured query instead of relying on mutation. Replace raw base-query overloads with explicit output contracts. See `libs/knex-schema/MIGRATION-v5.md` for the complete migration guide.
+- c5b4dbc: Require Node.js 24+ consistently across all published packages. Correct the root and all published-package license files to BSD-3-Clause, matching package metadata and documentation, and verify license consistency in source and npm tarballs. See docs/MIGRATION-v5.md for migration guidance.
+  
+  Harden JWT key/algorithm and claim validation, cookie parsing/serialization, and request-body lifecycle handling. Require explicit authorization scope for bounded server idempotency; coalesce concurrent retries and capture full response bodies. Bound response caching and bypass private, no-store and cookie-setting responses.
+  
+  Preserve DI scope validation through factories and propagate registered optional-service failures. Fix batch response status/header capture, timeout abort-listener cleanup, concurrent deduplication response cloning, CLI database cleanup on validation/production-guard failures, and the missing client idempotency JavaScript export. Update security-sensitive dependencies and ensure OpenTelemetry disable flags override SDK defaults.
+  
+  Add regression tests, package-consumer smoke checks, package-level unit coverage floors, migration/security documentation and release validation gates.
+
+### Minor Changes
+
+- f9b1f56: Add optional-aware fallbacks and preprocessing, and automatic named schema
+  references through ordinary immutable use-site modifiers, without a wrapper API.
+  Shape, validation-rule, default, fallback and extension changes clear inherited
+  names; apply schemaName after those edits to establish a new named definition.
+  Preserve one canonical definition in JSON
+  Schema, OpenAPI and AsyncAPI with strict name collision checks. Keep existing
+  type inference and optional null acceptance unchanged.
+- 32240e4: Add contract-declared mutation replay with typed async request preparation,
+  explicit authorization scopes, and consistent endpoint error policies. Generate
+  client keys and coordinate HTTP retries/batching from the contract without
+  changing ordinary client calls. Document replay headers and framework errors in
+  OpenAPI while preserving domain response schemas.
+- e788a0d: Add schema-based single and multiple file upload contracts, typed multipart client
+  serialization, and matching OpenAPI schemas. Enforce multipart body, file, field,
+  and part limits, reject truncated or duplicate singleton uploads, and support
+  file-only endpoints. Existing options-only uploads retain their single-file
+  shape and explicit MIME rejection reporting.
+  
+  Add lossless JSONB object reads and writes using native object schemas with
+  `.acceptUnknownProps().jsonb()`. Preserve nested extension data through returning
+  rows and projections, validate JSON extensions in the database layer, align
+  nullable object column DDL with reads, and track nested edits independently in
+  the ORM. Fix the PostgreSQL
+  upsert returning path exercised by document round trips.
+
+### Patch Changes
+
+- Updated dependencies [6d7e982]
+- Updated dependencies [54a3d43]
+- Updated dependencies [d916566]
+- Updated dependencies [0a08509]
+- Updated dependencies [a90a491]
+- Updated dependencies [efe2f2f]
+- Updated dependencies [f9b1f56]
+- Updated dependencies [c5b4dbc]
+- Updated dependencies [47133eb]
+- Updated dependencies [32240e4]
+- Updated dependencies [e788a0d]
+  - @cleverbrush/server@5.0.0
+  - @cleverbrush/auth@5.0.0
+  - @cleverbrush/schema-json@5.0.0
+  - @cleverbrush/schema@5.0.0
+
 ## 4.5.0
 
 ## 4.4.3

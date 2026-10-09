@@ -5,8 +5,8 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/schema": "^4.5.0",
-        "@cleverbrush/server": "^4.5.0"
+        "@cleverbrush/schema": "^5.0.0",
+        "@cleverbrush/server": "^5.0.0"
     },
     "devDependencies": {
         "@tanstack/react-query": "^5.75.0",
@@ -105,5 +105,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "4.5.0"
+    "version": "5.0.0"
 }
