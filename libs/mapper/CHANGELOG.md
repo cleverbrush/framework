@@ -1,5 +1,11 @@
 # @cleverbrush/mapper
 
+## 4.5.0
+
+### Patch Changes
+
+- @cleverbrush/schema@4.5.0
+
 ## 4.4.3
 
 ### Patch Changes
