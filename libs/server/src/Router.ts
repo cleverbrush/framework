@@ -1,4 +1,5 @@
 import type { ParseStringSchemaBuilder } from '@cleverbrush/schema';
+import { matchRoutePath } from './EndpointPath.js';
 import type {
     EndpointRegistration,
     RouteMatch,
@@ -256,7 +257,7 @@ export class Router {
         // Try exact method match first
         const methodRoutes = this.#routes.get(upperMethod);
         if (methodRoutes) {
-            const result = this.#findFirstMatch(methodRoutes, normalized);
+            const result = this.#findFirstMatch(methodRoutes, normalized, url);
             if (result) {
                 return { match: result, methodNotAllowed: false };
             }
@@ -266,7 +267,7 @@ export class Router {
         const allowedMethods: string[] = [];
         for (const [m, routes] of this.#routes) {
             if (m === upperMethod) continue;
-            if (this.#findFirstMatch(routes, normalized)) {
+            if (this.#findFirstMatch(routes, normalized, url)) {
                 allowedMethods.push(m);
             }
         }
@@ -281,16 +282,17 @@ export class Router {
     /** Returns the first successful match from an indexed route collection. */
     #findFirstMatch<TRegistration>(
         collection: RouteCollection<TRegistration>,
-        normalizedUrl: string
+        normalizedUrl: string,
+        rawUrl: string
     ): RegisteredRouteMatch<TRegistration> | null {
         const exactRoute = collection.exactRoutes.get(normalizedUrl);
         if (exactRoute) {
-            const match = this.#tryMatch(exactRoute, normalizedUrl);
+            const match = this.#tryMatch(exactRoute, normalizedUrl, rawUrl);
             if (match) return match;
         }
 
         for (const route of collection.dynamicRoutes) {
-            const match = this.#tryMatch(route, normalizedUrl);
+            const match = this.#tryMatch(route, normalizedUrl, rawUrl);
             if (match) return match;
         }
 
@@ -305,7 +307,8 @@ export class Router {
 
     #tryMatch<TRegistration>(
         route: RegisteredRoute<TRegistration>,
-        normalizedUrl: string
+        normalizedUrl: string,
+        rawUrl: string
     ): RegisteredRouteMatch<TRegistration> | null {
         const { basePath, routePath } = route;
 
@@ -320,11 +323,14 @@ export class Router {
 
         if (isParseStringSchema(routePath)) {
             // Dynamic route: validate remainder via parseString schema
-            const result = routePath.validate(remainder);
-            if (result.valid) {
+            const result = matchRoutePath(
+                { basePath, pathTemplate: routePath },
+                rawUrl
+            );
+            if (result !== undefined) {
                 return {
                     registration: route.registration,
-                    parsedPath: result.object as Record<string, any>
+                    parsedPath: result as Record<string, any>
                 };
             }
             return null;
@@ -378,6 +384,6 @@ export class Router {
         }
 
         this.finalize();
-        return this.#findFirstMatch(this.#subscriptionRoutes, normalized);
+        return this.#findFirstMatch(this.#subscriptionRoutes, normalized, url);
     }
 }

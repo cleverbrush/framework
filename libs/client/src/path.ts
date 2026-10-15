@@ -1,3 +1,4 @@
+import { endpointPath } from '@cleverbrush/server/contract';
 /**
  * Builds the full request URL from endpoint metadata and optional path
  * parameters.
@@ -24,7 +25,12 @@ export function buildPath(
     }
 
     if (typeof pathTemplate.serialize === 'function') {
-        return basePath + pathTemplate.serialize(params ?? {});
+        return typeof (pathTemplate as any).introspect === 'function'
+            ? endpointPath(
+                  { introspect: () => ({ basePath, pathTemplate }) } as any,
+                  params ?? {}
+              )
+            : basePath + pathTemplate.serialize(params ?? {});
     }
 
     return basePath;

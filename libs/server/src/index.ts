@@ -57,6 +57,11 @@ export type {
     IdempotencyScope
 } from './EndpointOptions.js';
 export {
+    type EndpointParams,
+    endpointPath,
+    matchEndpointPath
+} from './EndpointPath.js';
+export {
     ErrorMap,
     type ErrorResponse,
     type ErrorResponsesOf,

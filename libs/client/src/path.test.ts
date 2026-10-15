@@ -1,7 +1,15 @@
+import { string } from '@cleverbrush/schema';
+import { route } from '@cleverbrush/server/contract';
 import { describe, expect, test, vi } from 'vitest';
 import { buildPath } from './path.js';
 
 describe('buildPath', () => {
+    test('encodes real contract parameters without changing literal separators', () => {
+        const template = route({ id: string() })`/${p => p.id}/content`;
+        expect(buildPath('/files', template, { id: 'a/b%2F?#' })).toBe(
+            '/files/a%2Fb%252F%3F%23/content'
+        );
+    });
     test('plain string template — appends to basePath', () => {
         expect(buildPath('/api/todos', '')).toBe('/api/todos');
         expect(buildPath('/api/todos', '/active')).toBe('/api/todos/active');

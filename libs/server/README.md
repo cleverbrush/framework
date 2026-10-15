@@ -990,6 +990,27 @@ chunks and restore response hooks on failure.
 See [security guidance](../../SECURITY.md) and the
 [v4.x-to-v5 migration guide](../../docs/MIGRATION-v5.md).
 
+
+
+### Endpoint path helpers
+
+`endpointPath(endpoint, params)` constructs an encoded pathname from a contract.
+`matchEndpointPath(endpoint, pathname)` returns validated parameters or `undefined`.
+Both are exported from `@cleverbrush/server/contract` for browser use and from the
+main package. Matching checks paths only, not methods or authorization. Origins,
+query strings and fragments are intentionally separate.
+
+```ts
+import { endpointPath, matchEndpointPath } from '@cleverbrush/server/contract';
+
+const path = endpointPath(api.files.content, { id: 'report 1' });
+const params = matchEndpointPath(api.files.content, path);
+```
+
+Parameters are URI-component encoded and decoded once. Invalid values throw
+during construction; mismatches, malformed encoding and invalid parameter values
+return `undefined` when matching. One trailing slash is accepted.
+
 ## License
 
 BSD-3-Clause — see [LICENSE](../../LICENSE).
