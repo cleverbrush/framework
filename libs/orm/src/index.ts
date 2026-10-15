@@ -15,7 +15,8 @@ export type {
 export type {
     DbContext,
     EntityMap,
-    TrackedDbContext
+    TrackedDbContext,
+    TransactionOptions
 } from './dbcontext.js';
 export { createDb } from './dbcontext.js';
 export type {

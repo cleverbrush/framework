@@ -872,7 +872,11 @@ export class ObjectSchemaBuilder<
             };
         }
 
-        if (typeof objToValidate !== 'object' || objToValidate === null) {
+        if (
+            typeof objToValidate !== 'object' ||
+            objToValidate === null ||
+            Array.isArray(objToValidate)
+        ) {
             // Only add "must be an object" when there is no prior error (e.g.
             // a required-violation error already pushed by preValidateAsync).
             if (errors.length === 0) {
@@ -1356,7 +1360,7 @@ export class ObjectSchemaBuilder<
                         }
                     } as any;
                 }
-            } else if (typeof object === 'object') {
+            } else if (typeof object === 'object' && !Array.isArray(object)) {
                 const propKeys = this.#propKeys;
 
                 // Check for unknown properties
@@ -2639,10 +2643,6 @@ export class ObjectSchemaBuilder<
         }
 
         const propsNames = Object.keys(introspected.properties);
-
-        if (propsNames.length === 0) {
-            return {} as any;
-        }
 
         if (typeof selector !== 'function') {
             selector = o => o;

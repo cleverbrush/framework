@@ -19,6 +19,37 @@ import {
 import { type DbSet, makeDbSet } from './dbset.js';
 import { PendingChangesError } from './errors.js';
 
+/** Options applied before a transaction callback runs. */
+export interface TransactionOptions {
+    /**
+     * PostgreSQL transaction-scoped advisory locks. Use stable, namespaced keys.
+     * Keys are deduplicated and sorted to give overlapping batches a consistent
+     * acquisition order. Locks remain held until the owning transaction ends;
+     * they do not replace row constraints or authorization.
+     */
+    readonly advisoryLocks?: readonly string[];
+}
+
+/** Acquire locks using parameter bindings on the transaction's connection. */
+async function acquireTransactionLocks(
+    trx: Knex.Transaction,
+    options?: TransactionOptions
+): Promise<void> {
+    const keys = options?.advisoryLocks ?? [];
+    if (!keys.length) return;
+    if (!['pg', 'postgres', 'postgresql'].includes(trx.client.config.client)) {
+        throw new Error('Advisory transaction locks require PostgreSQL.');
+    }
+    if (keys.some(key => typeof key !== 'string' || key.length === 0)) {
+        throw new TypeError('Advisory lock keys must be nonempty strings.');
+    }
+    for (const key of [...new Set(keys)].sort()) {
+        await trx.raw('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', [
+            key
+        ]);
+    }
+}
+
 /**
  * The map of entity name → entity definition passed to {@link createDb}.
  *
@@ -44,7 +75,10 @@ export type DbContext<TMap extends EntityMap> = {
      * Run `callback` inside a Knex transaction. The callback receives a new
      * `DbContext` whose `DbSet`s are bound to the transaction.
      */
-    transaction<T>(callback: (db: DbContext<TMap>) => Promise<T>): Promise<T>;
+    transaction<T>(
+        callback: (db: DbContext<TMap>) => Promise<T>,
+        options?: TransactionOptions
+    ): Promise<T>;
 
     /**
      * Return a new `DbContext` whose `DbSet`s are bound to `trx`. Useful
@@ -148,9 +182,11 @@ function buildContext<TMap extends EntityMap>(
             return buildContext<TMap>(trx as unknown as Knex, entities);
         },
         async transaction<T>(
-            callback: (db: DbContext<TMap>) => Promise<T>
+            callback: (db: DbContext<TMap>) => Promise<T>,
+            options?: TransactionOptions
         ): Promise<T> {
             return knex.transaction(async (trx: Knex.Transaction) => {
+                await acquireTransactionLocks(trx, options);
                 return callback(
                     buildContext<TMap>(trx as unknown as Knex, entities)
                 );
@@ -198,9 +234,11 @@ function buildTrackedContext<TMap extends EntityMap>(
         },
 
         async transaction<T>(
-            callback: (db: DbContext<TMap>) => Promise<T>
+            callback: (db: DbContext<TMap>) => Promise<T>,
+            options?: TransactionOptions
         ): Promise<T> {
             return knex.transaction(async (trx: Knex.Transaction) => {
+                await acquireTransactionLocks(trx, options);
                 return callback(
                     buildTrackedContext<TMap>(
                         trx as unknown as Knex,
