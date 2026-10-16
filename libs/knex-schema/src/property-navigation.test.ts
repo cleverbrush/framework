@@ -1,8 +1,16 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { LanguageVariant, SyntaxKind } from 'typescript/unstable/ast';
+import { createScanner } from 'typescript/unstable/ast/scanner';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { typescriptCli } from '../../../scripts/typescript-cli.mjs';
+import {
+    type Location,
+    NativeLanguageService,
+    positionAt
+} from '../test-fixtures/native-language-service.js';
 
 // Exercise the whole public type pipeline in one language service, including
 // downstream ORM, mapper, form and client consumers of the emitted declarations.
@@ -94,37 +102,14 @@ const references = [...sources].flatMap(([file, source]) =>
     }))
 );
 
-let service: ts.LanguageService;
-beforeAll(() => {
-    const options: ts.CompilerOptions = {
-        target: ts.ScriptTarget.ES2022,
-        module: ts.ModuleKind.ESNext,
-        moduleResolution: ts.ModuleResolutionKind.Bundler,
-        strict: true,
-        skipLibCheck: true,
-        allowJs: true,
-        checkJs: true,
-        noEmit: true,
-        esModuleInterop: true,
-        types: ['node']
-    };
-    service = ts.createLanguageService({
-        ...ts.sys,
-        useCaseSensitiveFileNames: () => ts.sys.useCaseSensitiveFileNames,
-        getScriptFileNames: () => [...sources.keys()],
-        getScriptVersion: () => '0',
-        getScriptSnapshot: file => {
-            const text = sources.get(file) ?? ts.sys.readFile(file);
-            return text === undefined
-                ? undefined
-                : ts.ScriptSnapshot.fromString(text);
-        },
-        getCompilationSettings: () => options,
-        getCurrentDirectory: () => dirname(model),
-        getDefaultLibFileName: ts.getDefaultLibFilePath
-    });
+let service: NativeLanguageService;
+beforeAll(async () => {
+    service = new NativeLanguageService();
+    await service.open(dirname(model), sources);
 });
-afterAll(() => service?.dispose());
+afterAll(async () => {
+    await service?.close();
+});
 
 test('navigation fixtures typecheck against public package declarations', () => {
     // Formatting must not silently stop the marker parser from finding cases.
@@ -132,16 +117,23 @@ test('navigation fixtures typecheck against public package declarations', () => 
     expect(new Set(references.map(reference => reference.name))).toEqual(
         new Set(Object.keys(documentation))
     );
-    const diagnostics = [...sources.keys()].flatMap(file => [
-        ...service.getSyntacticDiagnostics(file),
-        ...service.getSemanticDiagnostics(file)
-    ]);
-    expect(
-        diagnostics.map(d =>
-            ts.flattenDiagnosticMessageText(d.messageText, '\n')
-        )
-    ).toEqual([]);
-    const files = service.getProgram()!.getSourceFiles();
+    const result = spawnSync(
+        process.execPath,
+        [
+            typescriptCli(),
+            '-p',
+            fileURLToPath(
+                new URL('../test-fixtures/tsconfig.json', import.meta.url)
+            ),
+            '--listFiles',
+            '--pretty',
+            'false'
+        ],
+        { encoding: 'utf8', timeout: 120_000 }
+    );
+    expect(result.error).toBeUndefined();
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    const files = result.stdout.split('\n').map(file => file.trim());
     for (const name of [
         'knex-schema',
         'orm',
@@ -154,9 +146,7 @@ test('navigation fixtures typecheck against public package declarations', () => 
         'client'
     ]) {
         expect(
-            files.some(file =>
-                file.fileName.endsWith(`/libs/${name}/dist/index.d.ts`)
-            ),
+            files.some(file => file.endsWith(`/libs/${name}/dist/index.d.ts`)),
             `${name} must be tested through its published declarations`
         ).toBe(true);
     }
@@ -165,33 +155,40 @@ test('navigation fixtures typecheck against public package declarations', () => 
 }, 120_000);
 
 describe.each(references)('$language $name ($property)', reference => {
-    test('goes to the original property declaration', () => {
+    test('goes to the original property declaration', async () => {
         const doc = documentation[reference.name];
         expect(doc).toBeDefined();
         const comment = `/** ${doc} */`;
         const offset = modelSource.indexOf(comment);
         expect(offset).toBeGreaterThanOrEqual(0);
-        const scanner = ts.createScanner(
-            ts.ScriptTarget.ES2022,
+        const scanner = createScanner(
             true,
-            ts.LanguageVariant.Standard,
+            LanguageVariant.Standard,
             modelSource
         );
-        scanner.setTextPos(offset + comment.length);
+        scanner.resetTokenState(offset + comment.length);
         scanner.scan();
-        if (scanner.getToken() === ts.SyntaxKind.ReadonlyKeyword)
-            scanner.scan();
+        if (scanner.getToken() === SyntaxKind.ReadonlyKeyword) scanner.scan();
         expect(scanner.getTokenText()).toBe(reference.property);
-        const definitions = service.getDefinitionAtPosition(
-            reference.file,
-            reference.position
+        const definitions = await service.request<Location[]>(
+            'textDocument/definition',
+            {
+                textDocument: { uri: pathToFileURL(reference.file).href },
+                position: positionAt(
+                    sources.get(reference.file)!,
+                    reference.position
+                )
+            }
         );
         expect(definitions).toContainEqual(
             expect.objectContaining({
-                fileName: model,
-                textSpan: {
-                    start: scanner.getTokenPos(),
-                    length: reference.property.length
+                uri: pathToFileURL(model).href,
+                range: {
+                    start: positionAt(modelSource, scanner.getTokenStart()),
+                    end: positionAt(
+                        modelSource,
+                        scanner.getTokenStart() + reference.property.length
+                    )
                 }
             })
         );
@@ -200,14 +197,21 @@ describe.each(references)('$language $name ($property)', reference => {
     // TypeScript omits hover docs for this union-context object literal even
     // when both branches navigate to the same schema. Keep the accepted union.
     if (reference.name !== 'update-key') {
-        test('shows the original JSDoc on hover', () => {
-            const info = service.getQuickInfoAtPosition(
-                reference.file,
-                reference.position
+        test('shows the original JSDoc on hover', async () => {
+            const info = await service.request<{ contents: { value: string } }>(
+                'textDocument/hover',
+                {
+                    textDocument: { uri: pathToFileURL(reference.file).href },
+                    position: positionAt(
+                        sources.get(reference.file)!,
+                        reference.position
+                    )
+                }
             );
-            expect(ts.displayPartsToString(info?.documentation)).toBe(
-                documentation[reference.name]
-            );
+            // Markdown hover separates the signature from the original documentation.
+            expect(
+                info.contents.value.replace(/^```[\s\S]*?```\s*/, '').trim()
+            ).toBe(documentation[reference.name]);
         });
     }
 });

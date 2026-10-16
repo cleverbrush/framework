@@ -1,26 +1,35 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import ts from 'typescript';
-import { describe, expect, it } from 'vitest';
+import type { Node, SourceFile } from 'typescript/unstable/ast';
+import { ModifierFlags } from 'typescript/unstable/ast';
+import * as ts from 'typescript/unstable/ast/is';
+import { getCombinedModifierFlags } from 'typescript/unstable/ast/utils';
+import { API } from 'typescript/unstable/sync';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+let api: API;
+beforeAll(() => {
+    api = new API();
+});
+afterAll(() => api?.close());
 
 /** Inspect emitted declarations, since those are what installed consumers read. */
-function declaration(path: string): ts.SourceFile {
+function declaration(path: string): SourceFile {
     const url = new URL(path, import.meta.url);
-    return ts.createSourceFile(
-        fileURLToPath(url),
-        readFileSync(url, 'utf8'),
-        ts.ScriptTarget.Latest,
-        true
+    return api.createSourceFile(fileURLToPath(url), readFileSync(url, 'utf8'))
+        .sourceFile;
+}
+
+function hasSummary(node: Node): boolean {
+    return !!node.jsDoc?.some(doc => ts.isJSDoc(doc) && doc.comment.length);
+}
+
+function isInternal(node: Node): boolean {
+    return !!node.jsDoc?.some(
+        doc =>
+            ts.isJSDoc(doc) &&
+            doc.tags?.some(tag => tag.tagName.getText() === 'internal')
     );
-}
-
-function hasSummary(node: ts.Node): boolean {
-    const docs = (node as ts.Node & { jsDoc?: readonly ts.JSDoc[] }).jsDoc;
-    return !!docs?.some(doc => doc.comment);
-}
-
-function isInternal(node: ts.Node): boolean {
-    return ts.getJSDocTags(node).some(tag => tag.tagName.text === 'internal');
 }
 
 describe('published query/ORM API documentation', () => {
@@ -60,7 +69,7 @@ describe('published query/ORM API documentation', () => {
         );
         expect(missing).toEqual([]);
 
-        function check(source: ts.SourceFile, names: Set<string>): void {
+        function check(source: SourceFile, names: Set<string>): void {
             for (const node of source.statements) {
                 if (
                     ts.isVariableStatement(node) &&
@@ -87,9 +96,9 @@ describe('published query/ORM API documentation', () => {
                     if (ts.isClassDeclaration(node)) {
                         for (const member of node.members) {
                             if (
-                                ts.getCombinedModifierFlags(member) &
-                                    (ts.ModifierFlags.Private |
-                                        ts.ModifierFlags.Protected) ||
+                                getCombinedModifierFlags(member) &
+                                    (ModifierFlags.Private |
+                                        ModifierFlags.Protected) ||
                                 (member.name &&
                                     ts.isPrivateIdentifier(member.name)) ||
                                 isInternal(member)
@@ -117,17 +126,17 @@ describe('published query/ORM API documentation', () => {
         ]) {
             const source = declaration(path);
             const missing: string[] = [];
-            function visit(node: ts.Node): void {
+            function visit(node: Node): void {
                 if (
-                    (ts.isMethodSignature(node) ||
-                        ts.isPropertySignature(node) ||
+                    (ts.isMethodSignatureDeclaration(node) ||
+                        ts.isPropertySignatureDeclaration(node) ||
                         ts.isCallSignatureDeclaration(node)) &&
                     !isInternal(node) &&
                     !hasSummary(node)
                 ) {
                     missing.push(node.getText(source).split('\n')[0]);
                 }
-                ts.forEachChild(node, visit);
+                node.forEachChild(visit);
             }
             const node = source.statements.find(
                 n =>
