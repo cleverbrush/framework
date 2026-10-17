@@ -208,3 +208,45 @@ const hash = HashObject({ name: 'John', age: 30 });
 ## License
 
 BSD-3-Clause
+
+### `deepForEachAsync(input, visitor, context?, options?)`
+
+Visits plain records sequentially in parent-before-child order, awaiting each
+visitor before continuing. Arrays, including nested arrays, are containers;
+primitives, dates and custom instances are ignored. By default traversal follows
+all own array-valued fields on a record. `options.optimizer` selects one such
+field instead. Ordinary object-valued fields are not child containers.
+
+```ts
+import { deepForEachAsync } from '@cleverbrush/deep';
+
+type Node = { name: string; children?: Node[] };
+await deepForEachAsync<Node>(tree, async node => {
+    await saveNode(node.name);
+}, undefined, { optimizer: 'children' });
+```
+
+`options.validation(node)` returning false skips that record and its subtree,
+while later siblings are still visited. `context` is the visitor's `this` value.
+Visitor/validation errors reject the returned promise immediately. Repeated
+references are visited at each occurrence; a cycle on the active traversal path
+rejects with `TypeError`. Traversal itself does not copy or mutate input; visitors
+may mutate the records, and child arrays are read after their parent visitor.
+
+### `deepSort(items, index, field)`
+
+Stably sorts and returns the input array in place, using the numeric element at
+`item[field][index]`. Equal keys preserve their original order and object identity.
+
+```ts
+import { deepSort } from '@cleverbrush/deep';
+
+const nodes = [{ position: [0, 3] }, { position: [0, 1] }];
+deepSort(nodes, 1, 'position');
+// nodes is now [{ position: [0, 1] }, { position: [0, 3] }]
+```
+
+`index` must be a non-negative integer and exist in every selected field, or a
+`RangeError` is thrown. Fields must be arrays containing finite numeric sort keys,
+or a `TypeError` is thrown. All keys are checked before the array is changed.
+Empty input is valid; path depth is independent of the number of records.
