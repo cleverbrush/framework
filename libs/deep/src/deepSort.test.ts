@@ -37,3 +37,12 @@ describe('deepSort', () => {
         expect(() => deepSort(null as never, 0, 'path')).toThrow(TypeError);
     });
 });
+
+it('rejects sparse input before sorting can duplicate an existing item', () => {
+    const input = new Array<{ path: number[] }>(2);
+    const existing = { path: [1] };
+    input[1] = existing;
+    expect(() => deepSort(input, 0, 'path')).toThrow(TypeError);
+    expect(0 in input).toBe(false);
+    expect(input[1]).toBe(existing);
+});
