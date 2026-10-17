@@ -142,3 +142,9 @@ export {
     type UploadSchema
 } from './upload.js';
 export { defineWebhook, type WebhookDefinition } from './Webhook.js';
+
+export {
+    type RequestSignalContext,
+    type RequestSignalOptions,
+    withRequestSignal
+} from './withRequestSignal.js';
