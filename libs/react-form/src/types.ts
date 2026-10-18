@@ -131,6 +131,14 @@ export type UseSchemaFormOptions = {
      */
     validateOnBlur?: boolean;
     /**
+     * Adopt changed validation rules without resetting values, touched or dirty.
+     * Field names and value types must stay fixed for the form's lifetime.
+     * Changes invalidate older validation/submission callbacks and revalidate
+     * immediately without touching additional fields.
+     * @default false
+     */
+    refreshValidationRules?: boolean;
+    /**
      * Debounce delay in milliseconds for onChange-triggered validation.
      * When set, rapid field changes only trigger one validation run after
      * the user stops typing for the specified duration.

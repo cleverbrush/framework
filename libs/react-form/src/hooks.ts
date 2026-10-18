@@ -13,6 +13,7 @@ import {
 import {
     useCallback,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useSyncExternalStore
@@ -36,6 +37,9 @@ import type {
     UseFieldResult,
     UseSchemaFormOptions
 } from './types.js';
+
+const useBeforePaint =
+    typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 /** A stable form controller with reactive field and submission subscriptions. */
 export type SchemaFormInstance<
@@ -199,6 +203,15 @@ export function useSchemaForm<
         },
         [cancelScheduledValidation, store]
     );
+
+    useBeforePaint(() => {
+        if (!options?.refreshValidationRules || schemaRef.current === schema)
+            return;
+        schemaRef.current = schema;
+        epochRef.current++;
+        validationGenRef.current++;
+        void runValidation(false);
+    }, [schema, options?.refreshValidationRules, runValidation]);
 
     const validate = useCallback(() => runValidation(true), [runValidation]);
     const submit = useCallback(() => validate(), [validate]);

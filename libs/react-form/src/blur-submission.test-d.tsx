@@ -5,7 +5,10 @@ import type { FormSubmitOptions, UseSchemaFormOptions } from './types.js';
 
 const schema = object({ name: string() });
 test('blur and invalid-submit options preserve public value types', () => {
-    const options: UseSchemaFormOptions = { validateOnBlur: true };
+    const options: UseSchemaFormOptions = {
+        validateOnBlur: true,
+        refreshValidationRules: true
+    };
     const form = useSchemaForm(schema, options);
     form.handleSubmit(
         values => {

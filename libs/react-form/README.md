@@ -788,3 +788,21 @@ const commit = form.handleSubmit(saveQuantity, {
 
 The callback receives the native failed `ValidationResult`; custom validators
 can leave `errors` undefined. No UI or reset policy is chosen by the package.
+
+## Refreshing validation rules
+
+Schemas are captured once by default. Set `refreshValidationRules: true` when
+bounds or translated messages change while the field names and value types stay
+fixed. Memoize the schema by those rule dependencies; do not construct a new
+schema on every form-state render. A rule update immediately revalidates without
+changing values, initial baselines, dirty state or which fields are touched. Older
+validation and managed submission callbacks are ignored. Field renderers keep
+the original binding schema; mount a new form when the field structure or types
+change, rather than using this option for a different form model.
+
+```tsx
+const schema = useMemo(() => object({
+    quantity: number().min(minimum, minimumMessage)
+}), [minimum, minimumMessage]);
+const form = useSchemaForm(schema, { refreshValidationRules: true });
+```
