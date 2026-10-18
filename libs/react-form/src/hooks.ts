@@ -223,10 +223,10 @@ export function useSchemaForm<
         [store, cancelScheduledValidation]
     );
     const triggerValidation = useCallback(
-        (markTouched: boolean) => {
+        (markTouched: boolean, immediate = false) => {
             cancelScheduledValidation();
             const delay = optionsRef.current.validationDebounceMs;
-            if (delay != null && delay > 0) {
+            if (!immediate && delay != null && delay > 0) {
                 timerRef.current = setTimeout(() => {
                     timerRef.current = null;
                     void runValidation(markTouched);
@@ -260,13 +260,12 @@ export function useSchemaForm<
                 try {
                     const revision = store.getRevision();
                     const result = await runValidation(true);
-                    if (
-                        !current() ||
-                        revision !== store.getRevision() ||
-                        !result.valid ||
-                        result.object === undefined
-                    )
+                    if (!current() || revision !== store.getRevision()) return;
+                    if (!result.valid) {
+                        await submissionOptions?.onInvalid?.(result);
                         return;
+                    }
+                    if (result.object === undefined) return;
                     const values = result.object;
                     let outcome: FormSubmitResult<TData>;
                     try {
@@ -404,10 +403,10 @@ export function useFieldFromContext(
         },
         [store, path, options.createMissingStructure, triggerValidation]
     );
-    const onBlur = useCallback(
-        () => store.updateFieldState(path, { touched: true }),
-        [store, path]
-    );
+    const onBlur = useCallback(() => {
+        store.updateFieldState(path, { touched: true });
+        if (options.validateOnBlur) void triggerValidation?.(false, true);
+    }, [store, path, options.validateOnBlur, triggerValidation]);
     return {
         ...fieldState,
         onChange,

@@ -22,7 +22,10 @@ export type FormContextValue = {
     schema: ObjectSchemaBuilder<any, any, any>;
     options: UseSchemaFormOptions;
     pathMap: Map<PropertyDescriptorInner<any, any, any>, string>;
-    triggerValidation?: (markTouched: boolean) => Promise<unknown>;
+    triggerValidation?: (
+        markTouched: boolean,
+        immediate?: boolean
+    ) => Promise<unknown>;
 };
 
 /**

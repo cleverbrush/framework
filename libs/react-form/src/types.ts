@@ -1,4 +1,4 @@
-import type { SchemaBuilder } from '@cleverbrush/schema';
+import type { SchemaBuilder, ValidationResult } from '@cleverbrush/schema';
 import type { FormEvent, ReactNode } from 'react';
 
 /**
@@ -124,6 +124,13 @@ export type UseSchemaFormOptions = {
      */
     validateOnMount?: boolean;
     /**
+     * Validate immediately when a field blurs, cancelling pending debounced
+     * validation. Only that field becomes touched; other fields keep their state.
+     * Existing change-triggered validation is unaffected.
+     * @default false
+     */
+    validateOnBlur?: boolean;
+    /**
      * Debounce delay in milliseconds for onChange-triggered validation.
      * When set, rapid field changes only trigger one validation run after
      * the user stops typing for the specified duration.
@@ -164,6 +171,12 @@ export type FormSubmitResult<TData = void> =
 
 /** Application-owned success UI and exception translation. Rethrows propagate. */
 export type FormSubmitOptions<TValues, TData = void> = {
+    /**
+     * Awaited for current invalid validation, before releasing the submission
+     * lock. Values changed during validation, reset and unmount suppress it.
+     * Exceptions propagate instead of being translated as failed writes.
+     */
+    onInvalid?: (result: ValidationResult<TValues>) => void | Promise<void>;
     onSuccess?: (
         data: TData | undefined,
         values: TValues
