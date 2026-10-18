@@ -40,23 +40,26 @@ const attemptFields = {
 };
 
 // Named field maps keep declaration emission portable without duplicating row types.
+// Explicitly project composite schemas to their existing unbranded storage type:
+// comparing the branded recursive `this` type through a variable annotation
+// triggers TS5114 in the native compiler. Only the phantom brand is erased.
 const runs: ReturnType<typeof object<typeof runFields>> =
     object(runFields).hasTableName('cb_jobs_runs');
-const schedules: ReturnType<typeof object<typeof scheduleFields>> = object(
-    scheduleFields
-)
+const schedules = object(scheduleFields)
     .hasTableName('cb_jobs_schedules')
-    .hasPrimaryKey(['namespace', 'id']);
-const events: ReturnType<typeof object<typeof eventFields>> = object(
-    eventFields
-)
+    .hasPrimaryKey(['namespace', 'id']) as unknown as ReturnType<
+    typeof object<typeof scheduleFields>
+>;
+const events = object(eventFields)
     .hasTableName('cb_jobs_events')
-    .hasPrimaryKey(['runId', 'sequence']);
-const attempts: ReturnType<typeof object<typeof attemptFields>> = object(
-    attemptFields
-)
+    .hasPrimaryKey(['runId', 'sequence']) as unknown as ReturnType<
+    typeof object<typeof eventFields>
+>;
+const attempts = object(attemptFields)
     .hasTableName('cb_jobs_attempts')
-    .hasPrimaryKey(['runId', 'attempt']);
+    .hasPrimaryKey(['runId', 'attempt']) as unknown as ReturnType<
+    typeof object<typeof attemptFields>
+>;
 
 type StorageSchemas = {
     runs: typeof runs;

@@ -38,6 +38,7 @@ COPY demos/todo-frontend/package.json ./demos/todo-frontend/
 COPY websites/docs/package.json ./websites/docs/
 COPY websites/schema/package.json ./websites/schema/
 COPY websites/shared/package.json ./websites/shared/
+COPY scripts/api-docs/package.json ./scripts/api-docs/
 
 # Install workspace dependencies
 RUN npm ci --ignore-scripts

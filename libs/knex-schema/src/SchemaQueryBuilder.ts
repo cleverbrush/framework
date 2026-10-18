@@ -1610,7 +1610,7 @@ export class SchemaQueryBuilder<
 
     private writer(filtered = true): QuerySource<S, InferType<Row>> {
         this.assertWritable();
-        let base = this.knex(getTableName(this.source));
+        let base: Knex.QueryBuilder = this.knex(getTableName(this.source));
         if (filtered) {
             const keys = getPrimaryKeyColumns(this.source).columnNames;
             if (keys.length) {
