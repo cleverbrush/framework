@@ -250,3 +250,4 @@ deepSort(nodes, 1, 'position');
 `RangeError` is thrown. Fields must be arrays containing finite numeric sort keys,
 or a `TypeError` is thrown. All keys are checked before the array is changed.
 Empty input is valid; path depth is independent of the number of records.
+Sparse arrays and missing records are rejected before mutation.
