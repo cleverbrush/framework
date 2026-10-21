@@ -15,13 +15,17 @@ test('Throws with not ObjectSchemaBuilder instance', async () => {
     expect(() => (object as any).getPropertiesFor(number())).toThrow();
 });
 
-test('Returns empty object for empty schema', async () => {
+test('Returns a root descriptor without children for an empty schema', async () => {
     const schema = object();
     const tree = object.getPropertiesFor(schema);
 
     expect(tree).not.toBeNull();
     expect(tree).not.toBeUndefined();
-    expect(tree).toEqual({});
+    expect(Object.keys(tree)).toEqual([]);
+    const descriptor = tree[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+    expect(descriptor).toBeDefined();
+    const value = {};
+    expect(descriptor.getValue(value)).toMatchObject({ success: true, value });
 });
 
 test('Properties exists', async () => {

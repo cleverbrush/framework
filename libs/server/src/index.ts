@@ -57,6 +57,11 @@ export type {
     IdempotencyScope
 } from './EndpointOptions.js';
 export {
+    type EndpointParams,
+    endpointPath,
+    matchEndpointPath
+} from './EndpointPath.js';
+export {
     ErrorMap,
     type ErrorResponse,
     type ErrorResponsesOf,
@@ -137,3 +142,9 @@ export {
     type UploadSchema
 } from './upload.js';
 export { defineWebhook, type WebhookDefinition } from './Webhook.js';
+
+export {
+    type RequestSignalContext,
+    type RequestSignalOptions,
+    withRequestSignal
+} from './withRequestSignal.js';

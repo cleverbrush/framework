@@ -430,7 +430,8 @@ Creates a form instance bound to a schema. Returns field binding and form lifecy
 ```tsx
 const form = useSchemaForm(UserSchema, {
     createMissingStructure: true,  // default: true — auto-create parent objects when setting nested values
-    validateOnMount: false,        // default: false — set to true to show errors immediately on mount
+    validateOnMount: false,        // default: false — set to true to show errors immediately
+    validateOnBlur: true,          // opt in; touches only the blurred field on mount
     validationDebounceMs: 300      // optional — debounce onChange validation (ms); validate()/submit() are always immediate
 });
 ```
@@ -760,3 +761,48 @@ function App() {
 ## License
 
 BSD-3-Clause
+
+## Blur validation and rejected inline edits
+
+Set `validateOnBlur: true` to validate immediately when a field blurs, even when
+change validation is debounced. Only the blurred field becomes touched; errors on
+other fields remain available without forcing their messages to appear. The
+option defaults to false, preserving touch-only blur behavior for existing forms.
+Explicit `validate()` and submissions continue to touch all fields.
+
+Managed submission accepts an optional `onInvalid(result)` callback. It runs only
+for current invalid validation and is awaited under the same duplicate-submission
+lock as a successful submission. Values changed during validation, reset and
+unmount suppress stale callbacks. Exceptions from `onInvalid` propagate and are
+not translated by `onError`, because no write was attempted.
+
+```tsx
+const form = useSchemaForm(QuantitySchema, { validateOnBlur: true });
+const quantity = form.useField(t => t.quantity);
+const commit = form.handleSubmit(saveQuantity, {
+    onInvalid: () => form.reset(savedQuantity)
+});
+// Application policy: an inline editor can restore its saved baseline on blur.
+// Explicit form submission can use a handler without onInvalid to keep errors.
+```
+
+The callback receives the native failed `ValidationResult`; custom validators
+can leave `errors` undefined. No UI or reset policy is chosen by the package.
+
+## Refreshing validation rules
+
+Schemas are captured once by default. Set `refreshValidationRules: true` when
+bounds or translated messages change while the field names and value types stay
+fixed. Memoize the schema by those rule dependencies; do not construct a new
+schema on every form-state render. A rule update immediately revalidates without
+changing values, initial baselines, dirty state or which fields are touched. Older
+validation and managed submission callbacks are ignored. Field renderers keep
+the original binding schema; mount a new form when the field structure or types
+change, rather than using this option for a different form model.
+
+```tsx
+const schema = useMemo(() => object({
+    quantity: number().min(minimum, minimumMessage)
+}), [minimum, minimumMessage]);
+const form = useSchemaForm(schema, { refreshValidationRules: true });
+```

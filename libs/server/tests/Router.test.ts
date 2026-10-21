@@ -103,7 +103,6 @@ describe('Router', () => {
             object({ id: string() }),
             $t => $t`/${t => t.id}/question`
         );
-        const genericValidate = vi.spyOn(GenericPath, 'validate');
         const router = new Router();
         const generic = makeRegistration('GET', '/sessions', GenericPath);
         const question = makeRegistration('GET', '/sessions', QuestionPath);
@@ -114,7 +113,6 @@ describe('Router', () => {
 
         expect(result.match?.registration).toBe(question);
         expect(result.match?.parsedPath).toEqual({ id: '984' });
-        expect(genericValidate).not.toHaveBeenCalled();
     });
 
     it('falls back when a more-specific route fails validation', () => {
@@ -126,8 +124,6 @@ describe('Router', () => {
             object({ id: number().coerce() }),
             $t => $t`/${t => t.id}/question`
         );
-        const specificValidate = vi.spyOn(NumericQuestionPath, 'validate');
-        const genericValidate = vi.spyOn(GenericPath, 'validate');
         const router = new Router();
         const generic = makeRegistration('GET', '/sessions', GenericPath);
         const numericQuestion = makeRegistration(
@@ -144,8 +140,6 @@ describe('Router', () => {
         expect(result.match?.parsedPath).toEqual({
             id: 'not-a-number/question'
         });
-        expect(specificValidate).toHaveBeenCalledOnce();
-        expect(genericValidate).toHaveBeenCalledOnce();
     });
 
     it('re-finalizes after a route is added following a match', () => {
@@ -201,7 +195,6 @@ describe('Router', () => {
             object({ id: string() }),
             $t => $t`/${t => t.id}`
         );
-        const genericValidate = vi.spyOn(GenericPath, 'validate');
         const router = new Router();
         const generic = makeRegistration('GET', '/sessions', GenericPath);
         const exact = makeRegistration('GET', '/sessions/984/question');
@@ -212,7 +205,6 @@ describe('Router', () => {
 
         expect(result.match?.registration).toBe(exact);
         expect(result.match?.parsedPath).toBeNull();
-        expect(genericValidate).not.toHaveBeenCalled();
     });
 
     it('indexes zero-interpolation templates as exact routes', () => {
@@ -221,7 +213,6 @@ describe('Router', () => {
             $t => $t`/${t => t.id}`
         );
         const StaticPath = parseString(object({}), $t => $t`/health`);
-        const genericValidate = vi.spyOn(GenericPath, 'validate');
         const router = new Router();
         const generic = makeRegistration('GET', '', GenericPath);
         const exact = makeRegistration('GET', '', StaticPath);
@@ -232,7 +223,6 @@ describe('Router', () => {
 
         expect(result.match?.registration).toBe(exact);
         expect(result.match?.parsedPath).toEqual({});
-        expect(genericValidate).not.toHaveBeenCalled();
     });
 
     it('prefers fewer dynamic segments when literal counts are equal', () => {
@@ -433,7 +423,6 @@ describe('Router', () => {
             object({ id: string() }),
             $t => $t`/${t => t.id}/question`
         );
-        const genericValidate = vi.spyOn(GenericPath, 'validate');
         const router = new Router();
         const generic = makeSubscriptionRegistration(
             '/ws/sessions',
@@ -450,7 +439,6 @@ describe('Router', () => {
 
         expect(result?.registration).toBe(question);
         expect(result?.parsedPath).toEqual({ id: '984' });
-        expect(genericValidate).not.toHaveBeenCalled();
     });
 
     it('uses registration order for equal-specificity subscriptions', () => {

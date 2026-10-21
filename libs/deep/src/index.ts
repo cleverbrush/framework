@@ -4,6 +4,11 @@ import { deepExtend, type Merge, type MergeTwo } from './deepExtend.js';
 import { deepFlatten } from './deepFlatten.js';
 
 export {
+    type DeepForEachAsyncOptions,
+    deepForEachAsync
+} from './deepForEachAsync.js';
+export { deepSort } from './deepSort.js';
+export {
     deepClone,
     deepEqual,
     deepExtend,

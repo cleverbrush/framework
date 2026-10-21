@@ -521,3 +521,27 @@ Editing a nested object or array marks the column modified; replacing it with an
 equivalent document does not. `entry(entity).reset()` and `discardChanges()` restore
 independent copies, so subsequent edits cannot mutate the saved snapshot. JSON
 validation and encoding also apply to ORM saves and tracked updates.
+
+### Transaction advisory locks
+
+Use stable, namespaced keys to serialize operations that can race before a row
+exists. PostgreSQL releases these locks when their owning transaction commits or
+rolls back. The callback receives the same transaction-bound context as ordinary
+transactions; tracked contexts retain tracking.
+
+```ts
+await db.transaction(async tx => {
+    // Read and write the resource under a transaction-scoped lock.
+}, { advisoryLocks: [`resource:${resourceId}`] });
+```
+
+Keys must be nonempty strings. Duplicate keys are acquired once, in sorted order.
+This prevents inconsistent ordering within one lock set; callers must avoid
+inconsistent ordering across nested transactions. The database's configured lock
+timeout applies. Unsupported dialects reject advisory locks before the callback
+runs; ordinary transactions continue to work. Locks do not replace constraints or
+authorization.
+
+## License
+
+BSD-3-Clause — see [LICENSE](../../LICENSE).

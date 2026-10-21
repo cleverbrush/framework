@@ -311,6 +311,11 @@ export function omitGroups<T extends ApiContract, K extends keyof T>(
 }
 
 export {
+    type EndpointParams,
+    endpointPath,
+    matchEndpointPath
+} from './EndpointPath.js';
+export {
     file,
     type UploadConfiguration,
     type UploadContract,
