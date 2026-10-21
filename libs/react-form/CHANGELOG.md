@@ -1,5 +1,22 @@
 # @cleverbrush/react-form
 
+## 5.1.0
+
+### Minor Changes
+
+- c38a5a2: Add opt-in immediate blur validation that touches only the blurred field, and an
+  awaitable invalid-submission callback with existing duplicate and stale-result
+  protection. Opt-in validation-rule refresh retains edited values and field state
+  while adopting current bounds/messages and suppressing stale callbacks. Existing blur and submission defaults remain unchanged.
+
+### Patch Changes
+
+- Updated dependencies [c38a5a2]
+- Updated dependencies [c38a5a2]
+- Updated dependencies [c38a5a2]
+  - @cleverbrush/deep@5.1.0
+  - @cleverbrush/schema@5.1.0
+
 ## 5.0.0
 
 ### Major Changes
