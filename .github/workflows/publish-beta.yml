@@ -32,18 +32,34 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check for unreleased changesets
+        id: changesets
+        run: |
+          node --input-type=module <<'NODE' >> "$GITHUB_OUTPUT"
+          import { readChangesets } from '@changesets/read';
+          const changesets = await readChangesets(process.cwd());
+          const publish = changesets.some(
+              changeset => changeset.releases.length > 0
+          );
+          process.stdout.write(`publish=${publish}\n`);
+          NODE
+
       - name: Build
+        if: steps.changesets.outputs.publish == 'true'
         run: npm run build
 
       - name: Configure git user
+        if: steps.changesets.outputs.publish == 'true'
         run: |
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git config user.name "github-actions[bot]"
 
       - name: Version packages as snapshot
+        if: steps.changesets.outputs.publish == 'true'
         run: npx changeset version --snapshot beta
 
       - name: Publish beta to npm
+        if: steps.changesets.outputs.publish == 'true'
         run: npx changeset publish --tag beta --no-git-tag
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
