@@ -1,15 +1,5 @@
 # @cleverbrush/scheduler-postgres
 
-## 5.1.0
-
-### Patch Changes
-
-- Updated dependencies [39c0234]
-  - @cleverbrush/orm@5.1.0
-  - @cleverbrush/schema@5.1.0
-  - @cleverbrush/scheduler@5.1.0
-  - @cleverbrush/knex-schema@5.1.0
-
 ## 5.0.0
 
 ### Major Changes

@@ -1,14 +1,5 @@
 # @cleverbrush/knex-clickhouse
 
-## 5.1.0
-
-### Patch Changes
-
-- Updated dependencies [9207eff]
-- Updated dependencies [ec87c8f]
-  - @cleverbrush/deep@5.1.0
-  - @cleverbrush/async@5.1.0
-
 ## 5.0.0
 
 ### Major Changes

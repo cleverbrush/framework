@@ -57,8 +57,12 @@
     "devDependencies": {
         "@playwright/mcp": "^0.0.70",
         "@biomejs/biome": "^2.4.9",
+        "@changesets/assemble-release-plan": "^7.0.0",
         "@changesets/cli": "^3.0.3",
+        "@changesets/config": "^4.0.1",
+        "@changesets/pre": "^3.0.0",
         "@changesets/read": "^1.0.1",
+        "@manypkg/get-packages": "^3.1.0",
         "@testing-library/react": "^16.3.2",
         "@vitest/coverage-v8": "^4.1.11",
         "concurrently": "^9.1.0",

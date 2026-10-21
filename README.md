@@ -136,12 +136,14 @@ npm run docs
 npm run docs:snapshot
 ```
 
-Generation writes `websites/docs/public/api-docs/latest/` using the shared
-published-package version. The snapshot command archives that output under
-`v<version>/` and updates the version picker. It rejects stale output and
-existing snapshots. Commit the numbered archive; `latest/` is generated during
-the docs container build and remains ignored by Git. To generate and archive an
-explicit version, set `VERSION=1.2.3` for both documentation commands.
+Generation writes `websites/docs/public/api-docs/latest/` using the next version
+planned by pending changesets, or the shared package version when none remain.
+It leaves package versions, changelogs, and changesets untouched. The snapshot
+command archives that output under `v<version>/` and updates the version picker.
+It rejects stale output and existing snapshots. Commit the numbered archive;
+`latest/` is generated during the docs container build and remains ignored by
+Git. To generate and archive an explicit version, set `VERSION=1.2.3` for both
+documentation commands.
 
 ## Quality Gates
 
@@ -158,13 +160,16 @@ Published package behavior changes require a changeset.
 
 ## Release
 
-This repository uses Changesets and fixed-version package releases.
+This repository uses Changesets and fixed-version package releases. Add a
+changeset with your package changes:
 
 ```bash
 npm run changeset
-npm run version
-npm run release
 ```
+
+After merging to `master`, the release workflow opens a version PR that runs
+`npm run version`. Merging that PR runs `npm run release` to publish on npm.
+Documentation generation does not require either command.
 
 For beta releases:
 

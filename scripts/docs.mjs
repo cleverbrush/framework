@@ -8,6 +8,11 @@ import {
 } from 'node:fs';
 import { dirname, join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { assembleReleasePlan } from '@changesets/assemble-release-plan';
+import { readConfig } from '@changesets/config';
+import { readPreState } from '@changesets/pre';
+import { readChangesets } from '@changesets/read';
+import { getPackages } from '@manypkg/get-packages';
 
 const ROOT_DIR = fileURLToPath(new URL('../', import.meta.url));
 const numeric = '(?:0|[1-9]\\d*)';
@@ -22,7 +27,7 @@ function readJson(path) {
     return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-export function getDocsVersion(rootDir = ROOT_DIR, override) {
+export async function getDocsVersion(rootDir = ROOT_DIR, override) {
     const packageNames = readJson(
         join(rootDir, '.changeset/config.json')
     ).fixed.flat();
@@ -59,7 +64,34 @@ export function getDocsVersion(rootDir = ROOT_DIR, override) {
         throw new Error('Published package versions do not match.');
     }
 
-    const version = override ?? versions.values().next().value;
+    let version = override;
+    if (version === undefined) {
+        // Read the upcoming release without consuming changesets or requiring Git.
+        const workspaces = await getPackages(rootDir);
+        const [{ config, errors }, changesets, preState] = await Promise.all([
+            readConfig(rootDir, workspaces),
+            readChangesets(rootDir),
+            readPreState(rootDir)
+        ]);
+        if (errors) throw new Error(errors.join('\n'));
+        const plan = assembleReleasePlan(
+            changesets,
+            workspaces,
+            config,
+            preState
+        );
+        const plannedVersions = new Set(
+            plan.releases
+                .filter(release => packageNames.includes(release.name))
+                .map(release => release.newVersion)
+        );
+        if (plannedVersions.size > 1) {
+            throw new Error('Planned package versions do not match.');
+        }
+        version =
+            plannedVersions.values().next().value ??
+            versions.values().next().value;
+    }
     if (!versionPattern.test(version)) {
         throw new Error(`Invalid documentation version: ${version}`);
     }
@@ -101,7 +133,7 @@ function run(command, args) {
 }
 
 if (import.meta.main) {
-    const version = getDocsVersion(ROOT_DIR, process.env.VERSION);
+    const version = await getDocsVersion(ROOT_DIR, process.env.VERSION);
     if (process.argv[2] === '--version') {
         process.stdout.write(`${version}\n`);
     } else {

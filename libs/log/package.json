@@ -44,8 +44,8 @@
         "clean": "rm -rf dist tsconfig.tsbuildinfo"
     },
     "dependencies": {
-        "@cleverbrush/schema": "^5.1.0",
-        "@cleverbrush/async": "^5.1.0"
+        "@cleverbrush/schema": "^5.0.0",
+        "@cleverbrush/async": "^5.0.0"
     },
     "peerDependencies": {
         "@cleverbrush/di": "^5.0.0",
@@ -71,5 +71,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "5.1.0"
+    "version": "5.0.0"
 }

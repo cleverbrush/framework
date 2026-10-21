@@ -8,7 +8,7 @@ COPY package.json package-lock.json ./
 COPY typedoc.json tsconfig.json tsconfig.build.json turbo.json ./
 COPY README.md LICENSE SECURITY.md ./
 COPY docs/ docs/
-COPY .changeset/config.json .changeset/config.json
+COPY .changeset/ .changeset/
 COPY scripts/ scripts/
 
 # Include every workspace so npm ci and TypeDoc see the complete monorepo.

@@ -4,7 +4,7 @@ set -euo pipefail
 # snapshot-docs.sh — Snapshot generated API docs for the current version.
 #
 # Usage:
-#   npm run docs:snapshot          # uses the fixed release packages' version
+#   npm run docs:snapshot          # uses the planned fixed release version
 #   ./scripts/snapshot-docs.sh     # same
 #   VERSION=1.2.3 ./scripts/snapshot-docs.sh   # override version
 
@@ -30,7 +30,7 @@ if [[ -d "$TARGET_DIR" ]]; then
     exit 1
 fi
 
-# Do not archive stale docs under a newer package version.
+# Do not archive stale docs under a newer documentation version.
 if [[ ! -f "$LATEST_DIR/index.html" ]] || ! grep -Fq "<title>Libraries v$VERSION</title>" "$LATEST_DIR/index.html"; then
     echo "Error: latest docs do not match v$VERSION. Run 'npm run docs' first."
     exit 1

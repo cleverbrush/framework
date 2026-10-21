@@ -6,10 +6,12 @@ import {
     mkdtempSync,
     readFileSync,
     rmSync,
+    symlinkSync,
     writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { getDocsVersion, prepareDocs } from './docs.mjs';
 
@@ -33,8 +35,15 @@ beforeEach(() => {
     mkdirSync(join(rootDir, '.changeset'));
     mkdirSync(join(rootDir, 'scripts'));
     writeJson(join(rootDir, 'package.json'), {
+        name: 'docs-fixture',
         private: true,
-        version: '4.2.0'
+        version: '4.2.0',
+        packageManager: 'npm@11.12.1',
+        workspaces: ['libs/*']
+    });
+    writeJson(join(rootDir, 'package-lock.json'), {
+        name: 'docs-fixture',
+        lockfileVersion: 3
     });
     writeJson(join(rootDir, '.changeset/config.json'), {
         fixed: [['@cleverbrush/schema', '@cleverbrush/deep']]
@@ -42,6 +51,11 @@ beforeEach(() => {
     writePackage('schema');
     writePackage('deep');
     writeFileSync(join(rootDir, 'LICENSE'), 'Fixture license');
+    symlinkSync(
+        fileURLToPath(new URL('../node_modules', import.meta.url)),
+        join(rootDir, 'node_modules'),
+        'junction'
+    );
     for (const name of ['docs.mjs', 'snapshot-docs.sh']) {
         copyFileSync(
             new URL(name, import.meta.url),
@@ -55,32 +69,36 @@ afterEach(() => {
 });
 
 describe('documentation versions', () => {
-    it('uses release packages rather than the stale private root version', () => {
+    it('uses release packages rather than the stale private root version', async () => {
         mkdirSync(join(rootDir, 'libs/unrelated-directory'));
-        expect(getDocsVersion(rootDir)).toBe('5.1.0');
+        expect(await getDocsVersion(rootDir)).toBe('5.1.0');
     });
 
-    it('preserves explicit prerelease version overrides', () => {
-        expect(getDocsVersion(rootDir, '5.2.0-beta.1+build.2')).toBe(
+    it('preserves explicit prerelease version overrides', async () => {
+        expect(await getDocsVersion(rootDir, '5.2.0-beta.1+build.2')).toBe(
             '5.2.0-beta.1+build.2'
         );
     });
 
-    it('rejects mixed package versions even with an override', () => {
+    it('rejects mixed package versions even with an override', async () => {
         writePackage('deep', '5.0.0');
-        expect(() => getDocsVersion(rootDir)).toThrow('do not match');
-        expect(() => getDocsVersion(rootDir, '5.1.0')).toThrow('do not match');
+        await expect(getDocsVersion(rootDir)).rejects.toThrow('do not match');
+        await expect(getDocsVersion(rootDir, '5.1.0')).rejects.toThrow(
+            'do not match'
+        );
     });
 
-    it('rejects missing fixed release packages', () => {
+    it('rejects missing fixed release packages', async () => {
         rmSync(join(rootDir, 'libs/deep'), { recursive: true });
-        expect(() => getDocsVersion(rootDir)).toThrow('@cleverbrush/deep');
+        await expect(getDocsVersion(rootDir)).rejects.toThrow(
+            '@cleverbrush/deep'
+        );
     });
 
     it.each(['../5.1.0', 'v5.1.0', '05.1.0', '5.1.0-beta.01', ''])(
         'rejects an invalid override: %s',
-        version => {
-            expect(() => getDocsVersion(rootDir, version)).toThrow(
+        async version => {
+            await expect(getDocsVersion(rootDir, version)).rejects.toThrow(
                 'Invalid documentation version'
             );
         }
@@ -136,6 +154,31 @@ function snapshot(version) {
 }
 
 describe('documentation snapshots', () => {
+    it('previews the next release without applying changesets or needing Git', async () => {
+        writePackage('schema', '5.0.0');
+        writePackage('deep', '5.0.0');
+        const changeset = join(rootDir, '.changeset/upcoming.md');
+        const content = '---\n"@cleverbrush/schema": minor\n---\nNew API.\n';
+        writeFileSync(changeset, content);
+        const latest = latestDocs('5.1.0');
+
+        expect(existsSync(join(rootDir, '.git'))).toBe(false);
+        expect(await getDocsVersion(rootDir)).toBe('5.1.0');
+        const result = snapshot();
+        expect(result.status, result.stderr).toBe(0);
+        expect(existsSync(join(latest, '../v5.1.0/index.html'))).toBe(true);
+        expect(readFileSync(changeset, 'utf8')).toBe(content);
+        for (const name of ['schema', 'deep']) {
+            const directory = join(rootDir, 'libs', name);
+            expect(
+                JSON.parse(
+                    readFileSync(join(directory, 'package.json'), 'utf8')
+                ).version
+            ).toBe('5.0.0');
+            expect(existsSync(join(directory, 'CHANGELOG.md'))).toBe(false);
+        }
+    });
+
     it('archives matching latest docs and updates the sorted version picker', () => {
         const latest = latestDocs();
         prepareDocs(latest, rootDir);

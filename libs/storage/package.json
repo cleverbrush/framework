@@ -1,6 +1,6 @@
 {
     "name": "@cleverbrush/storage",
-    "version": "5.1.0",
+    "version": "5.0.0",
     "description": "Provider-neutral object storage contracts for Node.js",
     "type": "module",
     "sideEffects": false,
