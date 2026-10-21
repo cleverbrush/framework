@@ -1,5 +1,15 @@
 # @cleverbrush/deep
 
+## 5.1.0
+
+### Minor Changes
+
+- c38a5a2: Add sequential deepForEachAsync traversal and stable in-place deepSort with typed options, explicit validation and failure propagation.
+
+### Patch Changes
+
+- c38a5a2: Reject sparse record arrays before sorting so missing elements cannot duplicate existing records or partially mutate input.
+
 ## 5.0.0
 
 ### Major Changes

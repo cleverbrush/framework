@@ -1,5 +1,13 @@
 # @cleverbrush/log
 
+## 5.1.0
+
+### Patch Changes
+
+- Updated dependencies [c38a5a2]
+  - @cleverbrush/schema@5.1.0
+  - @cleverbrush/async@5.1.0
+
 ## 5.0.0
 
 ### Major Changes
