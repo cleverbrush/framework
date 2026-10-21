@@ -1,12 +1,14 @@
+import { fileURLToPath } from 'node:url';
 import type { NextConfig } from 'next';
 
 const isDev = process.env.NODE_ENV === 'development';
+const workspaceRoot = fileURLToPath(new URL('../..', import.meta.url));
 
 const cspHeader = [
     "default-src 'self'",
     `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://www.googletagmanager.com https://www.google-analytics.com`,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "img-src 'self' data: blob:",
+    "img-src 'self' data: blob: https://github.com https://img.shields.io",
     "font-src 'self' https://fonts.gstatic.com data:",
     "connect-src 'self' https://www.google-analytics.com",
     'frame-src https://www.googletagmanager.com',
@@ -50,6 +52,10 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
     output: 'standalone',
+    outputFileTracingRoot: workspaceRoot,
+    turbopack: {
+        root: workspaceRoot
+    },
     transpilePackages: [
         '@t3-oss/env-nextjs',
         '@t3-oss/env-core',

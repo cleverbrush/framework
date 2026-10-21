@@ -15,7 +15,7 @@
         "build:docs-site": "cd websites/docs && npm run build && cd ../..",
         "clean": "turbo run clean",
         "watch": "tsc --build --watch tsconfig.build.json",
-        "docs": "typedoc && ./scripts/inject-gtm.sh websites/docs/public/api-docs/latest",
+        "docs": "node scripts/docs.mjs",
         "docs:snapshot": "./scripts/snapshot-docs.sh",
         "lint": "biome check ./libs ./websites/schema ./websites/docs",
         "typecheck:schema-site": "tsc --noEmit -p websites/schema/tsconfig.json",

@@ -1,5 +1,8 @@
-node_modules
-dist
-*.tsbuildinfo
+**/node_modules
+**/dist
+**/*.tsbuildinfo
 /coverage
 .git
+**/.next
+**/.turbo
+/websites/docs/public/api-docs/latest

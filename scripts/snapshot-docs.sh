@@ -4,7 +4,7 @@ set -euo pipefail
 # snapshot-docs.sh — Snapshot generated API docs for the current version.
 #
 # Usage:
-#   npm run docs:snapshot          # uses version from root package.json
+#   npm run docs:snapshot          # uses the fixed release packages' version
 #   ./scripts/snapshot-docs.sh     # same
 #   VERSION=1.2.3 ./scripts/snapshot-docs.sh   # override version
 
@@ -13,10 +13,8 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 DOCS_DIR="$ROOT_DIR/websites/docs/public/api-docs"
 LATEST_DIR="$DOCS_DIR/latest"
 
-# Determine version
-if [[ -z "${VERSION:-}" ]]; then
-    VERSION=$(node -p "require('$ROOT_DIR/package.json').version")
-fi
+# Use the same version resolver as documentation generation (including VERSION).
+VERSION=$(node "$SCRIPT_DIR/docs.mjs" --version)
 
 TARGET_DIR="$DOCS_DIR/v$VERSION"
 
@@ -29,6 +27,12 @@ fi
 # Prevent overwriting an existing snapshot
 if [[ -d "$TARGET_DIR" ]]; then
     echo "Error: $TARGET_DIR already exists. Remove it first if you want to regenerate."
+    exit 1
+fi
+
+# Do not archive stale docs under a newer package version.
+if [[ ! -f "$LATEST_DIR/index.html" ]] || ! grep -Fq "<title>Libraries v$VERSION</title>" "$LATEST_DIR/index.html"; then
+    echo "Error: latest docs do not match v$VERSION. Run 'npm run docs' first."
     exit 1
 fi
 

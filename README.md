@@ -128,6 +128,21 @@ demo workflow.
 
 Each package also has local source, tests, and exports under `libs/`.
 
+Generate the API reference from the current package sources and READMEs:
+
+```bash
+npm run build
+npm run docs
+npm run docs:snapshot
+```
+
+Generation writes `websites/docs/public/api-docs/latest/` using the shared
+published-package version. The snapshot command archives that output under
+`v<version>/` and updates the version picker. It rejects stale output and
+existing snapshots. Commit the numbered archive; `latest/` is generated during
+the docs container build and remains ignored by Git. To generate and archive an
+explicit version, set `VERSION=1.2.3` for both documentation commands.
+
 ## Quality Gates
 
 Every change should leave these commands passing:
