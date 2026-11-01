@@ -9,7 +9,7 @@
     },
     "dependencies": {
         "@cleverbrush/website-shared": "*",
-        "next": "^16.3.6",
+        "next": "^16.4.3",
         "performative-ui": "^0.3.0",
         "react": "^19.1.0",
         "react-dom": "^19.1.0"

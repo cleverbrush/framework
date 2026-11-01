@@ -36,6 +36,42 @@ function makeMockKnex(client: any = {}): any {
 }
 
 describe('instrumentKnex', () => {
+    it('protects driver errors independently of statement redaction', () => {
+        const error = new Error(
+            'SELECT password; bound-secret; https://private.local'
+        );
+        for (const exceptionPolicy of [
+            undefined,
+            () => ({ name: 'DatabaseFailure', message: 'Unavailable' }),
+            () => {
+                throw error;
+            }
+        ] as const) {
+            const k = makeMockKnex();
+            instrumentKnex(k, { recordStatement: false, exceptionPolicy });
+            k.emit('query', {
+                sql: 'SELECT password',
+                bindings: ['bound-secret'],
+                __knexQueryUid: 'secret'
+            });
+            k.emit('query-error', error, { __knexQueryUid: 'secret' });
+        }
+        const spans = exporter.getFinishedSpans();
+        expect(spans).toHaveLength(3);
+        for (const span of spans) {
+            const exported = JSON.stringify({
+                status: span.status,
+                events: span.events,
+                attributes: span.attributes
+            });
+            for (const secret of [
+                'SELECT password',
+                'bound-secret',
+                'private.local'
+            ])
+                expect(exported).not.toContain(secret);
+        }
+    });
     it('emits a CLIENT span per query with semantic attributes', () => {
         const k = makeMockKnex({
             connection: {
@@ -79,8 +115,8 @@ describe('instrumentKnex', () => {
         });
         const span = exporter.getFinishedSpans()[0]!;
         expect(span.status.code).toBe(2); // ERROR
-        expect(span.status.message).toBe('syntax error');
-        expect(span.events.some(e => e.name === 'exception')).toBe(true);
+        expect(span.status.message).toBeUndefined();
+        expect(span.events).toHaveLength(0);
     });
 
     it('handles non-Error thrown values on query-error (string)', () => {
@@ -92,7 +128,7 @@ describe('instrumentKnex', () => {
         });
         const span = exporter.getFinishedSpans()[0]!;
         expect(span.status.code).toBe(2); // ERROR
-        expect(span.status.message).toBe('connection lost');
+        expect(span.status.message).toBeUndefined();
         // No `exception` event when the value isn't an Error.
         expect(span.events.some(e => e.name === 'exception')).toBe(false);
     });
@@ -104,10 +140,7 @@ describe('instrumentKnex', () => {
         k.emit('query-error', { code: 42 }, { __knexQueryUid: 'qe-obj' });
         const span = exporter.getFinishedSpans()[0]!;
         expect(span.status.code).toBe(2); // ERROR
-        // String() of a plain object yields '[object Object]' — verify the
-        // instrumentation still ends the span with a string status message.
-        expect(typeof span.status.message).toBe('string');
-        expect(span.status.message).toBe('[object Object]');
+        expect(span.status.message).toBeUndefined();
     });
 
     it('ignores orphan query-error events with no matching query', () => {
@@ -143,7 +176,7 @@ describe('instrumentKnex', () => {
 
     it('records the exception with name and stack on query-error', () => {
         const k = makeMockKnex();
-        instrumentKnex(k);
+        instrumentKnex(k, { exceptionPolicy: 'raw' });
         k.emit('query', { sql: 'select 1', __knexQueryUid: 'qe-rec' });
         const err = new Error('pool exhausted');
         err.name = 'PoolError';

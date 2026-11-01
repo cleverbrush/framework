@@ -54,6 +54,11 @@
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD-3-Clause",
     "type": "module",
+    "overrides": {
+        "monaco-editor": {
+            "dompurify": "^3.4.17"
+        }
+    },
     "devDependencies": {
         "@playwright/mcp": "^0.0.70",
         "@biomejs/biome": "^2.4.9",

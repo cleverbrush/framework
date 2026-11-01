@@ -10,9 +10,9 @@ OpenTelemetry instrumentation for the Cleverbrush framework — traces, logs, an
 ```bash
 npm install @cleverbrush/otel @opentelemetry/api
 # Optional auto-instrumentations (only if you want them):
-npm install @opentelemetry/instrumentation-http \
-            @opentelemetry/instrumentation-undici \
-            @opentelemetry/instrumentation-runtime-node
+npm install @opentelemetry/instrumentation-http@^0.222.0 \
+            @opentelemetry/instrumentation-undici@^0.25.0 \
+            @opentelemetry/instrumentation-runtime-node@^0.28.0
 ```
 
 ## Quick Start
@@ -54,12 +54,24 @@ import { tracingMiddleware } from '@cleverbrush/otel';
 import { createServer } from '@cleverbrush/server';
 
 const server = createServer()
-    .use(tracingMiddleware({ excludePaths: ['/health'] })) // first!
+    .useRequest(tracingMiddleware({ excludePaths: ['/health'] })) // first!
     .use(corsMiddleware)
     // ... rest of the chain
 ```
 
 A `SpanKind.SERVER` span is opened per request, named `operationId` or `METHOD route` and tagged with the standard HTTP semantic-convention attributes. W3C `traceparent` is extracted, so spans link to upstream callers.
+
+`useRequest()` includes CORS, authentication and routing rejections. Spans finish
+once on response `finish` or premature `close`, after error serialization and
+streaming, and record the final status when headers were sent. The
+`cleverbrush.http.outcome` attribute is `success`, `rejected`, `failure`,
+`interrupted`, `timeout`, or `cancelled`. Expected 4xx responses are not span
+errors. Failures, timeouts and interruptions are errors; deliberate cancellation
+is not. A disconnect alone is classified as interrupted.
+
+Route metadata is public at `context.route` after matching. Framework contexts
+support full response observation; structural/older contexts lacking
+`onResponseCompleted` retain middleware-scoped timing.
 
 ### 3. Trace typed client calls between services
 
@@ -103,6 +115,14 @@ const logger = createLogger({
 });
 ```
 
+Use matching Framework 5.2+ log/server packages for these lifecycle and queued-log
+guarantees. Log events capture their originating execution context before
+asynchronous dispatch. The sink passes that context explicitly to the OTel Logs
+API, including sampling flags and baggage. Ended spans retain correlation; events
+with no originating span cannot inherit another queued request's span. Enriched
+`TraceId`/`SpanId` properties are for display, never trusted context inputs. The
+OTel SDK already batches exports; an additional `BatchingSink` is optional.
+
 ## API
 
 | Export                            | Purpose                                                   |
@@ -114,8 +134,8 @@ const logger = createLogger({
 | `otelLogSink(opts?)`              | `@cleverbrush/log` sink → OTLP log records                |
 | `traceEnricher()`                 | `@cleverbrush/log` enricher → adds `TraceId` / `SpanId`   |
 | `configureOtel(services, opts?)`  | Register `ITracer` / `IMeter` in `@cleverbrush/di`        |
-| `outboundHttpInstrumentations()`  | Lazy-load HTTP / undici client auto-instrumentations      |
-| `runtimeMetrics()`                | Lazy-load Node runtime metrics                            |
+| `outboundHttpInstrumentations(opts?)` | Load HTTP / undici peers with safe diagnostics          |
+| `runtimeMetrics(opts?)`           | Load the supported Node runtime metrics peer              |
 | `OTEL_SPAN_ITEM_KEY`              | `ctx.items` key under which the request span is stashed   |
 
 All optional auto-instrumentations and `knex` are declared as **optional peer dependencies**, so the package is usable with only `@opentelemetry/api` installed.
@@ -140,7 +160,59 @@ span?.addEvent('cache.miss', { key: cacheKey });
 
 ## Privacy
 
-`tracingMiddleware` does **not** record query strings (`recordQuery: false` by default) and `instrumentKnex` lets you redact SQL via `sanitizeStatement`. `otelLogSink` accepts a `sanitizeAttribute` hook to drop sensitive fields per event.
+`exceptionPolicy` defaults to `'omit'` in `instrumentKnex`, server/client tracing,
+`withSpan` (callback and disposable forms), and `otelLogSink`. Failures still set
+error status and application errors retain their original identity. To allowlist
+details, reuse a policy callback returning only safe `name`, `message`, or `stack`
+strings. `'raw'` deliberately enables original exception fields. Span status
+messages never copy raw exception text. Failing policy callbacks omit details.
+
+```ts
+import type { ExceptionPolicy } from '@cleverbrush/otel';
+
+const exceptionPolicy: ExceptionPolicy = () => ({
+    name: 'OperationFailure',
+    message: 'Operation unavailable'
+});
+
+instrumentKnex(db, { recordStatement: false, exceptionPolicy });
+const sink = otelLogSink({
+    exceptionPolicy,
+    sanitizeAttribute: (key, value) => key === 'Password' ? undefined : value,
+    sanitizeBody: body => body.replaceAll('private-value', '[redacted]')
+});
+```
+
+`sanitizeAttribute` covers properties and automatic template/event/exception
+attributes. Templated bodies are rendered from redacted properties, then
+`sanitizeBody` sees the final text, including literal text. Returning `undefined`
+or throwing omits that attribute/body. This sanitizes the OTel sink's output;
+other sinks and user-supplied strings need their own privacy policy.
+
+Query strings remain excluded by default (`recordQuery: false`). SQL capture is
+independent: use `recordStatement: false` or `sanitizeStatement` when needed.
+
+## Optional instrumentation loading
+
+Both helpers return arrays. A missing/incompatible peer, failed load, invalid
+export or failed constructor produces a warning with the package name, expected
+range and reason code; it never prints the original loader error. Tolerant mode
+keeps other successfully loaded peers. Supply `onDiagnostic` to handle safe
+diagnostics yourself, or `strict: true` to throw `InstrumentationLoadError`.
+
+```ts
+const instrumentations = runtimeMetrics({
+    resolveFrom: import.meta.url, // resolve from this application/workspace
+    strict: true
+});
+```
+
+The supported optional peers are HTTP `^0.222.0`, undici `^0.25.0`, and runtime
+Node `^0.28.0`, tested with SDK `2.11.x` / SDK Node `0.222.x` and API `1.9.x`.
+Do not select an unsupported instrumentation version solely from SDK/API ranges.
+These helpers load instrumentation; actual metric collection still requires a
+metrics-enabled SDK and exporter. Runtime metrics receive the SDK's resource
+attributes configured through `setupOtel`.
 
 ## License
 

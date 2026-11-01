@@ -2,6 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 /** HTTP lifecycle fields required to cancel request-owned work. */
 export interface RequestSignalContext {
+    /** Optional lifecycle integration supplied by RequestContext. */
+    markResponseOutcome?(outcome: 'timeout' | 'cancelled'): void;
     readonly request: Pick<IncomingMessage, 'aborted' | 'once' | 'off'>;
     readonly response: Pick<
         ServerResponse,
@@ -47,6 +49,7 @@ export async function withRequestSignal<T>(
         );
     }
     const controller = new AbortController();
+    let terminalCause: 'timeout' | 'cancelled' | undefined;
     const disconnected = () =>
         controller.abort(
             new DOMException('Request disconnected.', 'AbortError')
@@ -54,14 +57,16 @@ export async function withRequestSignal<T>(
     const closed = () => {
         if (!context.response.writableFinished) disconnected();
     };
-    const cancelled = () => controller.abort(options.signal!.reason);
-    const timer = setTimeout(
-        () =>
-            controller.abort(
-                new DOMException('Request deadline exceeded.', 'TimeoutError')
-            ),
-        options.timeoutMs
-    );
+    const cancelled = () => {
+        if (!controller.signal.aborted) terminalCause = 'cancelled';
+        controller.abort(options.signal!.reason);
+    };
+    const timer = setTimeout(() => {
+        if (!controller.signal.aborted) terminalCause = 'timeout';
+        controller.abort(
+            new DOMException('Request deadline exceeded.', 'TimeoutError')
+        );
+    }, options.timeoutMs);
     context.request.once('aborted', disconnected);
     context.response.once('close', closed);
     options.signal?.addEventListener('abort', cancelled, { once: true });
@@ -71,6 +76,14 @@ export async function withRequestSignal<T>(
         if (options.signal?.aborted) cancelled();
         controller.signal.throwIfAborted();
         return await work(controller.signal);
+    } catch (error) {
+        if (
+            terminalCause &&
+            controller.signal.aborted &&
+            error === controller.signal.reason
+        )
+            context.markResponseOutcome?.(terminalCause);
+        throw error;
     } finally {
         clearTimeout(timer);
         context.request.off('aborted', disconnected);

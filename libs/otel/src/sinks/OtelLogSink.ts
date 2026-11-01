@@ -1,15 +1,27 @@
 import type { LogEvent, LogSink } from '@cleverbrush/log';
-import { LogLevel, levelToString } from '@cleverbrush/log';
+import {
+    LogLevel,
+    levelToString,
+    parseTemplate,
+    renderTemplate
+} from '@cleverbrush/log';
+import { context } from '@opentelemetry/api';
 import {
     logs,
     type Logger as OtelLogger,
     SeverityNumber
 } from '@opentelemetry/api-logs';
+import { type ExceptionPolicy, sanitizeException } from '../exceptionPolicy.js';
 
 /**
  * Configuration for {@link otelLogSink}.
  */
 export interface OtelLogSinkOptions {
+    /** Automatic exception details. @default 'omit' */
+    exceptionPolicy?: ExceptionPolicy;
+
+    /** Redact the final rendered body; return undefined to omit it. */
+    sanitizeBody?: (body: string) => string | undefined;
     /**
      * Logger name (`InstrumentationScope`) under which records are
      * emitted via the OTel Logs API.
@@ -22,9 +34,9 @@ export interface OtelLogSinkOptions {
     loggerVersion?: string;
 
     /**
-     * Hook for redacting / dropping properties before they become
-     * OTel log record attributes. Return `undefined` to drop the
-     * attribute entirely.
+     * Redact every attribute, including automatic template and exception
+     * fields. Return undefined to drop it. Templates are rendered again from
+     * redacted properties; sanitizeBody also covers literal message text.
      */
     sanitizeAttribute?: (key: string, value: unknown) => unknown | undefined;
 }
@@ -61,21 +73,20 @@ function toAttributeValue(value: unknown): unknown {
  * OpenTelemetry Logs API.
  *
  * Maps each `LogEvent` to an OTel `LogRecord`:
- * - `timestamp` → nanoseconds via `Date.getTime()` × 1e6
+ * - `timestamp` → milliseconds, converted internally by the OTel SDK
  * - `level` → `severityNumber` and `severityText`
  * - `renderedMessage` → `body`
  * - `properties` → flat attribute map (functions / symbols dropped,
  *   nested objects JSON-stringified)
  * - `messageTemplate` → `cleverbrush.message_template` attribute
  * - `eventId` → `cleverbrush.event_id` attribute
- * - `exception.*` attributes when the event carries an `Error`
+ * - `exception.*` attributes only when the exception policy allows them
  *
- * Trace correlation (`traceId`, `spanId`) is filled in automatically
- * by the OTel SDK from the active context — typically established by
- * `tracingMiddleware`.
+ * Passes each event's captured context explicitly to the OTel Logs API,
+ * preserving trace correlation through asynchronous queues and retries.
+ * Manually constructed events without a snapshot use the calling context.
  *
- * The sink itself is per-event; for high-throughput services wrap it
- * with `BatchingSink` from `@cleverbrush/log`.
+ * The OTel SDK batches export; additional BatchingSink buffering is optional.
  *
  * Requires that `setupOtel({ ... })` has been called so the global
  * `LoggerProvider` is set; otherwise emissions become no-ops.
@@ -99,6 +110,14 @@ export function otelLogSink(options?: OtelLogSinkOptions): LogSink {
     const loggerVersion = options?.loggerVersion;
     const sanitize = options?.sanitizeAttribute;
 
+    const sanitizeValue = (key: string, value: unknown): unknown => {
+        try {
+            return sanitize ? sanitize(key, value) : value;
+        } catch {
+            return undefined;
+        }
+    };
+
     let cached: OtelLogger | undefined;
     const getLogger = (): OtelLogger => {
         if (!cached) cached = logs.getLogger(loggerName, loggerVersion);
@@ -109,37 +128,70 @@ export function otelLogSink(options?: OtelLogSinkOptions): LogSink {
         async emit(events: LogEvent[]): Promise<void> {
             const otelLogger = getLogger();
             for (const event of events) {
-                const attributes: Record<string, unknown> = {};
-                for (const [key, raw] of Object.entries(event.properties)) {
-                    const value = sanitize
-                        ? sanitize(key, raw)
-                        : toAttributeValue(raw);
-                    if (value !== undefined) attributes[key] = value;
-                }
-
-                if (event.messageTemplate) {
-                    attributes['cleverbrush.message_template'] =
-                        event.messageTemplate;
-                }
-                if (event.eventId) {
-                    attributes['cleverbrush.event_id'] = event.eventId;
-                }
-                if (event.exception) {
-                    attributes['exception.type'] = event.exception.name;
-                    attributes['exception.message'] = event.exception.message;
-                    if (event.exception.stack) {
-                        attributes['exception.stacktrace'] =
-                            event.exception.stack;
+                const emit = () => {
+                    const attributes: Record<string, unknown> =
+                        Object.create(null);
+                    const properties: Record<string, unknown> =
+                        Object.create(null);
+                    const addAttribute = (key: string, value: unknown) => {
+                        try {
+                            const converted = toAttributeValue(value);
+                            if (converted !== undefined)
+                                attributes[key] = converted;
+                        } catch {
+                            // Inspection failures omit the affected field.
+                        }
+                    };
+                    for (const [key, raw] of Object.entries(event.properties)) {
+                        const value = sanitizeValue(key, raw);
+                        if (value !== undefined) properties[key] = value;
+                        addAttribute(key, value);
                     }
-                }
+                    const automatic: Record<string, unknown> = {
+                        'cleverbrush.message_template': event.messageTemplate,
+                        'cleverbrush.event_id': event.eventId
+                    };
+                    const exception = sanitizeException(
+                        event.exception,
+                        event.exception === undefined
+                            ? 'omit'
+                            : options?.exceptionPolicy
+                    );
+                    if (exception) {
+                        automatic['exception.type'] = exception.name;
+                        automatic['exception.message'] = exception.message;
+                        automatic['exception.stacktrace'] = exception.stack;
+                    }
+                    for (const [key, raw] of Object.entries(automatic)) {
+                        if (raw !== undefined)
+                            addAttribute(key, sanitizeValue(key, raw));
+                    }
 
-                otelLogger.emit({
-                    timestamp: event.timestamp.getTime(), // milliseconds; OTel SDK converts to ns internally
-                    severityNumber: SEVERITY_NUMBER[event.level],
-                    severityText: levelToString(event.level).toUpperCase(),
-                    body: event.renderedMessage,
-                    attributes: attributes as any
-                });
+                    let body: string | undefined;
+                    try {
+                        body = sanitize
+                            ? renderTemplate(
+                                  parseTemplate(event.messageTemplate),
+                                  properties
+                              )
+                            : event.renderedMessage;
+                        if (options?.sanitizeBody)
+                            body = options.sanitizeBody(body);
+                    } catch {
+                        // A failing body sanitizer must not export raw text.
+                        body = undefined;
+                    }
+                    otelLogger.emit({
+                        context: context.active(),
+                        timestamp: event.timestamp.getTime(),
+                        severityNumber: SEVERITY_NUMBER[event.level],
+                        severityText: levelToString(event.level).toUpperCase(),
+                        body,
+                        attributes: attributes as any
+                    });
+                };
+                if (event.runInContext) event.runInContext(emit);
+                else emit();
             }
         },
 

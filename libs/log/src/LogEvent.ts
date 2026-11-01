@@ -8,6 +8,11 @@ import type { LogLevel } from './LogLevel.js';
  * human-friendly display and machine-queryable structured search.
  */
 export interface LogEvent {
+    /**
+     * Runs work in the originating execution context. Captured before queuing;
+     * function metadata is omitted by JSON serialization and output formatters.
+     */
+    readonly runInContext?: <T>(callback: () => T) => T;
     /** ISO timestamp when the event occurred. */
     timestamp: Date;
     /** Severity level of the event. */

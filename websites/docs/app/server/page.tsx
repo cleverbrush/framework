@@ -494,6 +494,27 @@ server.handle(AdminEp, handler, { middlewares: [rateLimiter] });`)
                             }}
                         />
                     </pre>
+                    <p>
+                        Register response observers with{' '}
+                        <code>server.useRequest()</code> before CORS, routing
+                        and authentication. In that stage route, scoped services
+                        and principal are populated as processing advances. Read{' '}
+                        <code>context.route</code> for the readonly route
+                        template, operation ID and tags after matching. Ordinary{' '}
+                        <code>use()</code> middleware retains its order.
+                    </p>
+                    <p>
+                        <code>context.onResponseCompleted(callback)</code>{' '}
+                        observes one immutable final outcome, elapsed time and
+                        status after serialization and streaming. It returns
+                        unsubscribe and runs callbacks in their registration
+                        context. Status is absent if headers were not sent;
+                        premature close is an interruption unless
+                        timeout/cancellation was explicitly marked. Observer
+                        failures cannot change responses. Any original error is
+                        for trusted observers and must be sanitized before
+                        export.
+                    </p>
                 </div>
 
                 {/* ── DI Integration ───────────────────────────────── */}

@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { LogEvent } from './LogEvent.js';
 import type { LogLevel } from './LogLevel.js';
 import { safeSerialize } from './serialization.js';
@@ -202,6 +203,7 @@ export function createLogEvent(
     const eventId = computeEventId(template);
 
     return {
+        runInContext: AsyncLocalStorage.snapshot(),
         timestamp: new Date(),
         level,
         messageTemplate: template,

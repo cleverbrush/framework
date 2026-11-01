@@ -192,6 +192,7 @@ export class VirtualServerResponse extends Writable {
      * - `end(callback)` — end with callback (body already captured via pipe)
      */
     override end(chunk?: unknown, ...rest: unknown[]): this {
+        this.headersSent = true;
         if (chunk != null && typeof chunk !== 'function') {
             const buf =
                 Buffer.isBuffer(chunk) || chunk instanceof Uint8Array
