@@ -1,5 +1,12 @@
 # @cleverbrush/orm
 
+## 5.2.0
+
+### Patch Changes
+
+- @cleverbrush/knex-schema@5.2.0
+  - @cleverbrush/schema@5.2.0
+
 ## 5.1.0
 
 ### Minor Changes
