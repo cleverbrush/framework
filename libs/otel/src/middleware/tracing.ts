@@ -1,3 +1,4 @@
+import type { ResponseCompletion } from '@cleverbrush/server';
 import {
     context,
     propagation,
@@ -20,6 +21,10 @@ import {
     ATTR_URL_SCHEME,
     ATTR_USER_AGENT_ORIGINAL
 } from '@opentelemetry/semantic-conventions';
+import {
+    type ExceptionPolicy,
+    recordSpanException
+} from '../exceptionPolicy.js';
 
 /**
  * Attribute key under which the OTel server span is stashed on the
@@ -35,6 +40,8 @@ export const OTEL_SPAN_ITEM_KEY = 'otel.span';
  * Configuration for {@link tracingMiddleware}.
  */
 export interface TracingMiddlewareOptions {
+    /** Automatic exception details. @default 'omit' */
+    exceptionPolicy?: ExceptionPolicy;
     /**
      * Tracer name used when resolving the OTel tracer.
      *
@@ -85,11 +92,6 @@ export interface TracingMiddlewareOptions {
     responseTraceHeader?: string | false;
 }
 
-function getEndpointMeta(ctx: any): any | undefined {
-    const items: Map<string, unknown> | undefined = ctx?.items;
-    return items?.get('__endpoint_meta');
-}
-
 interface BatchSubrequestMeta {
     index: number;
     size: number;
@@ -121,23 +123,11 @@ function hasValidTraceparent(headers: Record<string, string>): boolean {
     );
 }
 
-function getRouteTemplate(meta: any): string | undefined {
-    if (!meta) return undefined;
-    const base: string = meta.basePath ?? '';
-    const tpl = meta.pathTemplate;
-    if (typeof tpl === 'string') return `${base}${tpl}`;
-    // ParseStringSchemaBuilder — try its `template` getter, otherwise toString
-    const candidate =
-        tpl?.template ?? tpl?.pattern ?? tpl?.toString?.() ?? null;
-    if (typeof candidate === 'string') return `${base}${candidate}`;
-    return base || undefined;
-}
-
 /**
  * Creates a `@cleverbrush/server` middleware that opens an OpenTelemetry
  * `SERVER` span for every incoming request.
  *
- * Should be registered as the **first** middleware so that the span
+ * Register first with `useRequest()` so that the span
  * wraps CORS, auth, request logging, and the handler — capturing the
  * full request lifetime.
  *
@@ -145,12 +135,13 @@ function getRouteTemplate(meta: any): string | undefined {
  * - Extracts inbound trace context from request headers
  *   (W3C `traceparent`, `baggage`).
  * - Names the span `${operationId}` if available, otherwise
- *   `${method} ${http.route}`, otherwise `${method} ${url.path}`.
+ *   `${method} ${http.route}`, otherwise `${method}`.
  * - Sets HTTP semantic-convention attributes
  *   (`http.request.method`, `url.path`, `url.scheme`,
  *   `server.address`, `user_agent.original`, `http.route`).
- * - Records `http.response.status_code` after `next()` completes.
- * - Marks the span `ERROR` and records the exception on uncaught errors.
+ * - Records final HTTP status and ends once on response finish/close.
+ * - Marks server failures, timeouts and interruptions as ERROR. Exception
+ *   details are omitted unless an explicit policy allows them.
  * - Stashes the span at `ctx.items.get(OTEL_SPAN_ITEM_KEY)` for
  *   downstream code to enrich.
  *
@@ -162,7 +153,7 @@ function getRouteTemplate(meta: any): string | undefined {
  * import { tracingMiddleware } from '@cleverbrush/otel';
  *
  * createServer()
- *     .use(tracingMiddleware({ excludePaths: ['/health'] }))
+ *     .useRequest(tracingMiddleware({ excludePaths: ['/health'] }))
  *     .use(corsMiddleware)
  *     .use(authMiddleware)
  *     .listen(3000);
@@ -212,16 +203,15 @@ export function tracingMiddleware(options?: TracingMiddlewareOptions) {
                 ? trace.getSpanContext(extractedCtx)
                 : undefined;
 
-        const meta = getEndpointMeta(ctx);
-        const route = getRouteTemplate(meta);
+        const meta = ctx.route;
+        const route = meta?.pathTemplate;
         const method: string = (ctx.method ?? 'GET').toUpperCase();
         // Span name follows OTel HTTP semconv (low-cardinality, descending priority):
         //   1. operationId       — e.g. "getTodoById"
         //   2. METHOD ROUTE      — e.g. "GET /todos/{id}"
-        //   3. METHOD pathname   — fallback when no route template is available
+        //   3. METHOD            — no route has been matched yet
         const spanName: string =
-            meta?.operationId ||
-            (route ? `${method} ${route}` : `${method} ${pathname}`);
+            meta?.operationId || (route ? `${method} ${route}` : method);
 
         const attributes: Record<string, string | number> = {
             [ATTR_HTTP_REQUEST_METHOD]: method,
@@ -270,6 +260,59 @@ export function tracingMiddleware(options?: TracingMiddlewareOptions) {
             parentCtx,
             async (span: Span) => {
                 ctx.items?.set?.(OTEL_SPAN_ITEM_KEY, span);
+                const started = performance.now();
+                let completed = false;
+                const complete = (result: ResponseCompletion) => {
+                    if (completed) return;
+                    completed = true;
+                    const route = ctx.route;
+                    if (route) {
+                        span.updateName(
+                            route.operationId ||
+                                `${method} ${route.pathTemplate}`
+                        );
+                        span.setAttribute(ATTR_HTTP_ROUTE, route.pathTemplate);
+                        if (route.operationId)
+                            span.setAttribute(
+                                'cleverbrush.endpoint.operationId',
+                                route.operationId
+                            );
+                        if (route.tags?.length)
+                            span.setAttribute(
+                                'cleverbrush.endpoint.tags',
+                                route.tags.join(',')
+                            );
+                    }
+                    if (result.statusCode !== undefined)
+                        span.setAttribute(
+                            ATTR_HTTP_RESPONSE_STATUS_CODE,
+                            result.statusCode
+                        );
+                    span.setAttribute(
+                        'cleverbrush.http.outcome',
+                        result.outcome
+                    );
+                    if (
+                        result.outcome === 'failure' ||
+                        result.outcome === 'timeout' ||
+                        result.outcome === 'interrupted'
+                    ) {
+                        if ('error' in result)
+                            recordSpanException(
+                                span,
+                                result.error,
+                                options?.exceptionPolicy
+                            );
+                        else span.setStatus({ code: SpanStatusCode.ERROR });
+                    }
+                    span.end();
+                };
+                const observesResponse =
+                    typeof ctx.onResponseCompleted === 'function';
+                if (observesResponse)
+                    ctx.onResponseCompleted(
+                        context.bind(context.active(), complete)
+                    );
 
                 // Write the trace ID to the response so consumers can look
                 // up the exact trace in SigNoz / Jaeger / any backend.
@@ -277,7 +320,7 @@ export function tracingMiddleware(options?: TracingMiddlewareOptions) {
                     const { traceId } = span.spanContext();
                     if (traceId) {
                         const res = ctx.response;
-                        if (res?.setHeader) {
+                        if (res?.setHeader && !res.headersSent) {
                             res.setHeader(responseTraceHeader, traceId);
                         } else if (ctx.setHeader) {
                             ctx.setHeader(responseTraceHeader, traceId);
@@ -295,33 +338,35 @@ export function tracingMiddleware(options?: TracingMiddlewareOptions) {
 
                 try {
                     await next();
-                    const status: number =
-                        ctx.response?.statusCode ?? ctx.statusCode ?? 200;
-                    span.setAttribute(ATTR_HTTP_RESPONSE_STATUS_CODE, status);
-                    if (status >= 500) {
-                        span.setStatus({ code: SpanStatusCode.ERROR });
-                    } else {
-                        span.setStatus({ code: SpanStatusCode.OK });
-                    }
                 } catch (err) {
-                    const status: number =
-                        ctx.response?.statusCode ?? ctx.statusCode ?? 500;
-                    span.setAttribute(ATTR_HTTP_RESPONSE_STATUS_CODE, status);
-                    if (err instanceof Error) {
-                        span.recordException(err);
-                        span.setStatus({
-                            code: SpanStatusCode.ERROR,
-                            message: err.message
+                    if (!observesResponse)
+                        complete({
+                            statusCode:
+                                ctx.response?.statusCode >= 400
+                                    ? ctx.response.statusCode
+                                    : 500,
+                            elapsedMs: performance.now() - started,
+                            outcome: 'failure',
+                            error: err
                         });
-                    } else {
-                        span.setStatus({
-                            code: SpanStatusCode.ERROR,
-                            message: String(err)
-                        });
-                    }
                     throw err;
                 } finally {
-                    span.end();
+                    // Structural/legacy contexts lack response completion.
+                    // Current RequestContext always takes the lifecycle path.
+                    if (!observesResponse && !completed) {
+                        const statusCode =
+                            ctx.response?.statusCode ?? ctx.statusCode ?? 200;
+                        complete({
+                            statusCode,
+                            elapsedMs: performance.now() - started,
+                            outcome:
+                                statusCode >= 500
+                                    ? 'failure'
+                                    : statusCode >= 400
+                                      ? 'rejected'
+                                      : 'success'
+                        });
+                    }
                 }
             }
         );

@@ -14,11 +14,17 @@ import {
     ATTR_SERVER_PORT
 } from '@opentelemetry/semantic-conventions/incubating';
 import type { Knex } from 'knex';
+import {
+    type ExceptionPolicy,
+    recordSpanException
+} from '../exceptionPolicy.js';
 
 /**
  * Configuration for {@link instrumentKnex}.
  */
 export interface InstrumentKnexOptions {
+    /** Automatic exception details, independently of SQL capture. @default 'omit' */
+    exceptionPolicy?: ExceptionPolicy;
     /**
      * Value to record as `db.system.name` (e.g. `postgresql`, `mysql`,
      * `sqlite`). When omitted, inferred from the knex client.
@@ -210,18 +216,7 @@ export function instrumentKnex<T extends Knex>(
         const span = active.get(uid);
         if (!span) return;
         active.delete(uid);
-        if (err instanceof Error) {
-            span.recordException(err);
-            span.setStatus({
-                code: SpanStatusCode.ERROR,
-                message: err.message
-            });
-        } else {
-            span.setStatus({
-                code: SpanStatusCode.ERROR,
-                message: String(err)
-            });
-        }
+        recordSpanException(span, err, options?.exceptionPolicy);
         span.end();
     });
 

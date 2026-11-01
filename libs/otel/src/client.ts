@@ -18,6 +18,12 @@ import {
     ATTR_URL_PATH,
     ATTR_URL_SCHEME
 } from '@opentelemetry/semantic-conventions';
+import {
+    type ExceptionPolicy,
+    recordSpanException
+} from './exceptionPolicy.js';
+
+export type { ExceptionPolicy, SanitizedException } from './exceptionPolicy.js';
 
 /**
  * A function with the same shape as `fetch`.
@@ -62,6 +68,8 @@ export interface ClientTracingInfo {
  * Configuration for {@link clientTracingMiddleware}.
  */
 export interface ClientTracingMiddlewareOptions {
+    /** Automatic exception details. @default 'omit' */
+    exceptionPolicy?: ExceptionPolicy;
     /**
      * Tracer name used when resolving the OTel tracer.
      *
@@ -215,23 +223,6 @@ function buildAttributes(
     return attributes;
 }
 
-function markError(span: Span, err: unknown): void {
-    if (err instanceof Error) {
-        span.recordException(err);
-        span.setStatus({
-            code: SpanStatusCode.ERROR,
-            message: err.message
-        });
-        return;
-    }
-
-    span.recordException(new Error(String(err)));
-    span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: String(err)
-    });
-}
-
 /**
  * Creates a `@cleverbrush/client` middleware that traces outbound HTTP calls
  * and injects W3C Trace Context headers.
@@ -318,7 +309,7 @@ export function clientTracingMiddleware(
                     }
                     return response;
                 } catch (err) {
-                    markError(span, err);
+                    recordSpanException(span, err, options.exceptionPolicy);
                     throw err;
                 } finally {
                     span.end();

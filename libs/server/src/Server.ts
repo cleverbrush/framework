@@ -18,7 +18,12 @@ import { type WebSocket, WebSocketServer } from 'ws';
 import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
 import { CorsPolicy, type ServerCorsOptions } from './Cors.js';
-import type { EndpointBuilder, Handler, HandlerMapping } from './Endpoint.js';
+import type {
+    EndpointBuilder,
+    EndpointMetadata,
+    Handler,
+    HandlerMapping
+} from './Endpoint.js';
 import type { EndpointOptions } from './EndpointOptions.js';
 import { validateErrorMap } from './ErrorMap.js';
 import { HttpError } from './HttpError.js';
@@ -118,6 +123,7 @@ export class ServerBuilder {
     readonly #subscriptionRegistrations: SubscriptionRegistration[] = [];
     readonly #webhooks: WebhookDefinition[] = [];
     readonly #globalMiddlewares: Middleware[] = [];
+    readonly #requestMiddlewares: Middleware[] = [];
     readonly #contentNegotiator = new ContentNegotiator();
     #options: ServerOptions;
     #authConfig: AuthenticationConfig | null = null;
@@ -147,6 +153,16 @@ export class ServerBuilder {
      */
     use(middleware: Middleware): this {
         this.#globalMiddlewares.push(middleware);
+        return this;
+    }
+
+    /**
+     * Wrap every HTTP request before CORS, routing and authentication. Use for
+     * tracing and completion observers; route, services and principal are
+     * populated later. Ordinary middleware retains its existing order.
+     */
+    useRequest(middleware: Middleware): this {
+        this.#requestMiddlewares.push(middleware);
         return this;
     }
 
@@ -403,7 +419,8 @@ export class ServerBuilder {
             this.#subscriptionRegistrations.length > 0,
             this.#batchConfig,
             this.#options.maxBodySize,
-            this.#corsOptions
+            this.#corsOptions,
+            this.#requestMiddlewares
         );
 
         const listenPort = port ?? this.#options.port ?? 3000;
@@ -429,6 +446,7 @@ export class Server {
     readonly #serviceProvider: ServiceProvider;
     readonly #contentNegotiator: ContentNegotiator;
     readonly #globalMiddlewares: Middleware[];
+    readonly #requestMiddlewares: readonly Middleware[];
     readonly #healthcheck: boolean;
     readonly #hasSubscriptions: boolean;
     readonly #batchConfig: ServerBatchingOptions | null;
@@ -447,12 +465,14 @@ export class Server {
         hasSubscriptions = false,
         batchConfig: ServerBatchingOptions | null = null,
         maxBodySize: number = DEFAULT_MAX_BODY_SIZE,
-        corsOptions?: ServerCorsOptions
+        corsOptions?: ServerCorsOptions,
+        requestMiddlewares: readonly Middleware[] = []
     ) {
         this.#router = router;
         this.#serviceProvider = serviceProvider;
         this.#contentNegotiator = contentNegotiator;
         this.#globalMiddlewares = globalMiddlewares;
+        this.#requestMiddlewares = [...requestMiddlewares];
         this.#healthcheck = healthcheck;
         this.#hasSubscriptions = hasSubscriptions;
         this.#batchConfig = batchConfig;
@@ -576,18 +596,12 @@ export class Server {
         res: http.ServerResponse,
         physicalRequest = true
     ): Promise<void> {
-        if (
-            physicalRequest &&
-            this.#cors &&
-            (await this.#cors.handle(req, res, (method, path) =>
-                this.#matchCorsRoute(method, path)
-            ))
-        )
-            return;
-        const scope = this.#serviceProvider.createScope();
+        let scope: ReturnType<ServiceProvider['createScope']> | undefined;
+        let requestContext: RequestContext | undefined;
 
         try {
             const ctx = new RequestContext(req, res, this.#maxBodySize);
+            requestContext = ctx;
             const urlPath = ctx.url.pathname;
             const method = ctx.method;
             const batchSubrequest = (
@@ -603,145 +617,184 @@ export class Server {
                 ctx.items.set('__batch_subrequest', batchSubrequest);
             }
 
-            if (
-                this.#healthcheck &&
-                method === 'GET' &&
-                urlPath === '/health'
-            ) {
-                res.writeHead(200);
-                res.end();
-                return;
-            }
+            const requestPipeline = new MiddlewarePipeline();
+            for (const middleware of this.#requestMiddlewares)
+                requestPipeline.add(middleware);
+            await requestPipeline.execute(ctx, async () => {
+                if (ctx.responded) return;
+                if (
+                    physicalRequest &&
+                    this.#cors &&
+                    (await this.#cors.handle(req, res, (method, path) =>
+                        this.#matchCorsRoute(method, path)
+                    ))
+                )
+                    return;
 
-            // Batch endpoint — it has no endpoint metadata, but should still
-            // pass through global middleware so observability/logging can wrap
-            // the physical batch request.
-            if (
-                this.#batchConfig !== null &&
-                method === 'POST' &&
-                urlPath === (this.#batchConfig.path ?? '/__batch')
-            ) {
+                scope = this.#serviceProvider.createScope();
                 ctx.services = scope.serviceProvider;
 
-                const pipeline = new MiddlewarePipeline();
-                for (const mw of this.#globalMiddlewares) {
-                    pipeline.add(mw);
+                if (
+                    this.#healthcheck &&
+                    method === 'GET' &&
+                    urlPath === '/health'
+                ) {
+                    ctx.setRoute({ pathTemplate: '/health', tags: [] });
+                    res.writeHead(200);
+                    res.end();
+                    return;
                 }
 
-                await pipeline.execute(ctx, async () => {
-                    if (ctx.responded) return;
-                    await this.#handleBatchRequest(req, res);
-                    ctx.responded = true;
-                });
-                return;
-            }
+                // Batch endpoint — it has no endpoint metadata, but should still
+                // pass through global middleware so observability/logging can wrap
+                // the physical batch request.
+                if (
+                    this.#batchConfig !== null &&
+                    method === 'POST' &&
+                    urlPath === (this.#batchConfig.path ?? '/__batch')
+                ) {
+                    ctx.setRoute({
+                        pathTemplate: this.#batchConfig.path ?? '/__batch',
+                        tags: []
+                    });
 
-            const routeResult = this.#router.match(method, urlPath);
+                    const pipeline = new MiddlewarePipeline();
+                    for (const mw of this.#globalMiddlewares) {
+                        pipeline.add(mw);
+                    }
 
-            if (!routeResult.match) {
-                if (routeResult.badRequest) {
-                    const pd = createProblemDetails(400);
-                    res.writeHead(400, {
+                    await pipeline.execute(ctx, async () => {
+                        if (ctx.responded) return;
+                        await this.#handleBatchRequest(req, res);
+                        ctx.responded = true;
+                    });
+                    return;
+                }
+
+                const routeResult = this.#router.match(method, urlPath);
+
+                if (!routeResult.match) {
+                    if (routeResult.badRequest) {
+                        const pd = createProblemDetails(400);
+                        res.writeHead(400, {
+                            'content-type': PROBLEM_JSON_CONTENT_TYPE
+                        });
+                        res.end(serializeProblemDetails(pd));
+                        return;
+                    }
+
+                    if (routeResult.methodNotAllowed) {
+                        const pd = createProblemDetails(
+                            405,
+                            'Method Not Allowed'
+                        );
+                        res.writeHead(405, {
+                            'content-type': PROBLEM_JSON_CONTENT_TYPE,
+                            allow: routeResult.allowedMethods!.join(', ')
+                        });
+                        res.end(serializeProblemDetails(pd));
+                        return;
+                    }
+
+                    const pd = createProblemDetails(404);
+                    res.writeHead(404, {
                         'content-type': PROBLEM_JSON_CONTENT_TYPE
                     });
                     res.end(serializeProblemDetails(pd));
                     return;
                 }
 
-                if (routeResult.methodNotAllowed) {
-                    const pd = createProblemDetails(405, 'Method Not Allowed');
-                    res.writeHead(405, {
-                        'content-type': PROBLEM_JSON_CONTENT_TYPE,
-                        allow: routeResult.allowedMethods!.join(', ')
-                    });
-                    res.end(serializeProblemDetails(pd));
-                    return;
+                const { registration, parsedPath } = routeResult.match;
+                const meta = registration.endpoint;
+                ctx.setRoute({
+                    pathTemplate: getRequestRouteTemplate(meta),
+                    operationId: meta.operationId ?? undefined,
+                    tags: meta.tags ?? []
+                });
+
+                // Set path params on context (raw string form for middleware)
+                if (parsedPath) {
+                    const rawParams: Record<string, string> = {};
+                    flattenToStrings(parsedPath, '', rawParams);
+                    ctx.pathParams = rawParams;
                 }
 
-                const pd = createProblemDetails(404);
-                res.writeHead(404, {
-                    'content-type': PROBLEM_JSON_CONTENT_TYPE
-                });
-                res.end(serializeProblemDetails(pd));
-                return;
-            }
+                // Store endpoint metadata for authorization middleware
+                ctx.items.set('__endpoint_meta', meta);
 
-            const { registration, parsedPath } = routeResult.match;
-            const meta = registration.endpoint;
-
-            // Set path params on context (raw string form for middleware)
-            if (parsedPath) {
-                const rawParams: Record<string, string> = {};
-                flattenToStrings(parsedPath, '', rawParams);
-                ctx.pathParams = rawParams;
-            }
-
-            ctx.services = scope.serviceProvider;
-
-            // Store endpoint metadata for authorization middleware
-            ctx.items.set('__endpoint_meta', meta);
-
-            // Build middleware pipeline
-            const pipeline = new MiddlewarePipeline();
-            for (const mw of this.#globalMiddlewares) {
-                pipeline.add(mw);
-            }
-            if (registration.middlewares) {
-                for (const mw of registration.middlewares) {
+                // Build middleware pipeline
+                const pipeline = new MiddlewarePipeline();
+                for (const mw of this.#globalMiddlewares) {
                     pipeline.add(mw);
                 }
-            }
+                if (registration.middlewares) {
+                    for (const mw of registration.middlewares) {
+                        pipeline.add(mw);
+                    }
+                }
 
-            await pipeline.execute(ctx, async () => {
-                if (ctx.responded) return;
+                await pipeline.execute(ctx, async () => {
+                    if (ctx.responded) return;
 
-                // Parse body if needed
-                let parsedBody: unknown;
-                let uploadedFiles:
-                    | Record<string, FilePart | FilePart[]>
-                    | undefined;
-                let rejectedFiles: RejectedFile[] | undefined;
-                if (needsBody(meta) || meta.fileUpload) {
-                    const contentType = req.headers['content-type'] ?? '';
+                    // Parse body if needed
+                    let parsedBody: unknown;
+                    let uploadedFiles:
+                        | Record<string, FilePart | FilePart[]>
+                        | undefined;
+                    let rejectedFiles: RejectedFile[] | undefined;
+                    if (needsBody(meta) || meta.fileUpload) {
+                        const contentType = req.headers['content-type'] ?? '';
 
-                    // Multipart / file-upload path
-                    if (
-                        meta.fileUpload &&
-                        contentType.startsWith('multipart/form-data')
-                    ) {
-                        try {
-                            const result = await parseMultipart(
-                                req,
-                                meta.fileUpload,
-                                this.#maxBodySize
-                            );
-                            if (
-                                meta.fileUpload.schema &&
-                                !meta.bodySchema &&
-                                Object.keys(result.fields).length
-                            ) {
-                                throw new HttpError(
-                                    400,
-                                    'Bad Request',
-                                    'This upload endpoint does not declare text fields',
-                                    {
-                                        errors: Object.keys(result.fields).map(
-                                            name => ({
+                        // Multipart / file-upload path
+                        if (
+                            meta.fileUpload &&
+                            contentType.startsWith('multipart/form-data')
+                        ) {
+                            try {
+                                const result = await parseMultipart(
+                                    req,
+                                    meta.fileUpload,
+                                    this.#maxBodySize
+                                );
+                                if (
+                                    meta.fileUpload.schema &&
+                                    !meta.bodySchema &&
+                                    Object.keys(result.fields).length
+                                ) {
+                                    throw new HttpError(
+                                        400,
+                                        'Bad Request',
+                                        'This upload endpoint does not declare text fields',
+                                        {
+                                            errors: Object.keys(
+                                                result.fields
+                                            ).map(name => ({
                                                 pointer: `/body/${name.replace(/~/g, '~0').replace(/\//g, '~1')}`,
                                                 detail: 'Unexpected multipart text field'
-                                            })
-                                        )
-                                    }
+                                            }))
+                                        }
+                                    );
+                                }
+                                parsedBody = result.fields;
+                                uploadedFiles = result.files;
+                                rejectedFiles = result.rejectedFiles;
+                            } catch (error) {
+                                if (error instanceof HttpError) throw error;
+                                const pd = createProblemDetails(
+                                    400,
+                                    'Malformed multipart request'
                                 );
+                                res.writeHead(400, {
+                                    'content-type': PROBLEM_JSON_CONTENT_TYPE
+                                });
+                                res.end(serializeProblemDetails(pd));
+                                ctx.responded = true;
+                                return;
                             }
-                            parsedBody = result.fields;
-                            uploadedFiles = result.files;
-                            rejectedFiles = result.rejectedFiles;
-                        } catch (error) {
-                            if (error instanceof HttpError) throw error;
+                        } else if (meta.fileUpload) {
                             const pd = createProblemDetails(
                                 400,
-                                'Malformed multipart request'
+                                'File upload endpoint requires multipart/form-data content type'
                             );
                             res.writeHead(400, {
                                 'content-type': PROBLEM_JSON_CONTENT_TYPE
@@ -749,162 +802,159 @@ export class Server {
                             res.end(serializeProblemDetails(pd));
                             ctx.responded = true;
                             return;
+                        } else {
+                            const ctHandler =
+                                this.#contentNegotiator.selectRequestHandler(
+                                    contentType
+                                );
+                            if (ctHandler) {
+                                const rawBody = await ctx.body();
+                                const bodyText = rawBody.toString('utf-8');
+                                if (bodyText.length > 0) {
+                                    try {
+                                        parsedBody =
+                                            ctHandler.deserialize(bodyText);
+                                    } catch {
+                                        const pd = createProblemDetails(
+                                            400,
+                                            'Malformed request body'
+                                        );
+                                        res.writeHead(400, {
+                                            'content-type':
+                                                PROBLEM_JSON_CONTENT_TYPE
+                                        });
+                                        res.end(serializeProblemDetails(pd));
+                                        ctx.responded = true;
+                                        return;
+                                    }
+                                }
+                            } else if (contentType) {
+                                const pd = createProblemDetails(415);
+                                res.writeHead(415, {
+                                    'content-type': PROBLEM_JSON_CONTENT_TYPE
+                                });
+                                res.end(serializeProblemDetails(pd));
+                                ctx.responded = true;
+                                return;
+                            }
                         }
-                    } else if (meta.fileUpload) {
-                        const pd = createProblemDetails(
-                            400,
-                            'File upload endpoint requires multipart/form-data content type'
-                        );
+                    }
+
+                    // Resolve parameters
+                    const resolveResult = await resolveArgs(
+                        meta,
+                        parsedPath,
+                        ctx,
+                        parsedBody
+                    );
+                    if (!resolveResult.valid) {
                         res.writeHead(400, {
                             'content-type': PROBLEM_JSON_CONTENT_TYPE
                         });
-                        res.end(serializeProblemDetails(pd));
+                        res.end(
+                            serializeProblemDetails(
+                                resolveResult.problemDetails
+                            )
+                        );
                         ctx.responded = true;
                         return;
-                    } else {
-                        const ctHandler =
-                            this.#contentNegotiator.selectRequestHandler(
-                                contentType
-                            );
-                        if (ctHandler) {
-                            const rawBody = await ctx.body();
-                            const bodyText = rawBody.toString('utf-8');
-                            if (bodyText.length > 0) {
-                                try {
-                                    parsedBody =
-                                        ctHandler.deserialize(bodyText);
-                                } catch {
-                                    const pd = createProblemDetails(
-                                        400,
-                                        'Malformed request body'
-                                    );
-                                    res.writeHead(400, {
-                                        'content-type':
-                                            PROBLEM_JSON_CONTENT_TYPE
-                                    });
-                                    res.end(serializeProblemDetails(pd));
-                                    ctx.responded = true;
-                                    return;
-                                }
-                            }
-                        } else if (contentType) {
-                            const pd = createProblemDetails(415);
-                            res.writeHead(415, {
-                                'content-type': PROBLEM_JSON_CONTENT_TYPE
-                            });
-                            res.end(serializeProblemDetails(pd));
-                            ctx.responded = true;
-                            return;
+                    }
+
+                    // Inject uploaded files into the action context
+                    if (uploadedFiles && resolveResult.args.length > 0) {
+                        const ctx = resolveResult.args[0] as Record<
+                            string,
+                            unknown
+                        >;
+                        ctx.files = uploadedFiles;
+                        if (rejectedFiles && rejectedFiles.length > 0) {
+                            ctx.rejectedFiles = rejectedFiles;
                         }
                     }
-                }
 
-                // Resolve parameters
-                const resolveResult = await resolveArgs(
-                    meta,
-                    parsedPath,
-                    ctx,
-                    parsedBody
-                );
-                if (!resolveResult.valid) {
-                    res.writeHead(400, {
-                        'content-type': PROBLEM_JSON_CONTENT_TYPE
-                    });
-                    res.end(
-                        serializeProblemDetails(resolveResult.problemDetails)
-                    );
-                    ctx.responded = true;
-                    return;
-                }
-
-                // Inject uploaded files into the action context
-                if (uploadedFiles && resolveResult.args.length > 0) {
-                    const ctx = resolveResult.args[0] as Record<
-                        string,
-                        unknown
-                    >;
-                    ctx.files = uploadedFiles;
-                    if (rejectedFiles && rejectedFiles.length > 0) {
-                        ctx.rejectedFiles = rejectedFiles;
-                    }
-                }
-
-                const args = resolveResult.args;
-                const send = async (result: unknown) => {
-                    if (ctx.responded) return;
-                    await this.#sendResult(req, res, result);
-                    ctx.responded = true;
-                };
-                const translate = async (error: unknown) => {
-                    if (!registration.errors) throw error;
-                    return registration.errors.translate(error);
-                };
-                // Framework transport validation precedes application callbacks.
-                const key = ctx.headers['x-idempotency-key'];
-                if (
-                    meta.idempotent &&
-                    key !== undefined &&
-                    (key.length === 0 || key.length > 256)
-                )
-                    throw new HttpError(
-                        400,
-                        'Idempotency key must contain 1 to 256 characters'
-                    );
-                try {
-                    if (registration.prepare)
-                        args[0] = await registration.prepare(...args);
-                    if (registration.idempotency && key !== undefined) {
-                        const scope = await registration.idempotency.scope(
-                            ...args
+                    const args = resolveResult.args;
+                    const send = async (result: unknown) => {
+                        if (ctx.responded) return;
+                        await this.#sendResult(req, res, result);
+                        ctx.responded = true;
+                    };
+                    const translate = async (error: unknown) => {
+                        if (!registration.errors) throw error;
+                        return registration.errors.translate(error);
+                    };
+                    // Framework transport validation precedes application callbacks.
+                    const key = ctx.headers['x-idempotency-key'];
+                    if (
+                        meta.idempotent &&
+                        key !== undefined &&
+                        (key.length === 0 || key.length > 256)
+                    )
+                        throw new HttpError(
+                            400,
+                            'Idempotency key must contain 1 to 256 characters'
                         );
-                        if (
-                            typeof scope !== 'string' &&
-                            !(
-                                Array.isArray(scope) &&
-                                scope.length > 0 &&
-                                scope.every(
-                                    part =>
-                                        typeof part === 'string' ||
-                                        (typeof part === 'number' &&
-                                            Number.isFinite(part))
+                    try {
+                        if (registration.prepare)
+                            args[0] = await registration.prepare(...args);
+                        if (registration.idempotency && key !== undefined) {
+                            const scope = await registration.idempotency.scope(
+                                ...args
+                            );
+                            if (
+                                typeof scope !== 'string' &&
+                                !(
+                                    Array.isArray(scope) &&
+                                    scope.length > 0 &&
+                                    scope.every(
+                                        part =>
+                                            typeof part === 'string' ||
+                                            (typeof part === 'number' &&
+                                                Number.isFinite(part))
+                                    )
                                 )
                             )
-                        )
-                            throw new TypeError(
-                                'Idempotency scope must be a string or identity components'
-                            );
-                        this.#replayScopes.set(ctx, JSON.stringify(scope));
-                    }
-                } catch (error) {
-                    await send(await translate(error));
-                    return;
-                }
-                const execute = async () => {
-                    let result: unknown;
-                    try {
-                        result = await registration.handler(...args);
+                                throw new TypeError(
+                                    'Idempotency scope must be a string or identity components'
+                                );
+                            this.#replayScopes.set(ctx, JSON.stringify(scope));
+                        }
                     } catch (error) {
-                        if (registration.handlerErrorsMapped) throw error;
-                        result = await translate(error);
+                        await send(await translate(error));
+                        return;
                     }
-                    await send(result);
-                };
-                if (registration.idempotency) {
-                    let replay = this.#replay.get(registration);
-                    if (!replay) {
-                        replay = idempotency({
-                            ...registration.idempotency,
-                            scope: request => this.#replayScopes.get(request)
-                        });
-                        this.#replay.set(registration, replay);
+                    const execute = async () => {
+                        let result: unknown;
+                        try {
+                            result = await registration.handler(...args);
+                        } catch (error) {
+                            if (registration.handlerErrorsMapped) throw error;
+                            result = await translate(error);
+                        }
+                        await send(result);
+                    };
+                    if (registration.idempotency) {
+                        let replay = this.#replay.get(registration);
+                        if (!replay) {
+                            replay = idempotency({
+                                ...registration.idempotency,
+                                scope: request =>
+                                    this.#replayScopes.get(request)
+                            });
+                            this.#replay.set(registration, replay);
+                        }
+                        await replay(ctx, execute);
+                    } else {
+                        await execute();
                     }
-                    await replay(ctx, execute);
-                } else {
-                    await execute();
-                }
+                });
             });
         } catch (err) {
-            if (res.headersSent) return;
+            requestContext?.recordResponseError(err);
+            if (res.destroyed) return;
+            if (res.headersSent) {
+                if (!res.writableFinished && !res.destroyed) res.destroy();
+                return;
+            }
 
             if (err instanceof HttpError) {
                 const pd = err.toProblemDetails();
@@ -913,7 +963,7 @@ export class Server {
                 });
                 res.end(serializeProblemDetails(pd));
             } else {
-                console.error('[server] Unhandled error:', err);
+                console.error('[server] Unhandled request error');
                 const pd = createProblemDetails(500);
                 res.writeHead(500, {
                     'content-type': PROBLEM_JSON_CONTENT_TYPE
@@ -922,7 +972,7 @@ export class Server {
             }
         } finally {
             try {
-                await scope.asyncDispose();
+                await scope?.asyncDispose();
             } catch {
                 // Swallow disposal errors
             }
@@ -1392,6 +1442,18 @@ export class Server {
             }
         })();
     }
+}
+
+function getRequestRouteTemplate(meta: EndpointMetadata): string {
+    const base = meta.basePath;
+    const template = meta.pathTemplate;
+    if (typeof template === 'string')
+        return template === '/' ? base || '/' : base + template;
+    const { literals, segments } = template.introspect().templateDefinition;
+    let path = base;
+    for (let index = 0; index < segments.length; index++)
+        path += literals[index] + `{${segments[index].path}}`;
+    return path + (literals[segments.length] ?? '');
 }
 
 export function createServer(options?: ServerOptions): ServerBuilder {

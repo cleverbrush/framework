@@ -11,6 +11,10 @@ import {
     string
 } from '@cleverbrush/schema';
 import { HttpError } from './HttpError.js';
+import {
+    type ResponseCompletionListener,
+    ResponseLifecycle
+} from './ResponseLifecycle.js';
 import { checkJsonDepth, safeJsonParse } from './safeJson.js';
 
 /**
@@ -46,6 +50,13 @@ export const IRequestContext = object({
 /** Default maximum request body size: 5 MB. */
 export const DEFAULT_MAX_BODY_SIZE = 5 * 1024 * 1024;
 
+/** Public, low-cardinality metadata for the route matched by the server. */
+export interface RequestRoute {
+    readonly pathTemplate: string;
+    readonly operationId?: string;
+    readonly tags: readonly string[];
+}
+
 export class RequestContext {
     readonly request: IncomingMessage;
     readonly response: ServerResponse;
@@ -54,6 +65,8 @@ export class RequestContext {
     readonly headers: Record<string, string>;
     readonly items: Map<string, unknown> = new Map();
     readonly maxBodySize: number;
+    readonly #lifecycle: ResponseLifecycle;
+    #route?: RequestRoute;
 
     #pathParams: Record<string, string> = {};
     /** @internal — overridable for testing */
@@ -79,6 +92,7 @@ export class RequestContext {
     ) {
         this.request = request;
         this.response = response;
+        this.#lifecycle = new ResponseLifecycle(response);
         this.method = (request.method ?? 'GET').toUpperCase();
         this.maxBodySize = maxBodySize ?? DEFAULT_MAX_BODY_SIZE;
 
@@ -99,6 +113,37 @@ export class RequestContext {
             }
         }
         this.headers = headers;
+    }
+
+    /** Available after routing; absent for unmatched requests. */
+    get route(): RequestRoute | undefined {
+        return this.#route;
+    }
+
+    /**
+     * Observe completion once, in the context active at registration. Late
+     * subscribers receive the stored result immediately. Returns unsubscribe.
+     */
+    onResponseCompleted(listener: ResponseCompletionListener): () => void {
+        return this.#lifecycle.subscribe(listener);
+    }
+
+    /** Mark a known terminal cause; a successful response takes precedence. */
+    markResponseOutcome(outcome: 'timeout' | 'cancelled'): void {
+        this.#lifecycle.mark(outcome);
+    }
+
+    /** @internal Store an immutable route snapshot before authentication. */
+    setRoute(route: RequestRoute): void {
+        this.#route = Object.freeze({
+            ...route,
+            tags: Object.freeze([...route.tags])
+        });
+    }
+
+    /** @internal Preserve application failures for completion observers. */
+    recordResponseError(error: unknown): void {
+        this.#lifecycle.recordError(error);
     }
 
     /** Path parameters extracted from the matched route template. */

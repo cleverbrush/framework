@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { Enricher } from './Enricher.js';
 import type { LogFilter } from './Filter.js';
 import type { LogEvent } from './LogEvent.js';
@@ -96,7 +97,11 @@ export class LoggerPipeline {
             }
         }
 
-        this.#queue.push(event);
+        this.#queue.push(
+            event.runInContext
+                ? event
+                : { ...event, runInContext: AsyncLocalStorage.snapshot() }
+        );
         this.#scheduleFlush();
     }
 
@@ -167,10 +172,14 @@ export class LoggerPipeline {
         const processed: LogEvent[] = [];
 
         for (let event of batch) {
+            const runInContext = event.runInContext!;
             // Apply enrichers
             for (const enricher of this.#enrichers) {
                 try {
-                    event = enricher(event);
+                    event = {
+                        ...runInContext(() => enricher(event)),
+                        runInContext
+                    };
                 } catch (err) {
                     SelfLog.write('Enricher failed', err);
                 }
@@ -194,7 +203,7 @@ export class LoggerPipeline {
             let pass = true;
             for (const filter of this.#filters) {
                 try {
-                    if (!filter(event)) {
+                    if (!runInContext(() => filter(event))) {
                         pass = false;
                         break;
                     }

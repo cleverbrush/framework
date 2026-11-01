@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Reads .d.ts files from Zod's v3 API surface in node_modules and generates
+ * Reads .d.ts files from Zod's v4 API surface in node_modules and generates
  * a TypeScript module that the playground editor uses to feed Monaco's TS
  * language service with Zod types (needed for the extern() example).
  *
@@ -8,7 +8,7 @@
  */
 
 import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -29,8 +29,9 @@ function collectDts(dir, acc = []) {
         const full = join(dir, entry);
         if (statSync(full).isDirectory()) {
             const rel = relative(ZOD_DIR, full);
-            // Only recurse into v3/ and v3/helpers/ — skip v4, locales, etc.
-            if (rel === 'v3' || rel === join('v3', 'helpers')) {
+            // The root entry re-exports v4/classic, which depends on core and
+            // locale declarations. Include that tree, not legacy v3 types.
+            if (rel === 'v4' || rel.startsWith(`v4${sep}`)) {
                 collectDts(full, acc);
             }
         } else if (entry.endsWith('.d.ts')) {
@@ -43,9 +44,9 @@ function collectDts(dir, acc = []) {
 const files = collectDts(ZOD_DIR);
 
 const entries = files.map((absPath) => {
-    const rel = relative(ZOD_DIR, absPath); // e.g. "v3/types.d.ts"
+    const rel = relative(ZOD_DIR, absPath).replaceAll('\\', '/');
     const monacoPath = `file:///node_modules/zod/${rel}`;
-    const content = readFileSync(absPath, 'utf-8');
+    const content = readFileSync(absPath, 'utf-8').replace(/[ \t]+$/gm, '');
     return { monacoPath, content };
 });
 

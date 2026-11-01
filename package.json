@@ -4,7 +4,7 @@
         "node": ">=24"
     },
     "private": true,
-    "version": "4.2.0",
+    "version": "5.2.0",
     "description": "Schema-first TypeScript libraries for application development",
     "packageManager": "npm@11.12.1",
     "scripts": {
@@ -54,6 +54,11 @@
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD-3-Clause",
     "type": "module",
+    "overrides": {
+        "monaco-editor": {
+            "dompurify": "^3.4.17"
+        }
+    },
     "devDependencies": {
         "@playwright/mcp": "^0.0.70",
         "@biomejs/biome": "^2.4.9",

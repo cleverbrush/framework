@@ -1,5 +1,16 @@
-import { LogLevel } from '@cleverbrush/log';
-import { context, trace } from '@opentelemetry/api';
+import {
+    BatchingSink,
+    createLogEvent,
+    createLogger,
+    LogLevel
+} from '@cleverbrush/log';
+import {
+    type Context,
+    context,
+    propagation,
+    ROOT_CONTEXT,
+    trace
+} from '@opentelemetry/api';
 import { logs, SeverityNumber } from '@opentelemetry/api-logs';
 import {
     InMemoryLogRecordExporter,
@@ -12,11 +23,24 @@ import {
 } from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { traceEnricher } from '../enrichers/trace.js';
 import { otelLogSink } from './OtelLogSink.js';
 
 const logExporter = new InMemoryLogRecordExporter();
+const emittedContexts = new Map<string, Context>();
 const loggerProvider = new LoggerProvider({
-    processors: [new SimpleLogRecordProcessor({ exporter: logExporter })]
+    processors: [
+        {
+            onEmit(record, context) {
+                const origin = record.attributes.Origin;
+                if (typeof origin === 'string')
+                    emittedContexts.set(origin, context);
+            },
+            async forceFlush() {},
+            async shutdown() {}
+        },
+        new SimpleLogRecordProcessor({ exporter: logExporter })
+    ]
 });
 
 const spanExporter = new InMemorySpanExporter();
@@ -37,9 +61,183 @@ afterAll(async () => {
 beforeEach(() => {
     logExporter.reset();
     spanExporter.reset();
+    emittedContexts.clear();
 });
 
 describe('otelLogSink', () => {
+    it('omits automatic exception details by default', async () => {
+        const error = new Error(
+            'SELECT password; bound-secret; https://private.local'
+        );
+        await otelLogSink().emit([
+            createLogEvent(LogLevel.Error, 'Database unavailable', {}, error)
+        ]);
+        const record = logExporter.getFinishedLogRecords()[0]!;
+        expect(record.body).toBe('Database unavailable');
+        expect(
+            Object.keys(record.attributes).some(key =>
+                key.startsWith('exception.')
+            )
+        ).toBe(false);
+        expect(
+            JSON.stringify({ body: record.body, attributes: record.attributes })
+        ).not.toContain('bound-secret');
+    });
+
+    it('redacts body, structured fields and all automatic attributes', async () => {
+        const keys: string[] = [];
+        const sink = otelLogSink({
+            exceptionPolicy: 'raw',
+            sanitizeAttribute: (key, value) => {
+                keys.push(key);
+                if (key === 'Password' || key === 'exception.stacktrace')
+                    return undefined;
+                if (key === 'exception.message') return 'Unavailable';
+                if (typeof value === 'string')
+                    return value.replaceAll('https://private.local', '[url]');
+                return value;
+            },
+            sanitizeBody: body =>
+                body.replaceAll('https://private.local', '[url]')
+        });
+        await sink.emit([
+            createLogEvent(
+                LogLevel.Error,
+                'https://private.local {Password} {@Payload}',
+                { Password: 'bound-secret', Payload: { ok: true } },
+                new Error(
+                    'SELECT password; bound-secret; https://private.local'
+                )
+            )
+        ]);
+        const record = logExporter.getFinishedLogRecords()[0]!;
+        expect(record.body).toBe('[url] {Password} {"ok":true}');
+        expect(record.attributes['exception.message']).toBe('Unavailable');
+        expect(keys).toEqual(
+            expect.arrayContaining([
+                'cleverbrush.message_template',
+                'cleverbrush.event_id',
+                'exception.type',
+                'exception.message',
+                'exception.stacktrace'
+            ])
+        );
+        const output = JSON.stringify({
+            body: record.body,
+            attributes: record.attributes
+        });
+        for (const secret of [
+            'SELECT password',
+            'bound-secret',
+            'private.local'
+        ])
+            expect(output).not.toContain(secret);
+    });
+
+    it('fails closed when sanitizers throw', async () => {
+        const secret = new Error('provider-secret');
+        const sink = otelLogSink({
+            exceptionPolicy: () => {
+                throw secret;
+            },
+            sanitizeAttribute: () => {
+                throw secret;
+            },
+            sanitizeBody: () => {
+                throw secret;
+            }
+        });
+        await sink.emit([
+            createLogEvent(
+                LogLevel.Error,
+                'provider-secret',
+                {
+                    Password: 'provider-secret'
+                },
+                secret
+            )
+        ]);
+        const record = logExporter.getFinishedLogRecords()[0]!;
+        expect(record.body).toBeUndefined();
+        expect(record.attributes).toEqual({});
+    });
+
+    it('keeps originating context through queues, copies, batching and retry', async () => {
+        const sink = otelLogSink();
+        let attempts = 0;
+        const batching = new BatchingSink({
+            batchSize: 100,
+            flushInterval: 60000,
+            maxRetries: 1,
+            retryDelay: 1,
+            emit: async events => {
+                if (attempts++ === 0) throw new Error('transient');
+                await sink.emit(events);
+            }
+        });
+        const logger = createLogger({
+            sinks: [batching],
+            enrichers: [
+                traceEnricher(),
+                ({ runInContext: _snapshot, ...event }) => event
+            ]
+        });
+        const tracer = trace.getTracer('origins');
+        const a = tracer.startSpan('A');
+        const b = tracer.startSpan('B');
+        const forSpan = (span: typeof a, tenant: string) =>
+            propagation.setBaggage(
+                trace.setSpan(ROOT_CONTEXT, span),
+                propagation.createBaggage({
+                    tenant: { value: tenant }
+                })
+            );
+        const contextA = forSpan(a, 'A');
+        const contextB = forSpan(b, 'B');
+        context.with(contextA, () => logger.info('event', { Origin: 'A' }));
+        context.with(contextB, () => logger.info('event', { Origin: 'B' }));
+        a.end();
+        b.end();
+        context.with(contextA, () =>
+            logger.info('event', { Origin: 'A-ended' })
+        );
+        context.with(ROOT_CONTEXT, () =>
+            logger.info('event', {
+                Origin: 'none',
+                TraceId: a.spanContext().traceId,
+                SpanId: a.spanContext().spanId,
+                TraceFlags: 1
+            })
+        );
+        const unsampled = {
+            traceId: 'a'.repeat(32),
+            spanId: 'b'.repeat(16),
+            traceFlags: 0
+        };
+        context.with(trace.setSpanContext(ROOT_CONTEXT, unsampled), () =>
+            logger.info('event', { Origin: 'unsampled' })
+        );
+        await context.with(contextB, () => logger.flush());
+        const records = logExporter.getFinishedLogRecords();
+        expect(records).toHaveLength(5);
+        expect(attempts).toBe(2);
+        const byOrigin = (origin: string) =>
+            records.find(r => r.attributes.Origin === origin)!;
+        for (const origin of ['A', 'A-ended']) {
+            expect(byOrigin(origin).spanContext).toMatchObject(a.spanContext());
+            expect(
+                propagation
+                    .getBaggage(emittedContexts.get(origin)!)
+                    ?.getEntry('tenant')?.value
+            ).toBe('A');
+        }
+        expect(byOrigin('B').spanContext).toMatchObject(b.spanContext());
+        expect(byOrigin('none').spanContext).toBeUndefined();
+        expect(byOrigin('unsampled').spanContext).toMatchObject(unsampled);
+        expect(byOrigin('A').attributes.TraceId).toBe(a.spanContext().traceId);
+        expect(byOrigin('B').attributes.TraceId).toBe(b.spanContext().traceId);
+        await logger.dispose();
+    });
     it('maps LogEvent to OTel LogRecord (severity, body, attributes)', async () => {
         const sink = otelLogSink();
         await sink.emit([
@@ -67,7 +265,7 @@ describe('otelLogSink', () => {
     });
 
     it('emits exception attributes when an Error is attached', async () => {
-        const sink = otelLogSink();
+        const sink = otelLogSink({ exceptionPolicy: 'raw' });
         const err = new Error('boom');
         await sink.emit([
             {

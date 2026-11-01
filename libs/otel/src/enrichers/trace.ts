@@ -26,7 +26,9 @@ import { trace } from '@opentelemetry/api';
  */
 export function traceEnricher(): Enricher {
     return event => {
-        const span = trace.getActiveSpan();
+        const span = event.runInContext
+            ? event.runInContext(() => trace.getActiveSpan())
+            : trace.getActiveSpan();
         if (!span) return event;
         const ctx = span.spanContext();
         if (!ctx?.traceId) return event;

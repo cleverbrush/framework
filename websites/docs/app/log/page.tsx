@@ -194,15 +194,26 @@ const logger = createLogger({
 const [correlationId, requestLogging] = useLogging(logger, {
     excludePaths: ['/health'],
     // Set to false when @cleverbrush/otel's tracingMiddleware already
-    // sets a traceparent header — avoids a redundant second ID header
+    // sets X-Trace-Id — avoids a redundant second ID header
     correlationResponseHeader: false,
 });
 
-// Add to your @cleverbrush/server pipeline
-// Every request gets a unique correlation ID, logged on completion`)
+server.useRequest(correlationId).useRequest(requestLogging);
+// Includes authentication/CORS failures and final streamed response completion`)
                         }}
                     />
                 </pre>
+
+                <p>
+                    Events capture execution context before asynchronous
+                    queuing, so enrichers and OTel export retain each
+                    originating request. Request completion logs include Outcome
+                    and elapsed time; StatusCode is absent when headers were
+                    never sent. A custom getLevel callback receives status 0 in
+                    that case. OTel exception and final body/attribute policies
+                    are configured on otelLogSink; other sinks retain their own
+                    privacy behavior.
+                </p>
 
                 {/* ── DI Integration ──────────────────────────────── */}
                 <h2>🧩 DI Integration</h2>

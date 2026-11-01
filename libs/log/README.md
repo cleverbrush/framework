@@ -74,9 +74,19 @@ const [correlationId, requestLogging] = useLogging(logger, {
     // Set to false when OTel traceparent already provides traceability
     correlationResponseHeader: false,
 });
+
+server.useRequest(correlationId).useRequest(requestLogging);
 ```
 
-`correlationResponseHeader: false` suppresses the `X-Correlation-Id` response header entirely — useful when `@cleverbrush/otel`'s tracing middleware already sets a `traceparent` / `traceresponse` header and a second ID would be redundant.
+`correlationResponseHeader: false` suppresses `X-Correlation-Id` when OTel's
+`X-Trace-Id` response header already provides traceability.
+
+With current `@cleverbrush/server`, request logging observes one final response
+completion, including serialization, streamed data, authentication/CORS failures,
+and disconnects. Logs include `Outcome` and `Elapsed`; `StatusCode` is absent if
+no headers were sent. `getLevel` receives status `0` in that case. Completion
+callbacks retain the context captured when middleware registered them. Structural
+contexts without completion hooks retain middleware-scoped observation.
 
 ## OpenTelemetry Integration
 
@@ -93,6 +103,16 @@ const logger = createLogger({
 ```
 
 `@cleverbrush/log` itself stays free of any OpenTelemetry runtime dependency.
+
+`createLogEvent` and the pipeline capture execution context before queuing, so
+enrichers observe the originating request even when a batch contains multiple
+requests. `LogEvent.runInContext` is optional function metadata; JSON and standard
+formatters do not serialize it. Preserve it when custom code copies events or
+buffers them. The pipeline preserves it across enricher transformations.
+
+`otelLogSink` uses this captured context for top-level OTel trace correlation and
+supports exception policies plus final body/attribute sanitization. Other sinks
+continue to use their configured formats and privacy behavior.
 
 ## License
 

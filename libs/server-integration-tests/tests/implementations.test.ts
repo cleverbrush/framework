@@ -147,9 +147,11 @@ describe('modular implementation HTTP pipeline', () => {
         expect(unknown.status).toBe(500);
         const text = await unknown.text();
         expect(text).not.toContain('private database credentials');
-        expect(logged).toHaveBeenCalledWith(
-            '[server] Unhandled error:',
-            expect.objectContaining({ message: 'private database credentials' })
+        expect(logged).toHaveBeenCalledExactlyOnceWith(
+            '[server] Unhandled request error'
+        );
+        expect(JSON.stringify(logged.mock.calls)).not.toContain(
+            'private database credentials'
         );
         expect(translated).toHaveBeenCalledTimes(1);
     });

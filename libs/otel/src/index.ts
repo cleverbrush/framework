@@ -15,6 +15,10 @@ export {
 // Log integration
 // ---------------------------------------------------------------------------
 export { traceEnricher } from './enrichers/trace.js';
+export type {
+    ExceptionPolicy,
+    SanitizedException
+} from './exceptionPolicy.js';
 
 // ---------------------------------------------------------------------------
 // ORM / Knex instrumentation

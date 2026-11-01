@@ -1,6 +1,8 @@
 import type * as http from 'node:http';
 import type { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import type { ContentNegotiator } from './ContentNegotiator.js';
+import { recordResponseFailure } from './ResponseLifecycle.js';
 
 // ---------------------------------------------------------------------------
 // Base
@@ -375,12 +377,13 @@ export class StreamResult extends ActionResult {
         }
         res.writeHead(200, headers);
 
-        await new Promise<void>((resolve, reject) => {
-            this.readable.on('error', reject);
-            res.on('error', reject);
-            this.readable.on('end', resolve);
-            this.readable.pipe(res, { end: true });
-        });
+        const failed = (error: unknown) => recordResponseFailure(res, error);
+        this.readable.once('error', failed);
+        try {
+            await pipeline(this.readable, res);
+        } finally {
+            this.readable.off('error', failed);
+        }
     }
 }
 

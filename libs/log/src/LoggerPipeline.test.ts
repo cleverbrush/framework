@@ -1,5 +1,6 @@
 // @cleverbrush/log — LoggerPipeline unit tests
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { describe, expect, it } from 'vitest';
 import type { LogEvent } from './LogEvent.js';
 import { LoggerPipeline } from './LoggerPipeline.js';
@@ -38,6 +39,43 @@ function makeSink(): LogSink & { received: LogEvent[] } {
 function settle(): Promise<void> {
     return new Promise(r => setTimeout(r, 0));
 }
+
+describe('LoggerPipeline execution context', () => {
+    it('captures manually pushed events before batching and does not serialize context', async () => {
+        const storage = new AsyncLocalStorage<string>();
+        const sink = makeSink();
+        const filtered: (string | undefined)[] = [];
+        const pipeline = new LoggerPipeline({
+            minimumLevel: LogLevel.Information,
+            sinks: [sink],
+            enrichers: [
+                event => ({
+                    ...event,
+                    properties: {
+                        ...event.properties,
+                        Origin: storage.getStore()
+                    }
+                })
+            ],
+            filters: [
+                () => {
+                    filtered.push(storage.getStore());
+                    return true;
+                }
+            ]
+        });
+        storage.run('A', () => pipeline.push(makeEvent()));
+        storage.run('B', () => pipeline.push(makeEvent()));
+        await storage.run('drain', () => pipeline.flush());
+        expect(sink.received.map(event => event.properties.Origin)).toEqual([
+            'A',
+            'B'
+        ]);
+        expect(filtered).toEqual(['A', 'B']);
+        expect(JSON.stringify(sink.received)).not.toContain('runInContext');
+        await pipeline.dispose();
+    });
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // isEnabled

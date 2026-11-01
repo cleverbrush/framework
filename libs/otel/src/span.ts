@@ -2,9 +2,12 @@ import {
     type Span,
     type SpanAttributes,
     SpanKind,
-    SpanStatusCode,
     trace
 } from '@opentelemetry/api';
+import {
+    type ExceptionPolicy,
+    recordSpanException
+} from './exceptionPolicy.js';
 
 const DEFAULT_TRACER_NAME = '@cleverbrush/otel';
 
@@ -12,6 +15,8 @@ const DEFAULT_TRACER_NAME = '@cleverbrush/otel';
  * Options shared by both calling conventions of {@link withSpan}.
  */
 export interface WithSpanOptions {
+    /** Automatic exception details. @default 'omit' */
+    exceptionPolicy?: ExceptionPolicy;
     /**
      * OTel span kind.
      * @default SpanKind.INTERNAL
@@ -59,7 +64,7 @@ export interface SpanHandle {
     readonly span: Span;
 
     /**
-     * Records an exception and marks the span as errored.
+     * Marks the span as errored; details follow the configured exception policy.
      *
      * Idempotent — safe to call in a `catch` block even if the same
      * error might be reported elsewhere.
@@ -76,8 +81,8 @@ export interface SpanHandle {
  * The span is activated as the current context span via
  * `startActiveSpan`, so any child spans created inside `fn` (e.g. DB
  * queries from `instrumentKnex`) will be correctly nested under it.
- * Error handling is automatic — exceptions are recorded and the span is
- * marked `ERROR` before re-throwing.
+ * Error handling is automatic: the span is marked ERROR before rethrowing the
+ * original error. Exception details follow the configured policy (default omit).
  *
  * @example
  * ```ts
@@ -142,8 +147,7 @@ export function withSpan<T>(
             try {
                 result = fn(span);
             } catch (err) {
-                span.recordException(err as Error);
-                span.setStatus({ code: SpanStatusCode.ERROR });
+                recordSpanException(span, err, opts?.exceptionPolicy);
                 span.end();
                 throw err;
             }
@@ -154,8 +158,7 @@ export function withSpan<T>(
                         return v;
                     },
                     err => {
-                        span.recordException(err);
-                        span.setStatus({ code: SpanStatusCode.ERROR });
+                        recordSpanException(span, err, opts?.exceptionPolicy);
                         span.end();
                         throw err;
                     }
@@ -176,8 +179,7 @@ export function withSpan<T>(
         fail(err: unknown): void {
             if (failed) return;
             failed = true;
-            span.recordException(err as Error);
-            span.setStatus({ code: SpanStatusCode.ERROR });
+            recordSpanException(span, err, opts?.exceptionPolicy);
         },
         [Symbol.asyncDispose](): Promise<void> {
             span.end();

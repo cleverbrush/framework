@@ -1,3 +1,4 @@
+import type { ResponseCompletion } from '@cleverbrush/server';
 import type { Logger } from '../Logger.js';
 import { LogLevel, type LogLevelName, parseLogLevel } from '../LogLevel.js';
 
@@ -5,7 +6,7 @@ import { LogLevel, type LogLevelName, parseLogLevel } from '../LogLevel.js';
  * Request logging middleware configuration.
  */
 export interface RequestLoggingOptions {
-    /** Customize log level based on status code and elapsed time. */
+    /** Customize level; status is 0 if no response headers were sent. */
     getLevel?: (statusCode: number, elapsedMs: number) => LogLevelName;
     /** Paths to exclude from request logging. Accepts plain strings or objects with a `path` property (e.g. endpoint builders). */
     excludePaths?: (string | { readonly path: string })[];
@@ -22,9 +23,9 @@ export interface RequestLoggingOptions {
 /**
  * Creates request logging middleware for `@cleverbrush/server`.
  *
- * Logs HTTP request completion with method, path, status code, and
- * elapsed time. Uses the logger from the request context or falls
- * back to the provided logger.
+ * Logs one final HTTP outcome, status and full elapsed time, including streams
+ * and error serialization. Register with useRequest() to include auth/CORS
+ * rejections. Contexts without completion hooks use middleware-scoped timing.
  *
  * @param logger - the logger to use for request logging
  * @param options - request logging configuration
@@ -32,7 +33,7 @@ export interface RequestLoggingOptions {
  *
  * @example
  * ```ts
- * server.use(requestLoggingMiddleware(logger, {
+ * server.useRequest(requestLoggingMiddleware(logger, {
  *     excludePaths: ['/health', myEndpoint],
  *     getLevel: (status) => status >= 500 ? 'error' : 'information',
  * }));
@@ -59,7 +60,7 @@ export function requestLoggingMiddleware(
             return;
         }
 
-        const start = Date.now();
+        const start = performance.now();
         const method = context.method ?? 'GET';
 
         if (logRequestStart) {
@@ -69,29 +70,24 @@ export function requestLoggingMiddleware(
             });
         }
 
-        let statusCode = 200;
-        try {
-            await next();
-            statusCode =
-                context.statusCode ?? context.response?.statusCode ?? 200;
-        } catch (err) {
-            statusCode =
-                context.statusCode ?? context.response?.statusCode ?? 500;
-            throw err;
-        } finally {
-            const elapsed = Date.now() - start;
+        const logCompletion = (completion: ResponseCompletion) => {
+            const statusCode = completion.statusCode;
+            const elapsed = completion.elapsedMs;
             const levelName = getLevel
-                ? getLevel(statusCode, elapsed)
-                : statusCode >= 500
+                ? getLevel(statusCode ?? 0, elapsed)
+                : completion.outcome === 'failure' ||
+                    completion.outcome === 'timeout' ||
+                    completion.outcome === 'interrupted'
                   ? 'error'
-                  : statusCode >= 400
+                  : completion.outcome === 'rejected'
                     ? 'warning'
                     : 'information';
 
             const properties: Record<string, unknown> = {
                 Method: method,
                 Path: pathname,
-                StatusCode: statusCode,
+                ...(statusCode === undefined ? {} : { StatusCode: statusCode }),
+                Outcome: completion.outcome,
                 Elapsed: elapsed
             };
 
@@ -130,6 +126,34 @@ export function requestLoggingMiddleware(
                     properties
                 );
             }
+        };
+        if (typeof context.onResponseCompleted === 'function') {
+            context.onResponseCompleted(logCompletion);
+            await next();
+            return;
+        }
+
+        let failed = false;
+        try {
+            await next();
+        } catch (error) {
+            failed = true;
+            throw error;
+        } finally {
+            const statusCode =
+                context.statusCode ??
+                context.response?.statusCode ??
+                (failed ? 500 : 200);
+            logCompletion({
+                statusCode,
+                elapsedMs: performance.now() - start,
+                outcome:
+                    failed || statusCode >= 500
+                        ? 'failure'
+                        : statusCode >= 400
+                          ? 'rejected'
+                          : 'success'
+            });
         }
     };
 }
