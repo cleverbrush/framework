@@ -4,7 +4,7 @@
         "node": ">=24"
     },
     "private": true,
-    "version": "4.2.0",
+    "version": "5.2.0",
     "description": "Schema-first TypeScript libraries for application development",
     "packageManager": "npm@11.12.1",
     "scripts": {
