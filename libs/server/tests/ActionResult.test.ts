@@ -13,6 +13,7 @@ import {
     StreamResult
 } from '../src/ActionResult.js';
 import type { ContentNegotiator } from '../src/ContentNegotiator.js';
+import { VirtualServerResponse } from '../src/VirtualHttp.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -191,55 +192,46 @@ describe('ContentResult', () => {
 // ---------------------------------------------------------------------------
 
 describe('StreamResult', () => {
-    it('pipes stream to response', async () => {
-        const { req, res, written } = createReqRes();
-
-        // Make res writable for pipe
-        const chunks: Buffer[] = [];
-        (res as any).write = (chunk: any) => {
-            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-            return true;
-        };
-        (res as any).end = (chunk?: any) => {
-            if (chunk)
-                chunks.push(
-                    Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-                );
-            written.body = Buffer.concat(chunks);
-            return res;
-        };
-
-        const readable = Readable.from(['hello', ' ', 'stream']);
-        const result = new StreamResult(readable, 'text/plain');
-        await result.executeAsync(req, res, mockNegotiator());
-        expect(written.statusCode).toBe(200);
-        expect(written.headers['content-type']).toBe('text/plain');
-        expect(written.body.toString()).toBe('hello stream');
-    });
-
-    it('sets content-disposition when fileName is provided', async () => {
-        const { req, res, written } = createReqRes();
-        (res as any).write = () => true;
-        const readable = Readable.from(['data']);
+    it('pipes through response finish and captures the whole body', async () => {
+        const { req } = createReqRes();
+        const res = new VirtualServerResponse();
         const result = new StreamResult(
-            readable,
-            'application/pdf',
-            'report.pdf'
+            Readable.from(['hello', ' ', 'stream']),
+            'text/plain'
         );
-        await result.executeAsync(req, res, mockNegotiator());
-        expect(written.headers['content-disposition']).toBe(
-            'attachment; filename="report.pdf"'
+        await result.executeAsync(
+            req,
+            res as unknown as ServerResponse,
+            mockNegotiator()
         );
+        expect(res.writableFinished).toBe(true);
+        expect(res.toResult()).toMatchObject({
+            status: 200,
+            headers: { 'content-type': 'text/plain' },
+            body: 'hello stream'
+        });
     });
 
-    it('omits content-disposition when no fileName', async () => {
-        const { req, res, written } = createReqRes();
-        (res as any).write = () => true;
-        const readable = Readable.from(['x']);
-        const result = new StreamResult(readable, 'text/plain');
-        await result.executeAsync(req, res, mockNegotiator());
-        expect(written.headers['content-disposition']).toBeUndefined();
-    });
+    it.each([undefined, 'report.pdf'])(
+        'sets optional filename %s',
+        async fileName => {
+            const { req } = createReqRes();
+            const res = new VirtualServerResponse();
+            const result = new StreamResult(
+                Readable.from(['data']),
+                'application/pdf',
+                fileName
+            );
+            await result.executeAsync(
+                req,
+                res as unknown as ServerResponse,
+                mockNegotiator()
+            );
+            expect(res.toResult().headers['content-disposition']).toBe(
+                fileName ? 'attachment; filename="report.pdf"' : undefined
+            );
+        }
+    );
 });
 
 // ---------------------------------------------------------------------------

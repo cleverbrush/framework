@@ -119,8 +119,8 @@ in middleware. Existing `Vary` values are preserved and merged with `Origin`, pl
 the requested method/header fields on preflights. Cached CORS permissions are not
 reused for another origin. Virtual batch subrequests retain their usual auth
 pipeline; CORS applies to the outer HTTP request. WebSocket upgrades are outside
-this policy. Ordinary middleware, including middleware-based tracing, does not run
-for CORS short-circuits.
+this policy. Ordinary `.use()` middleware does not run for CORS short-circuits.
+Register response observers with `.useRequest()` to include these responses.
 
 ## Large APIs and shared error handling
 
@@ -625,6 +625,40 @@ const logger: Middleware = async (ctx, next) => {
 server.use(logger);
 ```
 
+`useRequest(middleware)` wraps HTTP requests before CORS, routing and
+authentication. Use it for tracing, correlation IDs and response observers.
+`use()` remains the matched-request pipeline after authentication. Before
+`next()`, early middleware has no route, scoped services or authenticated
+principal; these are populated as the request reaches the corresponding stages.
+
+```ts
+server.useRequest(async (context, next) => {
+    context.onResponseCompleted(completion => {
+        recordOutcome({
+            route: context.route?.pathTemplate,
+            status: completion.statusCode,
+            elapsedMs: completion.elapsedMs,
+            outcome: completion.outcome
+        });
+    });
+    await next();
+});
+```
+
+`context.route` is a readonly snapshot of the normalized route template,
+`operationId`, and tags after matching. `onResponseCompleted` returns unsubscribe,
+binds callbacks to their registration context, and delivers one immutable result
+on response finish or premature close. Late subscribers receive the stored result
+immediately; callback failures cannot change the response. Status is absent if no
+headers were sent. Completion includes an optional original `error` for trusted
+observers; sanitize it before exporting it.
+
+Outcomes are `success`, `rejected` (4xx), `failure` (5xx or known stream failure),
+`interrupted` (unexplained premature close), `timeout`, or `cancelled`. Use
+`markResponseOutcome('timeout' | 'cancelled')` only for a known cause; a successful
+completed response takes precedence after recovery. A failed stream terminates
+the transport while preserving any status already sent.
+
 ## Dependency Injection
 
 ```ts
@@ -1038,3 +1072,7 @@ abort it. Caller cancellation preserves its reason; disconnect and deadline use
 Timers and listeners are released on success or failure. Cancellation is
 cooperative: the work must observe or forward its signal. This helper neither
 races arbitrary work nor changes HTTP error/status policies.
+
+When the context supports completion observations, propagated deadline/caller
+aborts mark `timeout`/`cancelled`. Ignored aborts and unrelated errors do not.
+Disconnects remain interruptions unless an explicit cause was established.

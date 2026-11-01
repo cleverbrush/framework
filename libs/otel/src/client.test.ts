@@ -189,7 +189,7 @@ describe('clientTracingMiddleware', () => {
         expect(span.attributes['http.response.status_code']).toBe(503);
     });
 
-    it('records thrown fetch errors on the client span', async () => {
+    it('omits thrown fetch details while marking the client span failed', async () => {
         const send = clientTracingMiddleware()(async () => {
             throw new TypeError('fetch failed');
         });
@@ -200,7 +200,32 @@ describe('clientTracingMiddleware', () => {
 
         const span = exporter.getFinishedSpans()[0]!;
         expect(span.status.code).toBe(SpanStatusCode.ERROR);
-        expect(span.events.some(e => e.name === 'exception')).toBe(true);
+        expect(span.events).toHaveLength(0);
+    });
+
+    it('sanitizes thrown values without replacing the fetch failure', async () => {
+        const error = {
+            privateUrl: 'https://private.local',
+            credential: 'secret'
+        };
+        const send = clientTracingMiddleware({
+            exceptionPolicy: () => ({
+                name: 'TransportFailure',
+                message: 'Unavailable'
+            })
+        })(async () => {
+            throw error;
+        });
+        await expect(
+            send('http://service.local/items', { method: 'GET' })
+        ).rejects.toBe(error);
+        const span = exporter.getFinishedSpans()[0]!;
+        expect(span.events[0]?.attributes?.['exception.message']).toBe(
+            'Unavailable'
+        );
+        expect(
+            JSON.stringify({ status: span.status, events: span.events })
+        ).not.toContain('private');
     });
 
     it('preserves logical subrequest trace headers when wrapping batching', async () => {

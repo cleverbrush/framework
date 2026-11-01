@@ -17,6 +17,43 @@ const options = { timeoutMs: 100 };
 afterEach(() => vi.useRealTimers());
 
 describe('withRequestSignal', () => {
+    it('marks only propagated deadline/caller aborts for response observers', async () => {
+        const markResponseOutcome = vi.fn();
+        const context = { ...fixture(), markResponseOutcome };
+        await expect(
+            withRequestSignal(context, untilAbort, { timeoutMs: 1 })
+        ).rejects.toMatchObject({ name: 'TimeoutError' });
+        expect(markResponseOutcome).toHaveBeenCalledExactlyOnceWith('timeout');
+        markResponseOutcome.mockClear();
+        const caller = new AbortController();
+        const work = withRequestSignal(context, untilAbort, {
+            timeoutMs: 1000,
+            signal: caller.signal
+        });
+        caller.abort('private reason');
+        await expect(work).rejects.toBe('private reason');
+        expect(markResponseOutcome).toHaveBeenCalledExactlyOnceWith(
+            'cancelled'
+        );
+    });
+
+    it('does not mark ignored cancellation or unrelated work failures', async () => {
+        const markResponseOutcome = vi.fn();
+        const context = { ...fixture(), markResponseOutcome };
+        const caller = new AbortController();
+        const failure = new Error('unrelated');
+        await expect(
+            withRequestSignal(
+                context,
+                () => {
+                    caller.abort();
+                    throw failure;
+                },
+                { timeoutMs: 1000, signal: caller.signal }
+            )
+        ).rejects.toBe(failure);
+        expect(markResponseOutcome).not.toHaveBeenCalled();
+    });
     it('returns the result and removes lifecycle listeners and timer', async () => {
         vi.useFakeTimers();
         const context = fixture();

@@ -115,19 +115,25 @@ const server = createServer()
         origin: 'https://app.example.com',
         allowedHeaders: ['Content-Type', 'Authorization', 'traceparent', 'tracestate']
     })
-    .use(tracingMiddleware({ excludePaths: ['/health'] }));`)
+    .useRequest(tracingMiddleware({ excludePaths: ['/health'] }));`)
                         }}
                     />
                 </pre>
                 <p>
-                    CORS runs before ordinary middleware; its preflight and
-                    rejection responses do not enter this tracing middleware. A{' '}
-                    <code>SpanKind.SERVER</code> span is opened for requests
-                    reaching the middleware, named from the endpoint metadata (
-                    <code>operationId</code> or <code>METHOD route</code>), and
-                    tagged with HTTP semantic-convention attributes. Inbound W3C{' '}
+                    Register tracing with <code>useRequest()</code> to observe
+                    CORS, authentication and routing rejections. A{' '}
+                    <code>SpanKind.SERVER</code> span is named from public route
+                    metadata (<code>operationId</code> or{' '}
+                    <code>METHOD route</code>), and tagged with HTTP
+                    semantic-convention attributes. Inbound W3C{' '}
                     <code>traceparent</code> headers are extracted
-                    automatically.
+                    automatically. Spans end once on response finish or
+                    premature close, including streaming and error
+                    serialization. Final status is absent if headers were never
+                    sent. Expected 4xx rejections are not server failures; the{' '}
+                    <code>cleverbrush.http.outcome</code> attribute
+                    distinguishes success, rejection, failure, interruption,
+                    timeout and deliberate cancellation.
                 </p>
 
                 <h3>3. Trace typed client calls</h3>
@@ -331,11 +337,45 @@ span?.addEvent('cache.miss', { key: cacheKey });`)
                         <code>sanitizeStatement</code> hook to redact SQL.
                     </li>
                     <li>
+                        Automatic exception details default to{' '}
+                        <code>exceptionPolicy: 'omit'</code> across spans,
+                        HTTP/client/Knex instrumentation and OTel log export.
+                        Reuse a callback returning safe name/message/stack
+                        fields, or deliberately select <code>'raw'</code>.
+                        Application exceptions retain their identity; failing
+                        sanitizers omit telemetry details.
+                    </li>
+                    <li>
                         <code>otelLogSink</code> accepts a{' '}
-                        <code>sanitizeAttribute</code> hook to drop or rewrite
-                        sensitive fields per event.
+                        <code>sanitizeAttribute</code> hook for every property
+                        and automatic attribute, plus <code>sanitizeBody</code>{' '}
+                        for final rendered text. Templates use redacted
+                        properties; literal text can be handled by the final
+                        body sanitizer.
                     </li>
                 </ul>
+                <p>
+                    Log events capture execution context before queuing. OTel
+                    export uses that context explicitly through batching and
+                    retries, without trusting trace IDs supplied as properties.
+                    Use matching Framework 5.2+ log/server packages for these
+                    guarantees.
+                </p>
+                <h3>Optional instrumentation diagnostics</h3>
+                <p>
+                    Both instrumentation helpers accept{' '}
+                    <code>resolveFrom: import.meta.url</code> for workspace
+                    peers,
+                    <code>onDiagnostic</code> for safe failure information, and{' '}
+                    <code>strict: true</code> for startup validation. Default
+                    failures warn and continue without the unavailable peer.
+                    Supported optional peers are HTTP <code>^0.222.0</code>,
+                    undici <code>^0.25.0</code>, and runtime Node{' '}
+                    <code>^0.28.0</code>, tested with SDK 2.11.x / Node SDK
+                    0.222.x. Runtime series carry the SDK resource attributes;
+                    an exporter alone does not prove runtime collection is
+                    enabled.
+                </p>
 
                 {/* ── Demo ─────────────────────────────────────────── */}
                 <h2>🎯 See it in action</h2>

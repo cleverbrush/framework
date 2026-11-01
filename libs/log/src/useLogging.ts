@@ -19,7 +19,7 @@ export interface UseLoggingOptions extends RequestLoggingOptions {
 
 /**
  * Convenience function that returns correlation ID middleware and
- * request logging middleware, ready to spread into `ServerBuilder.use()`.
+ * request logging middleware, ready to register with `useRequest()`.
  *
  * @param logger - the root logger instance
  * @param options - request logging configuration
@@ -27,11 +27,10 @@ export interface UseLoggingOptions extends RequestLoggingOptions {
  *
  * @example
  * ```ts
- * const server = new ServerBuilder()
- *     .use(...useLogging(logger, {
- *         excludePaths: ['/health'],
- *     }))
- *     .build();
+ * const server = new ServerBuilder();
+ * for (const middleware of useLogging(logger, { excludePaths: ['/health'] })) {
+ *     server.useRequest(middleware);
+ * }
  * ```
  */
 export function useLogging(

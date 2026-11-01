@@ -158,7 +158,7 @@ function buildExporterUrl(
  *     serviceVersion: '1.0.0',
  *     environment: process.env.NODE_ENV,
  *     otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
- *     instrumentations: [...outboundHttpInstrumentations(), runtimeMetrics()],
+ *     instrumentations: [...outboundHttpInstrumentations(), ...runtimeMetrics()],
  * });
  *
  * process.on('SIGTERM', () => otel.shutdown());
@@ -252,9 +252,9 @@ export function setupOtel(config: OtelConfig): OtelHandle {
         sdk,
         shutdown(): Promise<void> {
             if (!shuttingDown) {
-                shuttingDown = sdk.shutdown().catch(err => {
+                shuttingDown = sdk.shutdown().catch(() => {
                     // Best-effort shutdown — log but don't throw
-                    console.error('[otel] shutdown error:', err);
+                    console.error('[otel] shutdown failed');
                 });
             }
             return shuttingDown;

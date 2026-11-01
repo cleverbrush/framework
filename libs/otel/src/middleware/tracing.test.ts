@@ -104,13 +104,11 @@ describe('tracingMiddleware', () => {
     it('uses operationId as span name when present', async () => {
         const mw = tracingMiddleware();
         const ctx = makeCtx();
-        ctx.items.set('__endpoint_meta', {
-            method: 'GET',
-            basePath: '',
+        ctx.route = {
             pathTemplate: '/todos/{id}',
             operationId: 'getTodoById',
             tags: ['todos']
-        });
+        };
         await mw(ctx, async () => {});
         const span = exporter.getFinishedSpans()[0]!;
         expect(span.name).toBe('getTodoById');
@@ -124,17 +122,14 @@ describe('tracingMiddleware', () => {
     it('falls back to METHOD ROUTE name when no operationId', async () => {
         const mw = tracingMiddleware();
         const ctx = makeCtx({ method: 'POST' });
-        ctx.items.set('__endpoint_meta', {
-            basePath: '/api',
-            pathTemplate: '/things'
-        });
+        ctx.route = { pathTemplate: '/api/things', tags: [] };
         await mw(ctx, async () => {});
         const span = exporter.getFinishedSpans()[0]!;
         expect(span.name).toBe('POST /api/things');
     });
 
     it('records exception and ERROR status on throw', async () => {
-        const mw = tracingMiddleware();
+        const mw = tracingMiddleware({ exceptionPolicy: 'raw' });
         const ctx = makeCtx();
         await expect(
             mw(ctx, async () => {
@@ -144,7 +139,7 @@ describe('tracingMiddleware', () => {
         ).rejects.toThrow('boom');
         const span = exporter.getFinishedSpans()[0]!;
         expect(span.status.code).toBe(2); // SpanStatusCode.ERROR
-        expect(span.status.message).toBe('boom');
+        expect(span.status.message).toBeUndefined();
         expect(span.events.some(e => e.name === 'exception')).toBe(true);
         expect(span.attributes['http.response.status_code']).toBe(500);
     });

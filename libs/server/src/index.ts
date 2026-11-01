@@ -104,8 +104,14 @@ export {
 export {
     DEFAULT_MAX_BODY_SIZE,
     IRequestContext,
-    RequestContext
+    RequestContext,
+    type RequestRoute
 } from './RequestContext.js';
+export type {
+    ResponseCompletion,
+    ResponseCompletionListener,
+    ResponseOutcome
+} from './ResponseLifecycle.js';
 export { route } from './route.js';
 export {
     type AuthenticationConfig,
