@@ -1,5 +1,11 @@
 # @cleverbrush/env
 
+## 5.2.0
+
+### Patch Changes
+
+- @cleverbrush/deep@5.2.0
+
 ## 5.1.0
 
 ### Patch Changes
