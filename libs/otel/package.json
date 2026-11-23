@@ -71,7 +71,7 @@
         "@cleverbrush/log": "^5.0.0",
         "@cleverbrush/server": "^5.0.0",
         "@opentelemetry/instrumentation-http": "^0.222.0",
-        "@opentelemetry/instrumentation-runtime-node": "^0.28.0",
+        "@opentelemetry/instrumentation-runtime-node": "^0.38.0",
         "@opentelemetry/instrumentation-undici": "^0.25.0",
         "knex": "^3.0.0"
     },
@@ -103,7 +103,7 @@
         "@cleverbrush/log": "*",
         "@cleverbrush/server": "*",
         "@opentelemetry/instrumentation-http": "^0.222.0",
-        "@opentelemetry/instrumentation-runtime-node": "^0.28.0",
+        "@opentelemetry/instrumentation-runtime-node": "^0.38.0",
         "@opentelemetry/instrumentation-undici": "^0.25.0",
         "@types/node": "^25.4.0",
         "knex": "^3.1.0"
